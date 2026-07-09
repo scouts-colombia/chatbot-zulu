@@ -1,5 +1,7 @@
 # Especificación de Software: Chat con Documentos para Scouts
 
+> **ARCHIVADO — historia.** Primer borrador. Superado por la v0.2 (SRS) y `docs/pilot-scope-v0.3.1.md` (alcance). No construir contra este documento.
+
 Versión 0.1 (borrador para validación)
 Alcance de esta iteración: Chat con documentos + Preguntas guiadas con opciones.
 
