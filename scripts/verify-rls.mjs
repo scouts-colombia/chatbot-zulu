@@ -104,6 +104,27 @@ const EMAIL_A = `rls-test-a-${RUN_ID}@example.com`;
 const EMAIL_B = `rls-test-b-${RUN_ID}@example.com`;
 const cleanupErrors = [];
 let idA, idB;
+let seededAuditId, seededEventId;
+
+// REST con la secret key (service role): siembra y limpieza de datos de prueba.
+async function svcRest(method, path, body) {
+  const res = await fetch(`${URL_BASE}/rest/v1/${path}`, {
+    method,
+    headers: {
+      apikey: SECRET,
+      "Content-Type": "application/json",
+      Prefer: "return=representation",
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  let json = null;
+  try {
+    json = await res.json();
+  } catch {
+    /* respuestas vacías */
+  }
+  return { status: res.status, json };
+}
 
 try {
   console.log("Creando usuarios de prueba...");
@@ -250,6 +271,16 @@ try {
     `status=${unblock.status}`
   );
 
+  // Ni su created_at (dato de auditoría; privilegios de columna, 0005).
+  const backdateProfile = await asA("PATCH", `profiles?id=eq.${idA}`, {
+    created_at: "2020-01-01T00:00:00Z",
+  });
+  check(
+    "A NO puede cambiar su created_at",
+    backdateProfile.status >= 400,
+    `status=${backdateProfile.status}`
+  );
+
   // Pero sí puede cambiar su nombre.
   const rename = await asA("PATCH", `profiles?id=eq.${idA}`, {
     nombre: "Scout A",
@@ -304,18 +335,38 @@ try {
     `status=${msgArchived.status}`
   );
 
-  // Tablas de solo-servidor invisibles para usuarios.
+  // Tablas de solo-servidor invisibles para usuarios. Se siembra una fila
+  // real con la secret key: un [] sobre tabla vacía no probaría nada.
+  const seedAudit = await svcRest("POST", "admin_audit_events", {
+    admin_user_id: idA,
+    action: "verify_rls_seed",
+    target_type: "test",
+    reason: "verificación RLS",
+  });
+  seededAuditId = seedAudit.json?.[0]?.id;
+  const seedEvent = await svcRest("POST", "model_request_events", {
+    user_id: idA,
+    model_id: "test",
+    status: "ok",
+  });
+  seededEventId = seedEvent.json?.[0]?.id;
+  check(
+    "siembra de filas de servidor (secret key)",
+    Boolean(seededAuditId && seededEventId),
+    `audit=${seedAudit.status} event=${seedEvent.status}`
+  );
+
   const audit = await asA("GET", "admin_audit_events?select=id");
   check(
-    "A no lee admin_audit_events",
+    "A no lee admin_audit_events (con fila sembrada)",
     audit.status !== 200 || audit.json?.length === 0,
-    `status=${audit.status}`
+    `status=${audit.status} filas=${audit.json?.length ?? "n/a"}`
   );
   const events = await asA("GET", "model_request_events?select=id");
   check(
-    "A no lee model_request_events",
+    "A no lee model_request_events (con fila sembrada)",
     events.status !== 200 || events.json?.length === 0,
-    `status=${events.status}`
+    `status=${events.status} filas=${events.json?.length ?? "n/a"}`
   );
 
   // knowledge_documents: lectura permitida, escritura no.
@@ -332,7 +383,27 @@ try {
     `status=${docsWrite.status}`
   );
 } finally {
-  console.log("Eliminando usuarios de prueba...");
+  console.log("Eliminando datos y usuarios de prueba...");
+  // Las filas sembradas van primero: admin_audit_events no tiene cascade
+  // y bloquearía la eliminación del usuario.
+  if (seededAuditId) {
+    const del = await svcRest(
+      "DELETE",
+      `admin_audit_events?id=eq.${seededAuditId}`
+    );
+    if (del.status >= 300) {
+      cleanupErrors.push(`audit seed: HTTP ${del.status}`);
+    }
+  }
+  if (seededEventId) {
+    const del = await svcRest(
+      "DELETE",
+      `model_request_events?id=eq.${seededEventId}`
+    );
+    if (del.status >= 300) {
+      cleanupErrors.push(`event seed: HTTP ${del.status}`);
+    }
+  }
   for (const id of [idA, idB]) {
     if (!id) {
       continue;
