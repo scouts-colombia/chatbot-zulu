@@ -61,7 +61,7 @@ Estas reglas vienen de decisiones tomadas a propósito. No reintroducir lo que s
 ### Privacidad, admin y RLS
 - NO guardar raw provider response por defecto.
 - Consentimiento append-only en `consent_acceptance_events`. `profiles` solo cachea la última versión aceptada, y esa caché la escribe el backend con la service role.
-- RLS real: el camino del chat (lectura/escritura de las conversaciones y mensajes del propio Scout) usa un cliente Supabase con el JWT del usuario. La service role SALTA la RLS; resérvala para auditoría admin, caché de consentimiento y el script de indexación. Si el chat usa service role, la RLS no protege.
+- RLS real: la lectura de lo propio y la inserción de mensajes del usuario (`sender = 'usuario'`) usan un cliente Supabase con el JWT del usuario. La secret key (service role) SALTA la RLS; resérvala para lo que el cliente no debe poder forjar: mensajes del asistente/sistema, `citations`, preguntas guiadas, `model_request_events`, auditoría admin, caché de consentimiento e indexación. Si el camino del usuario usa la secret key, la RLS no protege.
 - El acceso del admin a conversaciones ajenas NO es por RLS. Va por endpoint de servidor con motivo obligatorio + registro en `admin_audit_events`. NUNCA dar al admin lectura amplia por RLS.
 - `role` y `account_status` no se cambian desde el cliente; un trigger los protege.
 - Secretos (Gemini, Supabase service role) solo en servidor. Nunca exponer la service role al cliente.
