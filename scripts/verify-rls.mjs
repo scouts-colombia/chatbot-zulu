@@ -8,6 +8,7 @@
  * Uso: node scripts/verify-rls.mjs
  */
 
+import { randomBytes, randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 
 const env = Object.fromEntries(
@@ -36,14 +37,11 @@ function check(name, pass, detail = "") {
   );
 }
 
+// Las llaves sb_secret_ no son JWT: van solo en el header apikey, sin Bearer.
 async function adminCreateUser(email, password) {
   const res = await fetch(`${URL_BASE}/auth/v1/admin/users`, {
     method: "POST",
-    headers: {
-      apikey: SECRET,
-      Authorization: `Bearer ${SECRET}`,
-      "Content-Type": "application/json",
-    },
+    headers: { apikey: SECRET, "Content-Type": "application/json" },
     body: JSON.stringify({ email, password, email_confirm: true }),
   });
   const json = await res.json();
@@ -54,10 +52,13 @@ async function adminCreateUser(email, password) {
 }
 
 async function adminDeleteUser(id) {
-  await fetch(`${URL_BASE}/auth/v1/admin/users/${id}`, {
+  const res = await fetch(`${URL_BASE}/auth/v1/admin/users/${id}`, {
     method: "DELETE",
-    headers: { apikey: SECRET, Authorization: `Bearer ${SECRET}` },
+    headers: { apikey: SECRET },
   });
+  if (!res.ok) {
+    throw new Error(`No se pudo eliminar el usuario ${id}: HTTP ${res.status}`);
+  }
 }
 
 async function signIn(email, password) {
@@ -95,9 +96,13 @@ function rest(token) {
   };
 }
 
-const PASSWORD = "Rls-Test-2026!!";
-const EMAIL_A = "rls-test-a@example.com";
-const EMAIL_B = "rls-test-b@example.com";
+// Credenciales aleatorias por corrida: si la limpieza falla, no queda una
+// cuenta con contraseña conocida (menos aún promovida a admin).
+const RUN_ID = randomUUID().slice(0, 8);
+const PASSWORD = `T-${randomBytes(18).toString("base64url")}`;
+const EMAIL_A = `rls-test-a-${RUN_ID}@example.com`;
+const EMAIL_B = `rls-test-b-${RUN_ID}@example.com`;
+const cleanupErrors = [];
 let idA, idB;
 
 try {
@@ -184,6 +189,19 @@ try {
     `status=${consentForged.status}`
   );
 
+  // El cliente no puede fijar created_at (integridad de cuota D-11 y auditoría).
+  const msgBackdated = await asA("POST", "messages", {
+    conversation_id: convId,
+    sender: "usuario",
+    content: "ayer",
+    created_at: "2020-01-01T00:00:00Z",
+  });
+  check(
+    "A NO inserta mensaje con created_at propio",
+    msgBackdated.status === 403 || msgBackdated.status === 401,
+    `status=${msgBackdated.status}`
+  );
+
   // B no ve nada de A.
   const convsB = await asB("GET", "conversations?select=id");
   check(
@@ -244,21 +262,33 @@ try {
 
   // El servidor (secret key → service_role) SÍ puede cambiar el role:
   // valida la rama permitida del trigger protect_profile_fields.
-  const adminChange = await fetch(`${URL_BASE}/rest/v1/profiles?id=eq.${idA}`, {
-    method: "PATCH",
-    headers: {
-      apikey: SECRET,
-      Authorization: `Bearer ${SECRET}`,
-      "Content-Type": "application/json",
-      Prefer: "return=representation",
-    },
-    body: JSON.stringify({ role: "admin" }),
-  });
+  const svcPatchRole = (role) =>
+    fetch(`${URL_BASE}/rest/v1/profiles?id=eq.${idA}`, {
+      method: "PATCH",
+      headers: {
+        apikey: SECRET,
+        "Content-Type": "application/json",
+        Prefer: "return=representation",
+      },
+      body: JSON.stringify({ role }),
+    });
+
+  const adminChange = await svcPatchRole("admin");
   const adminJson = await adminChange.json();
   check(
     "servidor (secret key) SÍ cambia role",
     adminChange.status === 200 && adminJson?.[0]?.role === "admin",
     `status=${adminChange.status} role=${adminJson?.[0]?.role}`
+  );
+
+  // Degradación inmediata: la cuenta de prueba no permanece como admin
+  // ni un instante más del necesario.
+  const demote = await svcPatchRole("scout");
+  const demoteJson = await demote.json();
+  check(
+    "degradación inmediata a scout",
+    demote.status === 200 && demoteJson?.[0]?.role === "scout",
+    `status=${demote.status} role=${demoteJson?.[0]?.role}`
   );
 
   // Conversación archivada: no acepta mensajes nuevos.
@@ -303,16 +333,30 @@ try {
   );
 } finally {
   console.log("Eliminando usuarios de prueba...");
-  if (idA) {
-    await adminDeleteUser(idA);
+  for (const id of [idA, idB]) {
+    if (!id) {
+      continue;
+    }
+    try {
+      await adminDeleteUser(id);
+    } catch (e) {
+      cleanupErrors.push(String(e));
+    }
   }
-  if (idB) {
-    await adminDeleteUser(idB);
+}
+
+if (cleanupErrors.length > 0) {
+  console.error(
+    `\nLIMPIEZA INCOMPLETA — eliminar manualmente en el dashboard (${EMAIL_A}, ${EMAIL_B}):`
+  );
+  for (const err of cleanupErrors) {
+    console.error(`  - ${err}`);
   }
 }
 
 const failed = results.filter((r) => !r).length;
+const ok = failed === 0 && cleanupErrors.length === 0;
 console.log(
-  `\n=== RLS: ${failed === 0 ? "VERDE" : "ROJO"} (${results.length - failed}/${results.length}) ===`
+  `\n=== RLS: ${ok ? "VERDE" : "ROJO"} (${results.length - failed}/${results.length} checks, limpieza ${cleanupErrors.length === 0 ? "ok" : "FALLIDA"}) ===`
 );
-process.exit(failed === 0 ? 0 : 1);
+process.exit(ok ? 0 : 1);
