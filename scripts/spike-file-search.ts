@@ -10,7 +10,7 @@
  * Uso: pnpm exec tsx scripts/spike-file-search.ts
  */
 
-import { readFileSync, writeFileSync } from "node:fs";
+import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { GoogleGenAI } from "@google/genai";
 import { config as loadEnv } from "dotenv";
@@ -50,9 +50,17 @@ const responseJsonSchema = {
     preguntaGuiada: {
       type: "object",
       properties: {
-        tipo: { type: "string", enum: ["aclaracion", "modo_guiado", "sugerencia"] },
+        tipo: {
+          type: "string",
+          enum: ["aclaracion", "modo_guiado", "sugerencia"],
+        },
         texto: { type: "string" },
-        opciones: { type: "array", items: { type: "string" }, minItems: 2, maxItems: 4 },
+        opciones: {
+          type: "array",
+          items: { type: "string" },
+          minItems: 2,
+          maxItems: 4,
+        },
         permiteInputLibre: { type: "boolean" },
       },
       required: ["tipo", "texto", "opciones", "permiteInputLibre"],
@@ -92,13 +100,16 @@ No inventes citas, páginas, reglas, nombres de documentos ni políticas.
 Cuando la pregunta sea ambigua, usa estado "necesita_aclaracion" y ofrece una pregunta guiada.
 Responde siempre en español.`;
 
-const QUESTION = "¿Qué es la Red de Jóvenes y quiénes pueden participar en ella?";
+const QUESTION =
+  "¿Qué es la Red de Jóvenes y quiénes pueden participar en ella?";
 
 type Check = { name: string; pass: boolean; detail?: string };
 const checks: Check[] = [];
 function check(name: string, pass: boolean, detail?: string) {
   checks.push({ name, pass, detail });
-  console.log(`${pass ? "PASS" : "FAIL"}  ${name}${detail ? ` — ${detail}` : ""}`);
+  console.log(
+    `${pass ? "PASS" : "FAIL"}  ${name}${detail ? ` — ${detail}` : ""}`
+  );
 }
 
 async function getOrCreateStore() {
@@ -112,7 +123,9 @@ async function getOrCreateStore() {
   const store = await ai.fileSearchStores.create({
     config: { displayName: STORE_DISPLAY_NAME },
   });
-  if (!store.name) throw new Error("El store creado no devolvió name");
+  if (!store.name) {
+    throw new Error("El store creado no devolvió name");
+  }
   console.log(`Store creado: ${store.name}`);
   return store.name;
 }
@@ -125,18 +138,25 @@ async function uploadPdf(storeName: string) {
     config: {
       displayName: "Reglamento Red de Jóvenes",
       customMetadata: [
-        { key: "knowledge_document_id", stringValue: TEST_KNOWLEDGE_DOCUMENT_ID },
+        {
+          key: "knowledge_document_id",
+          stringValue: TEST_KNOWLEDGE_DOCUMENT_ID,
+        },
         { key: "document_version", stringValue: TEST_DOCUMENT_VERSION },
       ],
     },
   });
   const start = Date.now();
   while (!operation.done) {
-    if (Date.now() - start > 180_000) throw new Error("Timeout indexando (180s)");
+    if (Date.now() - start > 180_000) {
+      throw new Error("Timeout indexando (180s)");
+    }
     await new Promise((r) => setTimeout(r, 4000));
     operation = await ai.operations.get({ operation });
   }
-  console.log(`Indexación completa en ${Math.round((Date.now() - start) / 1000)}s`);
+  console.log(
+    `Indexación completa en ${Math.round((Date.now() - start) / 1000)}s`
+  );
 }
 
 async function main() {
@@ -167,7 +187,10 @@ async function main() {
 
   // ===== Spike #1 =====
   const text = response.text;
-  check("S1: response.text presente", typeof text === "string" && text.length > 0);
+  check(
+    "S1: response.text presente",
+    typeof text === "string" && text.length > 0
+  );
 
   let parsed: unknown = null;
   try {
@@ -257,6 +280,8 @@ async function main() {
 
 main().catch((e) => {
   console.error("Error fatal del spike:", e?.message ?? e);
-  if (e?.status) console.error("HTTP status:", e.status);
+  if (e?.status) {
+    console.error("HTTP status:", e.status);
+  }
   process.exit(2);
 });
