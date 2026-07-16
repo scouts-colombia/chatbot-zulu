@@ -75,6 +75,12 @@ Capacidad documentada para Gemini 3 / `gemini-3.5-flash`; lo que se valida es qu
 
 ## Fase 3 — Chat usable (requiere spikes verdes + Fase 2)
 
+### Design system (traído de `scouts-colombia/ruta`)
+- [ ] Adoptar el design system de `ruta`: tokens de `app/globals.css` (marca Scouts: `scouts-purple`, `scouts-yellow`, `scouts-blue`, `scouts-red`, `scouts-orange`; colores por sección: Manada, Tropa, Caminantes, ...; escala de radius; variables de sidebar/chart), tipografías (`font-sans`/`font-heading`/`font-jollygood`) y `theme-toggle`.
+- [ ] Traer de `ruta` los `components/ui` que el chat necesite y no estén aquí (`card`, `avatar`, `empty`, `field`, `combobox`, ...), adaptando imports. Omitir lo que no aplique (p. ej. `flag-icons`).
+- [ ] Aplicar el design system a lo ya construido: login/registro y home.
+
+### Chat
 - [ ] Conversaciones: crear, listar, abrir, archivar. [P-RF-05, P-RF-06]
 - [ ] Endpoint `POST /chat` que verifica usuario, rol, estado, consentimiento y cuota antes de llamar al modelo. [P-RF-07, P-RF-14]
 - [ ] Guard de cuota diaria usando `daily_chat_turns_by_user` antes de llamar al modelo. [D-11]
