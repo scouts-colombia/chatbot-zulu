@@ -42,8 +42,11 @@ async function ContenidoPrincipal() {
     .eq("id", user.id)
     .single();
 
-  const estado = perfil?.account_status ?? "activo";
-  const mensajeEstado = MENSAJES_ESTADO[estado];
+  // Sin perfil se cierra el paso (fail closed): un usuario de auth sin fila
+  // en profiles es un estado anómalo, no una cuenta activa.
+  const mensajeEstado = perfil
+    ? MENSAJES_ESTADO[perfil.account_status]
+    : "No pudimos cargar tu perfil. Cierra sesión e inténtalo de nuevo; si persiste, contacta a la organización.";
 
   return (
     <div className="flex min-h-dvh flex-col">
