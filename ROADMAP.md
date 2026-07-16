@@ -15,9 +15,11 @@ Regla de trabajo: las fases van en orden, pero la Fase 1 (spikes) y la Fase 2 (d
 - Fase 0 cerrada salvo un secreto: Supabase creado (**ChatBot Zulú**, `ddimxdrggrrfcvzwwben`) y conectado por MCP; key de Gemini validada; `.env` ajustados; PDF de prueba en `data/pdfs/`.
 - **Fase 1 cerrada: gate de spikes VERDE (7/7) el 2026-07-15.** Ver `docs/notes/spike-file-search-resultado.md`. La Fase 3 queda desbloqueada en cuanto cierre la Fase 2.
 
-**Siguiente:** Fase 2 — escribir y aplicar `supabase/migrations/0001_schema_rls.sql` (no se recibió: hay que **escribirlo** desde el pilot-scope), podar la plantilla, Supabase Auth.
+- Fase 2 / Esquema y RLS cerrado: migraciones 0001+0002 aplicadas al proyecto, RLS verificada 16/16 (`scripts/verify-rls.mjs`), seed de admin documentado.
 
-**Pendiente de decisión/gestión:** `SUPABASE_SERVICE_ROLE_KEY` en `.env.local`, push de `master` a `origin`, obtención de los 8 PDFs oficiales, bloqueos organizacionales (abajo).
+**Siguiente:** Fase 2 restante — podar la plantilla, Supabase Auth con UI en español, consentimiento.
+
+**Pendiente de decisión/gestión:** obtención de los 8 PDFs oficiales, ejecutar el seed del admin cuando se registre, 16 alertas Dependabot de la plantilla (la poda eliminará varias), bloqueos organizacionales (abajo).
 
 ---
 
@@ -27,7 +29,7 @@ Regla de trabajo: las fases van en orden, pero la Fase 1 (spikes) y la Fase 2 (d
 - [x] Crear API key de Gemini (**Gemini Developer API**, no Vertex). Smoke test 2026-07-15: HTTP 200, `gemini-3.5-flash` disponible y generando. (Billing/créditos: verificar si el tier gratuito limita File Search durante el spike.)
 - [x] Conseguir **1 PDF oficial de prueba**: `data/pdfs/reglamento-red-de-jovenes.pdf` (carpeta `data/` fuera de Git).
 - [x] Configurar `.env.local` y `.env.example` con las variables del piloto (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `GEMINI_API_KEY`, `GEMINI_MODEL`, `MAX_CHAT_TURNS_PER_USER_PER_DAY`); eliminadas las de la plantilla. `.gitignore` incluye `CLAUDE.local.md`.
-- [ ] Completar en `.env.local` el secreto que falta: `SUPABASE_SERVICE_ROLE_KEY` (dashboard → Settings → API keys). `GEMINI_API_KEY` ya está. No se commitean.
+- [x] Secretos completos en `.env.local`: `SUPABASE_SECRET_KEY` (formato moderno `sb_secret_`, preferido sobre la legacy service_role por rotación individual) y `GEMINI_API_KEY`. No se commitean.
 - [x] Validar disponibilidad de `gemini-3.5-flash` en la cuenta/región: confirmado por API el 2026-07-15 (`models.list` + `generateContent`).
 - [x] Conectar el MCP de Supabase en Claude Code para aplicar y revisar migraciones desde la sesión.
 
@@ -51,15 +53,16 @@ Capacidad documentada para Gemini 3 / `gemini-3.5-flash`; lo que se valida es qu
 ## Fase 2 — Fundación: datos, auth y poda (paralelo a Fase 1)
 
 ### Esquema y RLS
-- [ ] **Escribir** `supabase/migrations/0001_schema_rls.sql` desde el pilot-scope: tablas de §8 (`profiles`, `consent_acceptance_events`, `conversations`, `messages`, `citations`, `guided_questions`, `guided_question_options`, `knowledge_documents`, `model_request_events`, `admin_audit_events`, `rag_eval_cases`, `rag_eval_runs`), vistas `daily_chat_turns_by_user` y `daily_model_requests_by_user`, RLS de §16, trigger que crea `profiles` al registrarse un usuario en `auth.users`, y trigger que impide cambiar `role`/`account_status` desde el cliente.
-- [ ] Aplicar la migración en Supabase.
-- [ ] Documentar y ejecutar el **seed del primer admin** (UPDATE manual con service role o SQL en el dashboard; el rol nunca se autoasigna). [P-RNF-05]
-- [ ] Verificar RLS con un cliente Supabase **con el JWT del usuario** (no service role): un Scout no lee conversaciones ajenas y no puede cambiar su `role`.
+- [x] **Escribir** `supabase/migrations/0001_schema_rls.sql` desde el pilot-scope: 12 tablas de §8, vistas `daily_chat_turns_by_user` y `daily_model_requests_by_user` (con `security_invoker`), RLS de §16, trigger que crea `profiles` al registrarse, y trigger que protege `role`/`account_status`/caché de consentimiento.
+- [x] Aplicar las migraciones en Supabase (0001 + 0002 de endurecimiento por advisors: revoke execute de funciones de trigger). Advisors de seguridad limpios salvo 4 INFO intencionales (tablas de solo-servidor sin políticas).
+- [x] Documentar el **seed del primer admin** en `scripts/seed-admin.sql` (SQL Editor/psql; el rol nunca se autoasigna). Ejecutarlo cuando el admin real se registre. [P-RNF-05]
+- [x] Verificar RLS con el JWT del usuario: `scripts/verify-rls.mjs` — **VERDE 16/16** el 2026-07-15 (aislamiento entre Scouts, no auto-escalamiento de rol, mensajes de asistente no forjables, archivadas no aceptan mensajes, tablas de servidor invisibles).
 
 ### Poda de la plantilla
 - [ ] Eliminar NextAuth (`app/(auth)`), artefactos (`artifacts/*` y sus componentes), tools de la plantilla (`getWeather`, `createDocument`, `editDocument`, `updateDocument`, `requestSuggestions`), streams reanudables (Redis/`resumable-stream`, ruta `api/chat/[id]/stream`), votos y sugerencias. Conservar shell de chat, `components/ui`, hooks SWR.
 - [ ] Eliminar Drizzle como dueño de esquema: quitar `drizzle.config.ts`, `lib/db/migrations`, scripts `db:*`; el acceso a datos pasa a supabase-js. Ajustar el script `build` (hoy corre la migración de Drizzle).
-- [ ] Limpiar `package.json` (dependencias muertas tras la poda) y CI (`.github/workflows/playwright.yml` va a romper con la poda: reducir a lint + typecheck hasta reescribir e2e).
+- [ ] Limpiar `package.json` (dependencias muertas tras la poda).
+- [x] CI reducido a lint + typecheck: eliminado `playwright.yml` (probaba NextAuth/stack de la plantilla y fallaba por `MissingSecret`); typecheck añadido a `lint.yml`. Reescribir e2e propios después de la poda (P1 de esta fase).
 
 ### Auth y cuenta
 - [ ] Supabase Auth: registro/login por correo, **UI en español** (la plantilla está en inglés). [P-RF-01..03]

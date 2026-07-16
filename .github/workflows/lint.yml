@@ -1,6 +1,8 @@
 name: Lint
 on:
   push:
+    branches: [master, main]
+  pull_request:
 
 jobs:
   build:
@@ -23,3 +25,5 @@ jobs:
         run: pnpm install
       - name: Run check
         run: pnpm check
+      - name: Typecheck
+        run: pnpm exec tsc --noEmit

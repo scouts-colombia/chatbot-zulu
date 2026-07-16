@@ -1,0 +1,433 @@
+/**
+ * Verificación de RLS (Fase 2) — ROADMAP: "un Scout no lee conversaciones
+ * ajenas y no puede cambiar su role".
+ *
+ * Crea dos usuarios de prueba vía Admin API, ejercita las políticas con el
+ * JWT de cada uno contra PostgREST, y elimina los usuarios al final.
+ *
+ * Uso: node scripts/verify-rls.mjs
+ */
+
+import { randomBytes, randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
+
+const env = Object.fromEntries(
+  readFileSync(".env.local", "utf8")
+    .split("\n")
+    .filter((l) => l.includes("=") && !l.trim().startsWith("#"))
+    .map((l) => [
+      l.slice(0, l.indexOf("=")).trim(),
+      l.slice(l.indexOf("=") + 1).trim(),
+    ])
+);
+
+const URL_BASE = env.NEXT_PUBLIC_SUPABASE_URL;
+const ANON = env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const SECRET = env.SUPABASE_SECRET_KEY;
+if (!URL_BASE || !ANON || !SECRET) {
+  console.error("Faltan variables de Supabase en .env.local");
+  process.exit(1);
+}
+
+const results = [];
+function check(name, pass, detail = "") {
+  results.push(pass);
+  console.log(
+    `${pass ? "PASS" : "FAIL"}  ${name}${detail ? ` — ${detail}` : ""}`
+  );
+}
+
+// Las llaves sb_secret_ no son JWT: van solo en el header apikey, sin Bearer.
+async function adminCreateUser(email, password) {
+  const res = await fetch(`${URL_BASE}/auth/v1/admin/users`, {
+    method: "POST",
+    headers: { apikey: SECRET, "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password, email_confirm: true }),
+  });
+  const json = await res.json();
+  if (!res.ok) {
+    throw new Error(`admin create ${email}: ${JSON.stringify(json)}`);
+  }
+  return json.id;
+}
+
+async function adminDeleteUser(id) {
+  const res = await fetch(`${URL_BASE}/auth/v1/admin/users/${id}`, {
+    method: "DELETE",
+    headers: { apikey: SECRET },
+  });
+  if (!res.ok) {
+    throw new Error(`No se pudo eliminar el usuario ${id}: HTTP ${res.status}`);
+  }
+}
+
+async function signIn(email, password) {
+  const res = await fetch(`${URL_BASE}/auth/v1/token?grant_type=password`, {
+    method: "POST",
+    headers: { apikey: ANON, "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  const json = await res.json();
+  if (!res.ok) {
+    throw new Error(`signIn ${email}: ${JSON.stringify(json)}`);
+  }
+  return json.access_token;
+}
+
+function rest(token) {
+  return async (method, path, body) => {
+    const res = await fetch(`${URL_BASE}/rest/v1/${path}`, {
+      method,
+      headers: {
+        apikey: ANON,
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        Prefer: "return=representation",
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    let json = null;
+    try {
+      json = await res.json();
+    } catch {
+      /* respuestas vacías */
+    }
+    return { status: res.status, json };
+  };
+}
+
+// Credenciales aleatorias por corrida: si la limpieza falla, no queda una
+// cuenta con contraseña conocida (menos aún promovida a admin).
+const RUN_ID = randomUUID().slice(0, 8);
+const PASSWORD = `T-${randomBytes(18).toString("base64url")}`;
+const EMAIL_A = `rls-test-a-${RUN_ID}@example.com`;
+const EMAIL_B = `rls-test-b-${RUN_ID}@example.com`;
+const cleanupErrors = [];
+let idA, idB;
+let seededAuditId, seededEventId;
+
+// REST con la secret key (service role): siembra y limpieza de datos de prueba.
+async function svcRest(method, path, body) {
+  const res = await fetch(`${URL_BASE}/rest/v1/${path}`, {
+    method,
+    headers: {
+      apikey: SECRET,
+      "Content-Type": "application/json",
+      Prefer: "return=representation",
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  let json = null;
+  try {
+    json = await res.json();
+  } catch {
+    /* respuestas vacías */
+  }
+  return { status: res.status, json };
+}
+
+try {
+  console.log("Creando usuarios de prueba...");
+  idA = await adminCreateUser(EMAIL_A, PASSWORD);
+  idB = await adminCreateUser(EMAIL_B, PASSWORD);
+
+  const tokenA = await signIn(EMAIL_A, PASSWORD);
+  const tokenB = await signIn(EMAIL_B, PASSWORD);
+  const asA = rest(tokenA);
+  const asB = rest(tokenB);
+
+  // El trigger handle_new_user debió crear los profiles.
+  const profA = await asA("GET", "profiles?select=id,role,account_status");
+  check(
+    "trigger crea profile (rol scout, activo)",
+    profA.status === 200 &&
+      profA.json?.length === 1 &&
+      profA.json[0].role === "scout" &&
+      profA.json[0].account_status === "activo",
+    JSON.stringify(profA.json?.[0] ?? profA.json)
+  );
+
+  // A solo ve SU profile (no el de B).
+  check(
+    "A no ve el profile de B",
+    profA.json?.every((p) => p.id === idA)
+  );
+
+  // A crea conversación y mensaje propio.
+  const convA = await asA("POST", "conversations", { user_id: idA });
+  check(
+    "A crea conversación propia",
+    convA.status === 201,
+    `status=${convA.status}`
+  );
+  const convId = convA.json?.[0]?.id;
+
+  const msgA = await asA("POST", "messages", {
+    conversation_id: convId,
+    sender: "usuario",
+    content: "hola",
+  });
+  check(
+    "A inserta mensaje sender=usuario",
+    msgA.status === 201,
+    `status=${msgA.status}`
+  );
+
+  // A NO puede insertar mensajes como asistente (solo el servidor).
+  const msgForged = await asA("POST", "messages", {
+    conversation_id: convId,
+    sender: "asistente",
+    content: "respuesta forjada",
+  });
+  check(
+    "A NO inserta mensaje sender=asistente",
+    msgForged.status === 403 || msgForged.status === 401,
+    `status=${msgForged.status}`
+  );
+
+  // A NO puede adjuntar response_json a sus mensajes (contrato §8.3).
+  const msgWithJson = await asA("POST", "messages", {
+    conversation_id: convId,
+    sender: "usuario",
+    content: "hola",
+    response_json: { estado: "respondido", respuesta: "forjada" },
+  });
+  check(
+    "A NO inserta mensaje con response_json",
+    msgWithJson.status === 403 || msgWithJson.status === 401,
+    `status=${msgWithJson.status}`
+  );
+
+  // El consentimiento no es forjable por el cliente: lo inserta el servidor.
+  const consentForged = await asA("POST", "consent_acceptance_events", {
+    subject_user_id: idA,
+    policy_type: "privacy_policy",
+    policy_version: "v99-falsa",
+  });
+  check(
+    "A NO inserta consent_acceptance_events directo",
+    consentForged.status === 403 || consentForged.status === 401,
+    `status=${consentForged.status}`
+  );
+
+  // El cliente no puede fijar created_at (integridad de cuota D-11 y auditoría).
+  const msgBackdated = await asA("POST", "messages", {
+    conversation_id: convId,
+    sender: "usuario",
+    content: "ayer",
+    created_at: "2020-01-01T00:00:00Z",
+  });
+  check(
+    "A NO inserta mensaje con created_at propio",
+    msgBackdated.status === 403 || msgBackdated.status === 401,
+    `status=${msgBackdated.status}`
+  );
+
+  // B no ve nada de A.
+  const convsB = await asB("GET", "conversations?select=id");
+  check(
+    "B no ve conversaciones de A",
+    convsB.status === 200 && convsB.json?.length === 0
+  );
+
+  const msgsB = await asB(
+    "GET",
+    `messages?select=id&conversation_id=eq.${convId}`
+  );
+  check(
+    "B no ve mensajes de A",
+    msgsB.status === 200 && msgsB.json?.length === 0
+  );
+
+  // B no puede insertar en la conversación de A.
+  const msgBinA = await asB("POST", "messages", {
+    conversation_id: convId,
+    sender: "usuario",
+    content: "intruso",
+  });
+  check(
+    "B NO inserta en conversación de A",
+    msgBinA.status === 403 || msgBinA.status === 401,
+    `status=${msgBinA.status}`
+  );
+
+  // A no puede autoasignarse admin (trigger de campos protegidos).
+  const escalate = await asA("PATCH", `profiles?id=eq.${idA}`, {
+    role: "admin",
+  });
+  check(
+    "A NO puede cambiar su role a admin",
+    escalate.status >= 400,
+    `status=${escalate.status} ${JSON.stringify(escalate.json?.message ?? "")}`
+  );
+
+  // A tampoco puede cambiar su account_status.
+  const unblock = await asA("PATCH", `profiles?id=eq.${idA}`, {
+    account_status: "bloqueado",
+  });
+  check(
+    "A NO puede cambiar su account_status",
+    unblock.status >= 400,
+    `status=${unblock.status}`
+  );
+
+  // Ni su created_at (dato de auditoría; privilegios de columna, 0005).
+  const backdateProfile = await asA("PATCH", `profiles?id=eq.${idA}`, {
+    created_at: "2020-01-01T00:00:00Z",
+  });
+  check(
+    "A NO puede cambiar su created_at",
+    backdateProfile.status >= 400,
+    `status=${backdateProfile.status}`
+  );
+
+  // Pero sí puede cambiar su nombre.
+  const rename = await asA("PATCH", `profiles?id=eq.${idA}`, {
+    nombre: "Scout A",
+  });
+  check(
+    "A SÍ puede cambiar su nombre",
+    rename.status < 300,
+    `status=${rename.status}`
+  );
+
+  // El servidor (secret key → service_role) SÍ puede cambiar el role:
+  // valida la rama permitida del trigger protect_profile_fields.
+  const svcPatchRole = (role) =>
+    fetch(`${URL_BASE}/rest/v1/profiles?id=eq.${idA}`, {
+      method: "PATCH",
+      headers: {
+        apikey: SECRET,
+        "Content-Type": "application/json",
+        Prefer: "return=representation",
+      },
+      body: JSON.stringify({ role }),
+    });
+
+  const adminChange = await svcPatchRole("admin");
+  const adminJson = await adminChange.json();
+  check(
+    "servidor (secret key) SÍ cambia role",
+    adminChange.status === 200 && adminJson?.[0]?.role === "admin",
+    `status=${adminChange.status} role=${adminJson?.[0]?.role}`
+  );
+
+  // Degradación inmediata: la cuenta de prueba no permanece como admin
+  // ni un instante más del necesario.
+  const demote = await svcPatchRole("scout");
+  const demoteJson = await demote.json();
+  check(
+    "degradación inmediata a scout",
+    demote.status === 200 && demoteJson?.[0]?.role === "scout",
+    `status=${demote.status} role=${demoteJson?.[0]?.role}`
+  );
+
+  // Conversación archivada: no acepta mensajes nuevos.
+  await asA("PATCH", `conversations?id=eq.${convId}`, { archived: true });
+  const msgArchived = await asA("POST", "messages", {
+    conversation_id: convId,
+    sender: "usuario",
+    content: "tarde",
+  });
+  check(
+    "conversación archivada NO acepta mensajes",
+    msgArchived.status === 403 || msgArchived.status === 401,
+    `status=${msgArchived.status}`
+  );
+
+  // Tablas de solo-servidor invisibles para usuarios. Se siembra una fila
+  // real con la secret key: un [] sobre tabla vacía no probaría nada.
+  const seedAudit = await svcRest("POST", "admin_audit_events", {
+    admin_user_id: idA,
+    action: "verify_rls_seed",
+    target_type: "test",
+    reason: "verificación RLS",
+  });
+  seededAuditId = seedAudit.json?.[0]?.id;
+  const seedEvent = await svcRest("POST", "model_request_events", {
+    user_id: idA,
+    model_id: "test",
+    status: "ok",
+  });
+  seededEventId = seedEvent.json?.[0]?.id;
+  check(
+    "siembra de filas de servidor (secret key)",
+    Boolean(seededAuditId && seededEventId),
+    `audit=${seedAudit.status} event=${seedEvent.status}`
+  );
+
+  const audit = await asA("GET", "admin_audit_events?select=id");
+  check(
+    "A no lee admin_audit_events (con fila sembrada)",
+    audit.status !== 200 || audit.json?.length === 0,
+    `status=${audit.status} filas=${audit.json?.length ?? "n/a"}`
+  );
+  const events = await asA("GET", "model_request_events?select=id");
+  check(
+    "A no lee model_request_events (con fila sembrada)",
+    events.status !== 200 || events.json?.length === 0,
+    `status=${events.status} filas=${events.json?.length ?? "n/a"}`
+  );
+
+  // knowledge_documents: lectura permitida, escritura no.
+  const docsRead = await asA("GET", "knowledge_documents?select=id");
+  check("A lee knowledge_documents (listado)", docsRead.status === 200);
+  const docsWrite = await asA("POST", "knowledge_documents", {
+    display_name: "x",
+    version: "1",
+    file_search_store_name: "x",
+  });
+  check(
+    "A NO escribe knowledge_documents",
+    docsWrite.status === 403 || docsWrite.status === 401,
+    `status=${docsWrite.status}`
+  );
+} finally {
+  console.log("Eliminando datos y usuarios de prueba...");
+  // Las filas sembradas van primero: admin_audit_events no tiene cascade
+  // y bloquearía la eliminación del usuario.
+  if (seededAuditId) {
+    const del = await svcRest(
+      "DELETE",
+      `admin_audit_events?id=eq.${seededAuditId}`
+    );
+    if (del.status >= 300) {
+      cleanupErrors.push(`audit seed: HTTP ${del.status}`);
+    }
+  }
+  if (seededEventId) {
+    const del = await svcRest(
+      "DELETE",
+      `model_request_events?id=eq.${seededEventId}`
+    );
+    if (del.status >= 300) {
+      cleanupErrors.push(`event seed: HTTP ${del.status}`);
+    }
+  }
+  for (const id of [idA, idB]) {
+    if (!id) {
+      continue;
+    }
+    try {
+      await adminDeleteUser(id);
+    } catch (e) {
+      cleanupErrors.push(String(e));
+    }
+  }
+}
+
+if (cleanupErrors.length > 0) {
+  console.error(
+    `\nLIMPIEZA INCOMPLETA — eliminar manualmente en el dashboard (${EMAIL_A}, ${EMAIL_B}):`
+  );
+  for (const err of cleanupErrors) {
+    console.error(`  - ${err}`);
+  }
+}
+
+const failed = results.filter((r) => !r).length;
+const ok = failed === 0 && cleanupErrors.length === 0;
+console.log(
+  `\n=== RLS: ${ok ? "VERDE" : "ROJO"} (${results.length - failed}/${results.length} checks, limpieza ${cleanupErrors.length === 0 ? "ok" : "FALLIDA"}) ===`
+);
+process.exit(ok ? 0 : 1);
