@@ -15,11 +15,12 @@ Regla de trabajo: las fases van en orden, pero la Fase 1 (spikes) y la Fase 2 (d
 - Fase 0 cerrada salvo un secreto: Supabase creado (**ChatBot Zulú**, `ddimxdrggrrfcvzwwben`) y conectado por MCP; key de Gemini validada; `.env` ajustados; PDF de prueba en `data/pdfs/`.
 - **Fase 1 cerrada: gate de spikes VERDE (7/7) el 2026-07-15.** Ver `docs/notes/spike-file-search-resultado.md`. La Fase 3 queda desbloqueada en cuanto cierre la Fase 2.
 
-- Fase 2 / Esquema y RLS cerrado: migraciones 0001+0002 aplicadas al proyecto, RLS verificada 16/16 (`scripts/verify-rls.mjs`), seed de admin documentado.
+- Fase 2 / Esquema y RLS cerrado: migraciones 0001–0005 aplicadas al proyecto, RLS verificada 23/23 (`scripts/verify-rls.mjs`), seed de admin documentado.
+- Fase 2 / Poda y auth cerrados: plantilla podada (fuera NextAuth, Drizzle, artefactos, streams; ~40 dependencias menos), Supabase Auth con UI en español verificada en navegador contra el proyecto real. Despliegue en Vercel activo con previews por PR.
 
-**Siguiente:** Fase 2 restante — podar la plantilla, Supabase Auth con UI en español, consentimiento.
+**Siguiente:** Fase 3 — chat con Gemini File Search (los spikes ya están verdes). El consentimiento (Fase 2) queda bloqueado por el texto de la política.
 
-**Pendiente de decisión/gestión:** obtención de los 8 PDFs oficiales, ejecutar el seed del admin cuando se registre, 16 alertas Dependabot de la plantilla (la poda eliminará varias), bloqueos organizacionales (abajo).
+**Pendiente de decisión/gestión:** obtención de los 8 PDFs oficiales, ejecutar el seed del admin cuando se registre, eliminar `AUTH_SECRET` de Vercel (ya no se usa), bloqueos organizacionales (abajo).
 
 ---
 
@@ -59,21 +60,27 @@ Capacidad documentada para Gemini 3 / `gemini-3.5-flash`; lo que se valida es qu
 - [x] Verificar RLS con el JWT del usuario: `scripts/verify-rls.mjs` — **VERDE 16/16** el 2026-07-15 (aislamiento entre Scouts, no auto-escalamiento de rol, mensajes de asistente no forjables, archivadas no aceptan mensajes, tablas de servidor invisibles).
 
 ### Poda de la plantilla
-- [ ] Eliminar NextAuth (`app/(auth)`), artefactos (`artifacts/*` y sus componentes), tools de la plantilla (`getWeather`, `createDocument`, `editDocument`, `updateDocument`, `requestSuggestions`), streams reanudables (Redis/`resumable-stream`, ruta `api/chat/[id]/stream`), votos y sugerencias. Conservar shell de chat, `components/ui`, hooks SWR.
-- [ ] Eliminar Drizzle como dueño de esquema: quitar `drizzle.config.ts`, `lib/db/migrations`, scripts `db:*`; el acceso a datos pasa a supabase-js. Ajustar el script `build` (hoy corre la migración de Drizzle).
-- [ ] Limpiar `package.json` (dependencias muertas tras la poda).
-- [x] CI reducido a lint + typecheck: eliminado `playwright.yml` (probaba NextAuth/stack de la plantilla y fallaba por `MissingSecret`); typecheck añadido a `lint.yml`. Reescribir e2e propios después de la poda (P1 de esta fase).
+- [x] Eliminados: NextAuth (`app/(auth)` de la plantilla, botid, `AUTH_SECRET`), artefactos, tools, streams reanudables (Redis/`resumable-stream`), votos, sugerencias, chat de la plantilla, tests e2e de la plantilla. Conservados: `components/ui`, `theme-provider`, layout base.
+- [x] Eliminado Drizzle completo (`drizzle.config.ts`, `lib/db`, scripts `db:*`); el acceso a datos es supabase-js.
+- [x] `package.json` limpio: de ~60 dependencias a ~20 (fuera ai-sdk, codemirror, prosemirror, katex, redis, postgres, etc.). Debería bajar varias alertas de Dependabot.
+- [x] CI reducido a lint + typecheck: eliminado `playwright.yml` (probaba NextAuth/stack de la plantilla y fallaba por `MissingSecret`); typecheck añadido a `lint.yml`. Reescribir e2e propios (P1 de esta fase).
 
 ### Auth y cuenta
-- [ ] Supabase Auth: registro/login por correo, **UI en español** (la plantilla está en inglés). [P-RF-01..03]
-- [ ] Middleware/protección de rutas con la sesión de Supabase.
-- [ ] Estados de cuenta: bloquear el chat si `account_status != 'activo'`.
-- [ ] Flujo de consentimiento: insertar `consent_acceptance_events` y actualizar la caché en `profiles` (backend con service role). Bloquea el chat hasta aceptar. [P-RF-04, D-10]
+- [x] Supabase Auth: registro/login por correo con UI en español (`app/(auth)`, server actions, errores traducidos). Verificado en navegador contra el proyecto real: login → home con perfil vía RLS → logout. Nota: GoTrue valida entregabilidad del dominio del correo en signUp (dominios inventados fallan; correos reales pasan).
+- [x] Protección de rutas en `proxy.ts` con la sesión de Supabase (`@supabase/ssr`): sin sesión → `/login`; con sesión, `/login`/`/registro` → `/`.
+- [x] Estados de cuenta en la home: mensaje de bloqueo si `account_status != 'activo'`. El gate de API se implementa con el endpoint de chat (Fase 3).
+- [ ] Flujo de consentimiento: insertar `consent_acceptance_events` y actualizar la caché en `profiles` (backend con secret key). Bloquea el chat hasta aceptar. **Bloqueado por el texto/versión de la política (organizacional).** [P-RF-04, D-10]
 
 ---
 
 ## Fase 3 — Chat usable (requiere spikes verdes + Fase 2)
 
+### Design system (traído de `scouts-colombia/ruta`)
+- [ ] Adoptar el design system de `ruta`: tokens de `app/globals.css` (marca Scouts: `scouts-purple`, `scouts-yellow`, `scouts-blue`, `scouts-red`, `scouts-orange`; colores por sección: Manada, Tropa, Caminantes, ...; escala de radius; variables de sidebar/chart), tipografías (`font-sans`/`font-heading`/`font-jollygood`) y `theme-toggle`.
+- [ ] Traer de `ruta` los `components/ui` que el chat necesite y no estén aquí (`card`, `avatar`, `empty`, `field`, `combobox`, ...), adaptando imports. Omitir lo que no aplique (p. ej. `flag-icons`).
+- [ ] Aplicar el design system a lo ya construido: login/registro y home.
+
+### Chat
 - [ ] Conversaciones: crear, listar, abrir, archivar. [P-RF-05, P-RF-06]
 - [ ] Endpoint `POST /chat` que verifica usuario, rol, estado, consentimiento y cuota antes de llamar al modelo. [P-RF-07, P-RF-14]
 - [ ] Guard de cuota diaria usando `daily_chat_turns_by_user` antes de llamar al modelo. [D-11]
