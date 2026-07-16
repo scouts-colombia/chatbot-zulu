@@ -61,7 +61,8 @@ Capacidad documentada para Gemini 3 / `gemini-3.5-flash`; lo que se valida es qu
 ### Poda de la plantilla
 - [ ] Eliminar NextAuth (`app/(auth)`), artefactos (`artifacts/*` y sus componentes), tools de la plantilla (`getWeather`, `createDocument`, `editDocument`, `updateDocument`, `requestSuggestions`), streams reanudables (Redis/`resumable-stream`, ruta `api/chat/[id]/stream`), votos y sugerencias. Conservar shell de chat, `components/ui`, hooks SWR.
 - [ ] Eliminar Drizzle como dueño de esquema: quitar `drizzle.config.ts`, `lib/db/migrations`, scripts `db:*`; el acceso a datos pasa a supabase-js. Ajustar el script `build` (hoy corre la migración de Drizzle).
-- [ ] Limpiar `package.json` (dependencias muertas tras la poda) y CI (`.github/workflows/playwright.yml` va a romper con la poda: reducir a lint + typecheck hasta reescribir e2e).
+- [ ] Limpiar `package.json` (dependencias muertas tras la poda).
+- [x] CI reducido a lint + typecheck: eliminado `playwright.yml` (probaba NextAuth/stack de la plantilla y fallaba por `MissingSecret`); typecheck añadido a `lint.yml`. Reescribir e2e propios después de la poda (P1 de esta fase).
 
 ### Auth y cuenta
 - [ ] Supabase Auth: registro/login por correo, **UI en español** (la plantilla está en inglés). [P-RF-01..03]
