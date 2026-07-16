@@ -6,29 +6,30 @@ Regla de trabajo: las fases van en orden, pero la Fase 1 (spikes) y la Fase 2 (d
 
 ---
 
-## Estado actual (2026-07-09)
+## Estado actual (2026-07-15)
 
 **Hecho:**
 - Documentación colocada y con autoridad definida (`docs/pilot-scope-v0.3.1.md` manda; erratas del 2026-06-02 al inicio).
 - Decisiones cerradas: Supabase Auth (fuera NextAuth), sin streaming del proveedor + typewriter local, SQL dueño del esquema, Gemini Developer API con `gemini-3.5-flash`, spikes con criterios de verde.
 - `CLAUDE.md`, `AGENTS.md` y este ROADMAP en la raíz.
+- Fase 0 cerrada salvo un secreto: Supabase creado (**ChatBot Zulú**, `ddimxdrggrrfcvzwwben`) y conectado por MCP; key de Gemini validada; `.env` ajustados; PDF de prueba en `data/pdfs/`.
+- **Fase 1 cerrada: gate de spikes VERDE (7/7) el 2026-07-15.** Ver `docs/notes/spike-file-search-resultado.md`. La Fase 3 queda desbloqueada en cuanto cierre la Fase 2.
 
-**Sin empezar:** todo el código. La plantilla está intacta (NextAuth, artefactos, tools, streams reanudables siguen ahí).
+**Siguiente:** Fase 2 — escribir y aplicar `supabase/migrations/0001_schema_rls.sql` (no se recibió: hay que **escribirlo** desde el pilot-scope), podar la plantilla, Supabase Auth.
 
-**No existe todavía:** `supabase/migrations/0001_schema_rls.sql`. No se recibió: hay que **escribirlo** desde el pilot-scope (tarea de Fase 2, no de "colocar un archivo").
-
-**Pendiente de decisión/gestión:** push de `master` a `origin`, obtención de los 8 PDFs oficiales, bloqueos organizacionales (abajo).
+**Pendiente de decisión/gestión:** `SUPABASE_SERVICE_ROLE_KEY` en `.env.local`, push de `master` a `origin`, obtención de los 8 PDFs oficiales, bloqueos organizacionales (abajo).
 
 ---
 
 ## Fase 0 — Cuentas y llaves (sin código)
 
-- [ ] Crear el proyecto en Supabase y obtener URL, anon key y service role key. La service role solo va en servidor.
-- [ ] Crear API key de Gemini (**Gemini Developer API**, no Vertex) y cargar créditos.
-- [ ] Conseguir **1 PDF oficial de prueba** para los spikes (no hacen falta los 8 todavía).
-- [ ] Configurar `.env.local` y actualizar `.env.example` a las variables reales del piloto: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `GEMINI_API_KEY`, `GEMINI_MODEL=gemini-3.5-flash`, `MAX_CHAT_TURNS_PER_USER_PER_DAY=30`. Eliminar las de la plantilla (`AUTH_SECRET`, `AI_GATEWAY_API_KEY`, `BLOB_READ_WRITE_TOKEN`, `POSTGRES_URL`, `REDIS_URL`). `.gitignore`: incluir `CLAUDE.local.md`.
-- [ ] Validar disponibilidad de `gemini-3.5-flash` en la cuenta/región y versión del SDK antes de fijarlo.
-- [ ] Opcional: conectar el MCP de Supabase en Claude Code para aplicar y revisar migraciones desde la sesión.
+- [x] Crear el proyecto en Supabase: **ChatBot Zulú** (`ddimxdrggrrfcvzwwben`, us-east-2, Postgres 17). Obtener anon key y service role key del dashboard para `.env.local`; la service role solo va en servidor.
+- [x] Crear API key de Gemini (**Gemini Developer API**, no Vertex). Smoke test 2026-07-15: HTTP 200, `gemini-3.5-flash` disponible y generando. (Billing/créditos: verificar si el tier gratuito limita File Search durante el spike.)
+- [x] Conseguir **1 PDF oficial de prueba**: `data/pdfs/reglamento-red-de-jovenes.pdf` (carpeta `data/` fuera de Git).
+- [x] Configurar `.env.local` y `.env.example` con las variables del piloto (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `GEMINI_API_KEY`, `GEMINI_MODEL`, `MAX_CHAT_TURNS_PER_USER_PER_DAY`); eliminadas las de la plantilla. `.gitignore` incluye `CLAUDE.local.md`.
+- [ ] Completar en `.env.local` el secreto que falta: `SUPABASE_SERVICE_ROLE_KEY` (dashboard → Settings → API keys). `GEMINI_API_KEY` ya está. No se commitean.
+- [x] Validar disponibilidad de `gemini-3.5-flash` en la cuenta/región: confirmado por API el 2026-07-15 (`models.list` + `generateContent`).
+- [x] Conectar el MCP de Supabase en Claude Code para aplicar y revisar migraciones desde la sesión.
 
 ---
 
@@ -36,14 +37,14 @@ Regla de trabajo: las fases van en orden, pero la Fase 1 (spikes) y la Fase 2 (d
 
 Capacidad documentada para Gemini 3 / `gemini-3.5-flash`; lo que se valida es que tu SDK + store + schema + metadata reales devuelven los campos esperados. **No iniciar Fase 3 hasta que ambos estén verdes.** Si alguno falla, cambia la arquitectura, no solo la implementación. Detalle en `docs/notes/gemini-file-search-validacion.md`. [D-01, D-07]
 
-- [ ] Implementar `scripts/spike-file-search.ts`: crea store, indexa el PDF de prueba con `custom_metadata`, consulta con structured output y aserta los criterios de verde. Este script evoluciona luego a `scripts/index-knowledge-documents.ts`. [P-RF-20]
-- [ ] **Spike #1 — File Search + structured output + grounding en una sola llamada.** Verde cuando una llamada única a `generateContent` con File Search y structured output (schema real del piloto) devuelve:
+- [x] Implementar `scripts/spike-file-search.ts`: crea store, indexa el PDF de prueba con `custom_metadata`, consulta con structured output y aserta los criterios de verde. Este script evoluciona luego a `scripts/index-knowledge-documents.ts`. [P-RF-20]
+- [x] **Spike #1 — File Search + structured output + grounding en una sola llamada.** Verde cuando una llamada única a `generateContent` con File Search y structured output (schema real del piloto) devuelve:
   - `response.text` parsea y valida contra schema;
   - `candidates[0].groundingMetadata` existe;
   - `groundingChunks` trae al menos un `retrievedContext` del store esperado.
   Si el JSON llega pero el grounding no, rediseñar a dos pasadas. Usar el parámetro de structured output del SDK concreto (`response_format` / `responseFormat`), no asumir `responseSchema`.
-- [ ] **Spike #2 — round-trip de `custom_metadata`.** Verde cuando, indexado un doc con `key="knowledge_document_id"`, `value="<ID interno>"`, la consulta recupera ese doc y en `groundingChunks[*].retrievedContext.customMetadata` aparece un item con `key == "knowledge_document_id"` y `stringValue == "<ID interno>"`, y el servidor mapea ese ID sin usar título. Recordar: `customMetadata` es un ARREGLO de `{ key, stringValue }`, no un objeto plano.
-- [ ] Registrar en `docs/notes/` el resultado de los spikes (campos reales devueltos, casing, sorpresas del SDK).
+- [x] **Spike #2 — round-trip de `custom_metadata`.** Verde cuando, indexado un doc con `key="knowledge_document_id"`, `value="<ID interno>"`, la consulta recupera ese doc y en `groundingChunks[*].retrievedContext.customMetadata` aparece un item con `key == "knowledge_document_id"` y `stringValue == "<ID interno>"`, y el servidor mapea ese ID sin usar título. Recordar: `customMetadata` es un ARREGLO de `{ key, stringValue }`, no un objeto plano.
+- [x] Registrar en `docs/notes/` el resultado de los spikes: `docs/notes/spike-file-search-resultado.md` (VERDE 7/7 el 2026-07-15; `responseJsonSchema` es el parámetro correcto en `@google/genai` 2.x; `pageNumber` disponible en `retrievedContext`).
 
 ---
 
