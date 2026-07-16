@@ -159,6 +159,31 @@ try {
     `status=${msgForged.status}`
   );
 
+  // A NO puede adjuntar response_json a sus mensajes (contrato §8.3).
+  const msgWithJson = await asA("POST", "messages", {
+    conversation_id: convId,
+    sender: "usuario",
+    content: "hola",
+    response_json: { estado: "respondido", respuesta: "forjada" },
+  });
+  check(
+    "A NO inserta mensaje con response_json",
+    msgWithJson.status === 403 || msgWithJson.status === 401,
+    `status=${msgWithJson.status}`
+  );
+
+  // El consentimiento no es forjable por el cliente: lo inserta el servidor.
+  const consentForged = await asA("POST", "consent_acceptance_events", {
+    subject_user_id: idA,
+    policy_type: "privacy_policy",
+    policy_version: "v99-falsa",
+  });
+  check(
+    "A NO inserta consent_acceptance_events directo",
+    consentForged.status === 403 || consentForged.status === 401,
+    `status=${consentForged.status}`
+  );
+
   // B no ve nada de A.
   const convsB = await asB("GET", "conversations?select=id");
   check(
@@ -215,6 +240,25 @@ try {
     "A SÍ puede cambiar su nombre",
     rename.status < 300,
     `status=${rename.status}`
+  );
+
+  // El servidor (secret key → service_role) SÍ puede cambiar el role:
+  // valida la rama permitida del trigger protect_profile_fields.
+  const adminChange = await fetch(`${URL_BASE}/rest/v1/profiles?id=eq.${idA}`, {
+    method: "PATCH",
+    headers: {
+      apikey: SECRET,
+      Authorization: `Bearer ${SECRET}`,
+      "Content-Type": "application/json",
+      Prefer: "return=representation",
+    },
+    body: JSON.stringify({ role: "admin" }),
+  });
+  const adminJson = await adminChange.json();
+  check(
+    "servidor (secret key) SÍ cambia role",
+    adminChange.status === 200 && adminJson?.[0]?.role === "admin",
+    `status=${adminChange.status} role=${adminJson?.[0]?.role}`
   );
 
   // Conversación archivada: no acepta mensajes nuevos.
