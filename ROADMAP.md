@@ -76,9 +76,9 @@ Capacidad documentada para Gemini 3 / `gemini-3.5-flash`; lo que se valida es qu
 ## Fase 3 — Chat usable (requiere spikes verdes + Fase 2)
 
 ### Design system (traído de `scouts-colombia/ruta`)
-- [ ] Adoptar el design system de `ruta`: tokens de `app/globals.css` (marca Scouts: `scouts-purple`, `scouts-yellow`, `scouts-blue`, `scouts-red`, `scouts-orange`; colores por sección: Manada, Tropa, Caminantes, ...; escala de radius; variables de sidebar/chart), tipografías (`font-sans`/`font-heading`/`font-jollygood`) y `theme-toggle`.
-- [ ] Traer de `ruta` los `components/ui` que el chat necesite y no estén aquí (`card`, `avatar`, `empty`, `field`, `combobox`, ...), adaptando imports. Omitir lo que no aplique (p. ej. `flag-icons`).
-- [ ] Aplicar el design system a lo ya construido: login/registro y home.
+- [x] Tokens adoptados en `app/globals.css`: marca Scouts (`scouts-purple/yellow/blue/red/orange`), colores por sección (Manada, Tropa, Caminantes, Clan, ASP), manual PNPJ, escala de radius, `--primary`/`--ring`/`--accent` morados. Tipografías locales Futura (`--font-sans`) y JollyGood (`--font-jollygood`, con unicode-range) en `app/fuentes.ts` + `app/fonts/`. Superficies: `auth-hero`, `auth-card-surface` (glass), `auth-card-enter`, `pnpj-fondo`, utilidad `focus-ring`. Se conservaron las animaciones de chat de la plantilla (typewriter/typing, Fase 3).
+- [x] Aplicado a lo construido: login/registro (hero morado + tarjeta glass + wordmark JollyGood) y home (wordmark). Verificado en navegador (estilos computados + captura).
+- [ ] Traer de `ruta` los `components/ui` restantes que el chat necesite (`avatar`, `empty`, `field`, ... — `card` ya está) y el `theme-toggle` (en ruta está acoplado a su cookie de tema y fondos ilustrados; se adapta cuando exista el shell del chat).
 
 ### Chat
 - [ ] Conversaciones: crear, listar, abrir, archivar. [P-RF-05, P-RF-06]

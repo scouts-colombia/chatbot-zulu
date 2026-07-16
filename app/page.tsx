@@ -52,7 +52,9 @@ async function ContenidoPrincipal() {
     <div className="flex min-h-dvh flex-col">
       <header className="flex items-center justify-between border-b px-4 py-3">
         <div>
-          <h1 className="font-semibold">Chat Scout</h1>
+          <h1 className="font-jollygood text-scouts-purple text-xl">
+            Chat Scout
+          </h1>
           <p className="text-muted-foreground text-sm">
             {perfil?.nombre ?? perfil?.email ?? user.email}
             {perfil?.role === "admin" && " · admin"}

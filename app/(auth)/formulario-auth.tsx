@@ -20,10 +20,12 @@ export function FormularioAuth({ modo, accion }: Props) {
   const esRegistro = modo === "registro";
 
   return (
-    <div className="flex min-h-dvh items-center justify-center px-4">
-      <div className="w-full max-w-sm space-y-6">
+    <div className="auth-hero flex min-h-dvh items-center justify-center px-4 py-8">
+      <div className="auth-card-surface auth-card-enter w-full max-w-sm space-y-6 rounded-3xl p-8">
         <div className="space-y-1 text-center">
-          <h1 className="font-semibold text-2xl">Chat Scout</h1>
+          <h1 className="font-jollygood text-4xl text-scouts-purple">
+            Chat Scout
+          </h1>
           <p className="text-muted-foreground text-sm">
             {esRegistro
               ? "Crea tu cuenta para consultar los manuales oficiales"

@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { futuraStd, jollyGood } from "./fuentes";
 
 import "./globals.css";
 
@@ -14,12 +15,6 @@ export const metadata: Metadata = {
 export const viewport = {
   maximumScale: 1,
 };
-
-const geist = Geist({
-  subsets: ["latin"],
-  display: "swap",
-  variable: "--font-geist",
-});
 
 const geistMono = Geist_Mono({
   subsets: ["latin"],
@@ -54,7 +49,7 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      className={`${geist.variable} ${geistMono.variable}`}
+      className={`${futuraStd.variable} ${jollyGood.variable} ${geistMono.variable}`}
       lang="es"
       suppressHydrationWarning
     >
