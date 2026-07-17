@@ -75,12 +75,6 @@ Capacidad documentada para Gemini 3 / `gemini-3.5-flash`; lo que se valida es qu
 
 ## Fase 3 — Chat usable (requiere spikes verdes + Fase 2)
 
-### Design system (traído de `scouts-colombia/ruta`)
-- [ ] Adoptar el design system de `ruta`: tokens de `app/globals.css` (marca Scouts: `scouts-purple`, `scouts-yellow`, `scouts-blue`, `scouts-red`, `scouts-orange`; colores por sección: Manada, Tropa, Caminantes, ...; escala de radius; variables de sidebar/chart), tipografías (`font-sans`/`font-heading`/`font-jollygood`) y `theme-toggle`.
-- [ ] Traer de `ruta` los `components/ui` que el chat necesite y no estén aquí (`card`, `avatar`, `empty`, `field`, `combobox`, ...), adaptando imports. Omitir lo que no aplique (p. ej. `flag-icons`).
-- [ ] Aplicar el design system a lo ya construido: login/registro y home.
-
-### Chat
 - [ ] Conversaciones: crear, listar, abrir, archivar. [P-RF-05, P-RF-06]
 - [ ] Endpoint `POST /chat` que verifica usuario, rol, estado, consentimiento y cuota antes de llamar al modelo. [P-RF-07, P-RF-14]
 - [ ] Guard de cuota diaria usando `daily_chat_turns_by_user` antes de llamar al modelo. [D-11]
@@ -113,6 +107,16 @@ Capacidad documentada para Gemini 3 / `gemini-3.5-flash`; lo que se valida es qu
 - [ ] Pruebas: citas reales, preguntas fuera de alcance sin inventar fuente, adversariales e inyección, bloqueo de seguridad, JSON inválido con retry.
 - [ ] Revisión de RLS y recorrido completo de la Definition of Done (§18) y el checklist técnico (§19).
 - [ ] Despliegue en Vercel.
+
+---
+
+## Fase 6 — UI y design system (al final, decisión 2026-07-17)
+
+Primero toda la funcionalidad; la capa visual se aplica al final sobre pantallas ya estables.
+
+- [ ] Retomar la rama **`feat/design-system`** (PR #4, cerrado sin merge; NO borrar la rama): tokens de marca de `ruta` (scouts-*, secciones, PNPJ, radius), tipografías locales Futura/JollyGood (`app/fuentes.ts` + `app/fonts/`), superficies `auth-hero`/`auth-card-surface` (glass) y `components/ui/card`. Todo quedó construido y verificado (preview desplegado en el PR #4); al retomar: rebase sobre master o re-aplicación por partes (los archivos de tokens/fuentes son aditivos; solo las pantallas tocadas necesitan ajuste manual).
+- [ ] Aplicar el design system al chat y pantallas nuevas de las Fases 3-4.
+- [ ] Traer de `ruta` los `components/ui` restantes y el `theme-toggle` (acoplado en ruta a su cookie de tema; adaptar).
 
 ---
 
