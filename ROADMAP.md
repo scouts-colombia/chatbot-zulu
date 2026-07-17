@@ -75,18 +75,20 @@ Capacidad documentada para Gemini 3 / `gemini-3.5-flash`; lo que se valida es qu
 
 ## Fase 3 — Chat usable (requiere spikes verdes + Fase 2)
 
-- [ ] Conversaciones: crear, listar, abrir, archivar. [P-RF-05, P-RF-06]
-- [ ] Endpoint `POST /chat` que verifica usuario, rol, estado, consentimiento y cuota antes de llamar al modelo. [P-RF-07, P-RF-14]
-- [ ] Guard de cuota diaria usando `daily_chat_turns_by_user` antes de llamar al modelo. [D-11]
-- [ ] Llamada a Gemini con File Search + schema de salida. Historial: últimos 6-10 mensajes, sin resumen en v1. [P-RF-08, §10]
-- [ ] Validación de JSON + reintento único + fallback `error`. [P-RF-09, D-09]
-- [ ] Normalización de citas por `knowledge_document_id` (búsqueda por `key` en el arreglo `customMetadata`) y persistencia en `citations`. Evento de calidad `missing_knowledge_document_id` si falta. [P-RF-10, D-07, D-12]
-- [ ] Manejo del bloqueo del proveedor mapeado a `bloqueado_por_seguridad`. [D-08]
-- [ ] Registrar `model_request_events` por request, incluyendo `attempt_index`. [P-RF-18, D-03]
-- [ ] Render markdown + chips de citas con documento y página. Respuesta final con efecto **typewriter** sobre texto ya validado (sin streaming del proveedor); indicador "escribiendo" mientras el servidor procesa. [P-RF-11, D-04]
-- [ ] Estado `sin_fuente` sin inventar citas; evento de calidad si `respondido` llega sin citas. [P-RF-12, §7.2]
-- [ ] Preguntas guiadas: opciones 2-4 + input libre; elegir una opción genera un turno nuevo por el mismo endpoint. [P-RF-13]
-- [ ] Completar `scripts/index-knowledge-documents.ts` e indexar los 8 manuales (requiere los PDFs — ver bloqueos). [P-RF-19, P-RF-20]
+- [x] Conversaciones: crear, listar, abrir, archivar (server actions con el JWT del usuario; título automático con la primera pregunta). [P-RF-05, P-RF-06]
+- [x] Endpoint `POST /api/chat` que verifica usuario, estado de cuenta y cuota antes de llamar al modelo. El check de consentimiento se añade cuando exista la política (bloqueo organizacional). [P-RF-07, P-RF-14]
+- [x] Guard de cuota diaria usando `daily_chat_turns_by_user` antes de guardar el mensaje y de llamar al modelo. [D-11]
+- [x] Llamada a Gemini con File Search + `responseJsonSchema`. Historial: últimos 8 mensajes, sin resumen. Store(s) desde `knowledge_documents.active`. [P-RF-08, §10]
+- [x] Validación de JSON (zod) + reintento único con prompt correctivo + fallback `error` con `invalid_model_json`. [P-RF-09, D-09]
+- [x] Normalización de citas por `knowledge_document_id` (búsqueda por `key` en el arreglo `customMetadata`) y persistencia en `citations`. Marcas de calidad `missing_knowledge_document_id` y `respondido_sin_citas` en el evento. [P-RF-10, D-07, D-12]
+- [x] Bloqueo del proveedor (`promptFeedback.blockReason`, `finishReason=SAFETY`, candidato vacío) mapeado a `bloqueado_por_seguridad` con mensaje seguro. [D-08]
+- [x] `model_request_events` por intento con `attempt_index`, latencia, tokens, grounding y `safety_block_source`. [P-RF-18, D-03]
+- [x] Render markdown (react-markdown) + chips de citas con documento y página. Typewriter local sobre texto ya validado (por tiempo transcurrido, inmune al throttling de pestañas); indicador "escribiendo". [P-RF-11, D-04]
+- [x] `sin_fuente` con citas vacías forzadas en servidor (§7.2) y badge en UI. [P-RF-12]
+- [x] Preguntas guiadas: persistidas en `guided_questions`/`options`, botones 2-4 + input libre; elegir una opción envía un turno normal por el mismo endpoint. [P-RF-13]
+- [x] `scripts/index-knowledge-documents.ts` completo (reserva fila → upload con custom_metadata → confirma sincronización; idempotente por sha256, FORCE=1 para reindexar). Store del piloto creado e indexado el PDF de prueba. Indexar los 8 manuales reales cuando lleguen los PDFs (bloqueo organizacional). [P-RF-19, P-RF-20]
+
+Verificado e2e en navegador contra Gemini y Supabase reales (2026-07-17): pregunta sobre el Reglamento → respondido con 3 citas con página y `knowledge_document_id` (3/3 con versión coincidente); pregunta fuera de alcance → `sin_fuente` sin citas; eventos y cuota correctos en la base.
 
 ---
 
