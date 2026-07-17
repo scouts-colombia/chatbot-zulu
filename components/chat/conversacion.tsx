@@ -151,9 +151,11 @@ function IndicadorEscribiendo() {
 export function Conversacion({
   conversationId,
   mensajesIniciales,
+  archivada = false,
 }: {
   conversationId: string;
   mensajesIniciales: MensajeUI[];
+  archivada?: boolean;
 }) {
   const [mensajes, setMensajes] = useState<MensajeUI[]>(mensajesIniciales);
   const [borrador, setBorrador] = useState("");
@@ -246,7 +248,7 @@ export function Conversacion({
         {mensajes.map((mensaje) => (
           <Burbuja
             animar={mensaje.id === animandoId}
-            deshabilitado={enviando}
+            deshabilitado={enviando || archivada}
             key={mensaje.id}
             mensaje={mensaje}
             onOpcion={enviar}
@@ -263,30 +265,36 @@ export function Conversacion({
         </p>
       )}
 
-      <form
-        className="flex items-end gap-2 border-t px-4 py-3"
-        onSubmit={(evento) => {
-          evento.preventDefault();
-          enviar(borrador);
-        }}
-      >
-        <Textarea
-          className="max-h-40 min-h-11 flex-1 resize-none"
-          maxLength={2000}
-          onChange={(evento) => setBorrador(evento.target.value)}
-          onKeyDown={(evento) => {
-            if (evento.key === "Enter" && !evento.shiftKey) {
-              evento.preventDefault();
-              enviar(borrador);
-            }
+      {archivada ? (
+        <p className="border-t px-4 py-4 text-center text-muted-foreground text-sm">
+          Esta conversación está archivada: es de solo lectura.
+        </p>
+      ) : (
+        <form
+          className="flex items-end gap-2 border-t px-4 py-3"
+          onSubmit={(evento) => {
+            evento.preventDefault();
+            enviar(borrador);
           }}
-          placeholder="Escribe tu pregunta..."
-          value={borrador}
-        />
-        <Button disabled={enviando || !borrador.trim()} type="submit">
-          Enviar
-        </Button>
-      </form>
+        >
+          <Textarea
+            className="max-h-40 min-h-11 flex-1 resize-none"
+            maxLength={2000}
+            onChange={(evento) => setBorrador(evento.target.value)}
+            onKeyDown={(evento) => {
+              if (evento.key === "Enter" && !evento.shiftKey) {
+                evento.preventDefault();
+                enviar(borrador);
+              }
+            }}
+            placeholder="Escribe tu pregunta..."
+            value={borrador}
+          />
+          <Button disabled={enviando || !borrador.trim()} type="submit">
+            Enviar
+          </Button>
+        </form>
+      )}
     </div>
   );
 }

@@ -256,10 +256,13 @@ export async function POST(request: Request) {
     modelId,
   };
 
-  // Store(s) de File Search desde los documentos activos.
+  // Store(s) y documentos ACTIVOS. File Search recupera a nivel de store,
+  // así que además del nombre del store se construye un metadataFilter por
+  // knowledge_document_id: un documento desactivado no debe fundamentar
+  // respuestas aunque siga dentro del store.
   const { data: documentos } = await admin
     .from("knowledge_documents")
-    .select("file_search_store_name")
+    .select("id, file_search_store_name")
     .eq("active", true);
 
   const storeNames = [
@@ -267,6 +270,9 @@ export async function POST(request: Request) {
       (documentos ?? []).map((d) => d.file_search_store_name as string)
     ),
   ];
+  const metadataFilter = (documentos ?? [])
+    .map((d) => `knowledge_document_id = "${d.id as string}"`)
+    .join(" OR ");
 
   if (storeNames.length === 0) {
     const respuesta: RespuestaAsistente = {
@@ -319,6 +325,7 @@ export async function POST(request: Request) {
     historial,
     pregunta: cuerpo.mensaje,
     storeNames,
+    metadataFilter,
   });
 
   if (resultado.tipo === "bloqueado") {

@@ -63,10 +63,17 @@ export async function llamarModelo({
   historial,
   pregunta,
   storeNames,
+  metadataFilter,
 }: {
   historial: TurnoHistorial[];
   pregunta: string;
   storeNames: string[];
+  /**
+   * File Search recupera a nivel de store: el filtro por
+   * knowledge_document_id restringe la recuperación a los documentos
+   * ACTIVOS aunque el store contenga desactivados.
+   */
+  metadataFilter?: string;
 }): Promise<ResultadoModelo> {
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY as string });
   const model = process.env.GEMINI_MODEL ?? "gemini-3.5-flash";
@@ -93,7 +100,14 @@ export async function llamarModelo({
         contents,
         config: {
           systemInstruction,
-          tools: [{ fileSearch: { fileSearchStoreNames: storeNames } }],
+          tools: [
+            {
+              fileSearch: {
+                fileSearchStoreNames: storeNames,
+                ...(metadataFilter ? { metadataFilter } : {}),
+              },
+            },
+          ],
           responseMimeType: "application/json",
           responseJsonSchema,
         },

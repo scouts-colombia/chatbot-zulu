@@ -10,7 +10,9 @@ export const PreguntaGuiadaSchema = z.object({
   tipo: z.enum(["aclaracion", "modo_guiado", "sugerencia"]),
   texto: z.string(),
   opciones: z.array(z.string()).min(2).max(4),
-  permiteInputLibre: z.boolean(),
+  // Siempre true por contrato (§6.1): un false del modelo es JSON inválido
+  // y entra por la ruta de retry único (D-09).
+  permiteInputLibre: z.literal(true),
 });
 
 export const ModeloRespuestaSchema = z.object({

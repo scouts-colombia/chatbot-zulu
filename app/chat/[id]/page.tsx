@@ -132,6 +132,7 @@ async function ContenidoConversacion({
         )}
       </header>
       <Conversacion
+        archivada={conversacion.archived}
         conversationId={conversacion.id}
         mensajesIniciales={mensajes}
       />

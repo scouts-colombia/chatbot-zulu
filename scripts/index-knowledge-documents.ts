@@ -127,6 +127,13 @@ async function indexarArchivo(storeName: string, archivo: string) {
     operation = await ai.operations.get({ operation });
   }
 
+  // done=true puede venir con error: en ese caso NO se marca activo.
+  if (operation.error) {
+    throw new Error(
+      `La operación de indexación falló: ${JSON.stringify(operation.error).slice(0, 300)}`
+    );
+  }
+
   const documentName =
     (operation.response as { document?: { name?: string } } | undefined)
       ?.document?.name ?? null;
