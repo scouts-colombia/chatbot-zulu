@@ -176,15 +176,18 @@ export function Conversacion({
     setAviso(null);
     setEnviando(true);
     setBorrador("");
+    const idLocal = `local-${Date.now()}`;
     setMensajes((previos) => [
       ...previos,
-      {
-        id: `local-${Date.now()}`,
-        sender: "usuario",
-        content: limpio,
-        citas: [],
-      },
+      { id: idLocal, sender: "usuario", content: limpio, citas: [] },
     ]);
+
+    // Si el servidor rechaza el turno, la burbuja optimista se retira y el
+    // texto vuelve al composer para no fingir un mensaje que no existe.
+    const revertir = () => {
+      setMensajes((previos) => previos.filter((m) => m.id !== idLocal));
+      setBorrador(limpio);
+    };
 
     try {
       const respuesta = await fetch("/api/chat", {
@@ -195,6 +198,7 @@ export function Conversacion({
       const datos = await respuesta.json();
 
       if (!respuesta.ok) {
+        revertir();
         setAviso(
           datos?.mensaje ??
             "No se pudo enviar el mensaje. Inténtalo de nuevo en un momento."
@@ -223,6 +227,7 @@ export function Conversacion({
       setMensajes((previos) => [...previos, mensajeAsistente]);
       setAnimandoId(mensajeAsistente.id);
     } catch {
+      revertir();
       setAviso("No hay conexión con el servidor. Inténtalo de nuevo.");
     } finally {
       setEnviando(false);

@@ -65,10 +65,14 @@ async function registrarEventos(
       total_tokens: intento.totalTokens ?? null,
       grounding_disponible: intento.groundingDisponible,
       finish_reason: intento.finishReason ?? null,
+      // 'proveedor' cuando el bloqueo llegó sin JSON; 'modelo' cuando vino
+      // dentro de un JSON válido (§15.1).
       safety_block_source:
         intento.status === "blocked"
           ? (opciones?.safetyBlockSource ?? "proveedor")
-          : null,
+          : esUltimo && intento.status === "ok"
+            ? (opciones?.safetyBlockSource ?? null)
+            : null,
       error_code: intento.errorCode ?? marcasCalidad ?? null,
     };
   });
@@ -134,10 +138,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ codigo: "no_autenticado" }, { status: 401 });
   }
 
-  // Estado de cuenta: lógica de API, no RLS (CLAUDE.md).
+  // Estado de cuenta y consentimiento: lógica de API, no RLS (CLAUDE.md).
   const { data: perfil } = await supabase
     .from("profiles")
-    .select("account_status")
+    .select("account_status, privacy_policy_version_accepted")
     .eq("id", user.id)
     .single();
 
@@ -146,6 +150,24 @@ export async function POST(request: Request) {
       {
         codigo: "cuenta_inactiva",
         mensaje: "Tu cuenta no está habilitada para usar el chat.",
+      },
+      { status: 403 }
+    );
+  }
+
+  // Gate de consentimiento (P-RF-04). Se activa fijando PRIVACY_POLICY_VERSION
+  // cuando la organización publique el texto de la política; hasta entonces no
+  // hay versión que aceptar.
+  const versionPolitica = process.env.PRIVACY_POLICY_VERSION;
+  if (
+    versionPolitica &&
+    perfil.privacy_policy_version_accepted !== versionPolitica
+  ) {
+    return NextResponse.json(
+      {
+        codigo: "consentimiento_requerido",
+        mensaje:
+          "Debes aceptar la política de privacidad vigente antes de usar el chat.",
       },
       { status: 403 }
     );
@@ -178,56 +200,53 @@ export async function POST(request: Request) {
     );
   }
 
-  // Guard de cuota ANTES de llamar al modelo y de guardar el mensaje (D-11).
-  const maximoDiario = Number.parseInt(
-    process.env.MAX_CHAT_TURNS_PER_USER_PER_DAY ?? "30",
-    10
+  // Cuota + inserción del mensaje en UNA operación atómica (D-11): la función
+  // serializa por usuario con advisory lock, así N requests concurrentes no
+  // pueden superar el límite. Corre con el JWT del usuario (security invoker):
+  // la RLS y los privilegios de columna siguen aplicando por dentro.
+  const { data: idTurno, error: errorTurno } = await supabase.rpc(
+    "insertar_turno_usuario",
+    {
+      p_conversation_id: cuerpo.conversationId,
+      p_content: cuerpo.mensaje,
+    }
   );
-  const hoy = new Date().toISOString().slice(0, 10);
-  const { data: cuota } = await supabase
-    .from("daily_chat_turns_by_user")
-    .select("chat_turns")
-    .eq("usage_date", hoy)
-    .maybeSingle();
 
-  if ((cuota?.chat_turns ?? 0) >= maximoDiario) {
+  if (errorTurno || !idTurno) {
+    const limite = errorTurno?.message.match(/limite_diario:(\d+)/);
+    if (limite) {
+      return NextResponse.json(
+        {
+          codigo: "limite_diario",
+          mensaje: `Alcanzaste el límite de ${limite[1]} preguntas por día. Vuelve mañana.`,
+        },
+        { status: 429 }
+      );
+    }
     return NextResponse.json(
-      {
-        codigo: "limite_diario",
-        mensaje: `Alcanzaste el límite de ${maximoDiario} preguntas por día. Vuelve mañana.`,
-      },
-      { status: 429 }
-    );
-  }
-
-  // Mensaje del usuario con SU JWT: la RLS y los privilegios de columna
-  // aplican (sender usuario, sin response_json ni created_at del cliente).
-  const { data: mensajeUsuario, error: errorInsercion } = await supabase
-    .from("messages")
-    .insert({
-      conversation_id: cuerpo.conversationId,
-      sender: "usuario",
-      content: cuerpo.mensaje,
-    })
-    .select("id")
-    .single();
-
-  if (errorInsercion || !mensajeUsuario) {
-    return NextResponse.json(
-      { codigo: "no_se_pudo_guardar", mensaje: errorInsercion?.message },
+      { codigo: "no_se_pudo_guardar", mensaje: errorTurno?.message },
       { status: 500 }
     );
   }
 
-  // Primer mensaje: el título de la conversación pasa a ser la pregunta.
+  const mensajeUsuario = { id: idTurno as string };
+
+  const admin = crearClienteAdmin();
+
+  // Primer mensaje: el título pasa a ser la pregunta. Todo turno aceptado
+  // toca updated_at para que la lista ordene por actividad real (el trigger
+  // set_updated_at pone el valor).
   if (conversacion.title === "Nueva conversación") {
     await supabase
       .from("conversations")
       .update({ title: cuerpo.mensaje.slice(0, 80) })
       .eq("id", cuerpo.conversationId);
+  } else {
+    await admin
+      .from("conversations")
+      .update({ updated_at: ahora() })
+      .eq("id", cuerpo.conversationId);
   }
-
-  const admin = crearClienteAdmin();
   const modelId = process.env.GEMINI_MODEL ?? "gemini-3.5-flash";
   const requestId = crypto.randomUUID();
   const baseEventos = {
@@ -353,14 +372,71 @@ export async function POST(request: Request) {
 
   // JSON válido: normalizar citas del grounding (D-07) y persistir.
   const modelo = resultado.respuesta;
+
+  // Bloqueo emitido por el MODELO en JSON válido (§15.1): mismo mensaje
+  // seguro y breve que el bloqueo del proveedor. No se persiste ni se
+  // muestra el texto del modelo (minimización de datos con menores).
+  if (modelo.estado === "bloqueado_por_seguridad") {
+    const respuestaJson = {
+      estado: "bloqueado_por_seguridad",
+      respuesta: MENSAJE_BLOQUEADO,
+    };
+    const asistenteId = await guardarMensajeAsistente(
+      admin,
+      cuerpo.conversationId,
+      MENSAJE_BLOQUEADO,
+      respuestaJson
+    );
+    await registrarEventos(
+      admin,
+      { ...baseEventos, assistantMessageId: asistenteId },
+      resultado.intentos,
+      { safetyBlockSource: "modelo" }
+    );
+    const respuesta: RespuestaAsistente = {
+      estado: "bloqueado_por_seguridad",
+      respuesta: MENSAJE_BLOQUEADO,
+      citas: [],
+      metadata: metadataDe(resultado.intentos, modelId, requestId, "modelo"),
+    };
+    return NextResponse.json({ ...respuesta, mensajeId: asistenteId });
+  }
+
   const { citas: citasCrudas, faltaKnowledgeDocumentId } = normalizarCitas(
     resultado.response
   );
 
   // sin_fuente exige citas vacías (§7.2); las citas solo acompañan respuestas
   // con fundamento.
-  const citas: CitaNormalizada[] =
+  let citas: CitaNormalizada[] =
     modelo.estado === "respondido" ? citasCrudas : [];
+
+  // El snapshot de versión confiable es el de knowledge_documents (§7.1
+  // regla 3); el custom_metadata del proveedor queda solo como fallback.
+  const idsDocumentos = [
+    ...new Set(
+      citas
+        .map((cita) => cita.knowledgeDocumentId)
+        .filter((id): id is string => Boolean(id))
+    ),
+  ];
+  if (idsDocumentos.length > 0) {
+    const { data: versiones } = await admin
+      .from("knowledge_documents")
+      .select("id, version")
+      .in("id", idsDocumentos);
+    const versionPorId = new Map(
+      (versiones ?? []).map((doc) => [doc.id as string, doc.version as string])
+    );
+    citas = citas.map((cita) =>
+      cita.knowledgeDocumentId && versionPorId.has(cita.knowledgeDocumentId)
+        ? {
+            ...cita,
+            documentVersionSnapshot: versionPorId.get(cita.knowledgeDocumentId),
+          }
+        : cita
+    );
+  }
 
   const marcasCalidad: string[] = [];
   if (modelo.estado === "respondido" && citas.length === 0) {
@@ -393,7 +469,11 @@ export async function POST(request: Request) {
       }))
     );
     if (errorCitas) {
+      // La tabla citations es la única fuente de verdad (D-12): si no se
+      // persistieron, no se devuelven citas que desaparecerían al recargar.
       console.error("No se pudieron guardar las citas:", errorCitas.message);
+      citas = [];
+      marcasCalidad.push("citas_no_persistidas");
     }
   }
 
@@ -433,12 +513,7 @@ export async function POST(request: Request) {
     preguntaGuiada: modelo.preguntaGuiada,
     sugerencias: modelo.sugerencias,
     advertencias: modelo.advertencias,
-    metadata: metadataDe(
-      resultado.intentos,
-      modelId,
-      requestId,
-      modelo.estado === "bloqueado_por_seguridad" ? "modelo" : undefined
-    ),
+    metadata: metadataDe(resultado.intentos, modelId, requestId),
   };
 
   return NextResponse.json({ ...respuesta, mensajeId: asistenteId });
