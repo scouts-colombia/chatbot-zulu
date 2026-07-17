@@ -127,7 +127,7 @@ Primero toda la funcionalidad; la capa visual se aplica al final sobre pantallas
 Estos no dependen de código, pero pueden frenar el lanzamiento si llegan tarde.
 
 - [ ] **Obtener los 8 PDFs oficiales aprobados, con versión definida.** Bloquea la indexación de Fase 3. (1 PDF de prueba basta para la Fase 1.)
-- [ ] Texto y versión de la política de privacidad y los términos. Bloquea el flujo de consentimiento de Fase 2.
+- [ ] Texto y versión de la política de privacidad y los términos. Bloquea el flujo de consentimiento de Fase 2. **Al publicarla: fijar `PRIVACY_POLICY_VERSION` en Vercel (sin esa variable el gate del chat queda abierto a propósito durante la construcción — es requisito del checklist de lanzamiento, §19) y construir la UI de aceptación.**
 - [ ] Decisión del default de `account_status` para menores: `activo` o `pendiente_autorizacion`.
 - [ ] Política de autorización de adulto responsable para usuarios de 15 a 17.
 - [ ] Política de situaciones sensibles, requisito previo a cualquier escalamiento (P2).

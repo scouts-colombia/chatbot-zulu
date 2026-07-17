@@ -312,13 +312,16 @@ export async function POST(request: Request) {
     .order("created_at", { ascending: false })
     .limit(11);
 
+  // Cada turno del historial va acotado: el límite duro vive en la base
+  // (constraint de 0007 para sender='usuario'), y este slice defiende el
+  // prompt ante filas legadas o respuestas largas del asistente.
   const historial: TurnoHistorial[] = (previos ?? [])
     .filter((m) => m.id !== mensajeUsuario.id && m.sender !== "sistema")
     .slice(0, 8)
     .reverse()
     .map((m) => ({
       role: m.sender === "usuario" ? ("user" as const) : ("model" as const),
-      texto: m.content,
+      texto: m.content.slice(0, 4000),
     }));
 
   const resultado = await llamarModelo({
