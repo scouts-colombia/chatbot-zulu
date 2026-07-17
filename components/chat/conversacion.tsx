@@ -116,19 +116,22 @@ function Burbuja({
           </div>
         )}
         {mostrarAdjuntos && mensaje.preguntaGuiada && (
-          <div className="flex flex-wrap gap-2 border-t pt-2">
-            {mensaje.preguntaGuiada.opciones.map((opcion) => (
-              <Button
-                disabled={deshabilitado}
-                key={opcion}
-                onClick={() => onOpcion(opcion)}
-                size="sm"
-                type="button"
-                variant="outline"
-              >
-                {opcion}
-              </Button>
-            ))}
+          <div className="space-y-2 border-t pt-2">
+            <p className="font-medium">{mensaje.preguntaGuiada.texto}</p>
+            <div className="flex flex-wrap gap-2">
+              {mensaje.preguntaGuiada.opciones.map((opcion) => (
+                <Button
+                  disabled={deshabilitado}
+                  key={opcion}
+                  onClick={() => onOpcion(opcion)}
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                >
+                  {opcion}
+                </Button>
+              ))}
+            </div>
           </div>
         )}
       </div>

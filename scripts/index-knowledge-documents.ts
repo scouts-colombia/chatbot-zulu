@@ -154,6 +154,21 @@ async function indexarArchivo(storeName: string, archivo: string) {
     throw new Error(`No se pudo confirmar la fila: ${errorUpdate.message}`);
   }
 
+  // 4) Retirar versiones anteriores del mismo documento (mismo display_name,
+  // distinto sha256): active=false las excluye del metadataFilter del chat,
+  // y las citas históricas conservan su snapshot. El versionado completo es
+  // P1; este retiro evita citar versiones obsoletas junto a la nueva.
+  const { data: retiradas } = await supabase
+    .from("knowledge_documents")
+    .update({ active: false })
+    .eq("display_name", displayName)
+    .eq("active", true)
+    .neq("id", knowledgeDocumentId)
+    .select("id");
+  for (const retirada of retiradas ?? []) {
+    console.log(`RETIRADA versión anterior (id=${retirada.id})`);
+  }
+
   console.log(
     `OK       ${displayName} (id=${knowledgeDocumentId}, ${Math.round((Date.now() - inicio) / 1000)}s)`
   );
