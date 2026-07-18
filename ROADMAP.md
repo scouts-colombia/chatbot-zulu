@@ -75,24 +75,20 @@ Capacidad documentada para Gemini 3 / `gemini-3.5-flash`; lo que se valida es qu
 
 ## Fase 3 — Chat usable (requiere spikes verdes + Fase 2)
 
-### Design system (traído de `scouts-colombia/ruta`)
-- [ ] Adoptar el design system de `ruta`: tokens de `app/globals.css` (marca Scouts: `scouts-purple`, `scouts-yellow`, `scouts-blue`, `scouts-red`, `scouts-orange`; colores por sección: Manada, Tropa, Caminantes, ...; escala de radius; variables de sidebar/chart), tipografías (`font-sans`/`font-heading`/`font-jollygood`) y `theme-toggle`.
-- [ ] Traer de `ruta` los `components/ui` que el chat necesite y no estén aquí (`card`, `avatar`, `empty`, `field`, `combobox`, ...), adaptando imports. Omitir lo que no aplique (p. ej. `flag-icons`).
-- [ ] Aplicar el design system a lo ya construido: login/registro y home.
+- [x] Conversaciones: crear, listar, abrir, archivar (server actions con el JWT del usuario; título automático con la primera pregunta). [P-RF-05, P-RF-06]
+- [x] Endpoint `POST /api/chat` que verifica usuario, estado de cuenta y cuota antes de llamar al modelo. El check de consentimiento se añade cuando exista la política (bloqueo organizacional). [P-RF-07, P-RF-14]
+- [x] Guard de cuota diaria usando `daily_chat_turns_by_user` antes de guardar el mensaje y de llamar al modelo. [D-11]
+- [x] Llamada a Gemini con File Search + `responseJsonSchema`. Historial: últimos 8 mensajes, sin resumen. Store(s) desde `knowledge_documents.active`. [P-RF-08, §10]
+- [x] Validación de JSON (zod) + reintento único con prompt correctivo + fallback `error` con `invalid_model_json`. [P-RF-09, D-09]
+- [x] Normalización de citas por `knowledge_document_id` (búsqueda por `key` en el arreglo `customMetadata`) y persistencia en `citations`. Marcas de calidad `missing_knowledge_document_id` y `respondido_sin_citas` en el evento. [P-RF-10, D-07, D-12]
+- [x] Bloqueo del proveedor (`promptFeedback.blockReason`, `finishReason=SAFETY`, candidato vacío) mapeado a `bloqueado_por_seguridad` con mensaje seguro. [D-08]
+- [x] `model_request_events` por intento con `attempt_index`, latencia, tokens, grounding y `safety_block_source`. [P-RF-18, D-03]
+- [x] Render markdown (react-markdown) + chips de citas con documento y página. Typewriter local sobre texto ya validado (por tiempo transcurrido, inmune al throttling de pestañas); indicador "escribiendo". [P-RF-11, D-04]
+- [x] `sin_fuente` con citas vacías forzadas en servidor (§7.2) y badge en UI. [P-RF-12]
+- [x] Preguntas guiadas: persistidas en `guided_questions`/`options`, botones 2-4 + input libre; elegir una opción envía un turno normal por el mismo endpoint. [P-RF-13]
+- [x] `scripts/index-knowledge-documents.ts` completo (reserva fila → upload con custom_metadata → confirma sincronización; idempotente por sha256, FORCE=1 para reindexar). Store del piloto creado e indexado el PDF de prueba. Indexar los 8 manuales reales cuando lleguen los PDFs (bloqueo organizacional). [P-RF-19, P-RF-20]
 
-### Chat
-- [ ] Conversaciones: crear, listar, abrir, archivar. [P-RF-05, P-RF-06]
-- [ ] Endpoint `POST /chat` que verifica usuario, rol, estado, consentimiento y cuota antes de llamar al modelo. [P-RF-07, P-RF-14]
-- [ ] Guard de cuota diaria usando `daily_chat_turns_by_user` antes de llamar al modelo. [D-11]
-- [ ] Llamada a Gemini con File Search + schema de salida. Historial: últimos 6-10 mensajes, sin resumen en v1. [P-RF-08, §10]
-- [ ] Validación de JSON + reintento único + fallback `error`. [P-RF-09, D-09]
-- [ ] Normalización de citas por `knowledge_document_id` (búsqueda por `key` en el arreglo `customMetadata`) y persistencia en `citations`. Evento de calidad `missing_knowledge_document_id` si falta. [P-RF-10, D-07, D-12]
-- [ ] Manejo del bloqueo del proveedor mapeado a `bloqueado_por_seguridad`. [D-08]
-- [ ] Registrar `model_request_events` por request, incluyendo `attempt_index`. [P-RF-18, D-03]
-- [ ] Render markdown + chips de citas con documento y página. Respuesta final con efecto **typewriter** sobre texto ya validado (sin streaming del proveedor); indicador "escribiendo" mientras el servidor procesa. [P-RF-11, D-04]
-- [ ] Estado `sin_fuente` sin inventar citas; evento de calidad si `respondido` llega sin citas. [P-RF-12, §7.2]
-- [ ] Preguntas guiadas: opciones 2-4 + input libre; elegir una opción genera un turno nuevo por el mismo endpoint. [P-RF-13]
-- [ ] Completar `scripts/index-knowledge-documents.ts` e indexar los 8 manuales (requiere los PDFs — ver bloqueos). [P-RF-19, P-RF-20]
+Verificado e2e en navegador contra Gemini y Supabase reales (2026-07-17): pregunta sobre el Reglamento → respondido con 3 citas con página y `knowledge_document_id` (3/3 con versión coincidente); pregunta fuera de alcance → `sin_fuente` sin citas; eventos y cuota correctos en la base.
 
 ---
 
@@ -116,12 +112,22 @@ Capacidad documentada para Gemini 3 / `gemini-3.5-flash`; lo que se valida es qu
 
 ---
 
+## Fase 6 — UI y design system (al final, decisión 2026-07-17)
+
+Primero toda la funcionalidad; la capa visual se aplica al final sobre pantallas ya estables.
+
+- [ ] Retomar la rama **`feat/design-system`** (PR #4, cerrado sin merge; NO borrar la rama): tokens de marca de `ruta` (scouts-*, secciones, PNPJ, radius), tipografías locales Futura/JollyGood (`app/fuentes.ts` + `app/fonts/`), superficies `auth-hero`/`auth-card-surface` (glass) y `components/ui/card`. Todo quedó construido y verificado (preview desplegado en el PR #4); al retomar: rebase sobre master o re-aplicación por partes (los archivos de tokens/fuentes son aditivos; solo las pantallas tocadas necesitan ajuste manual).
+- [ ] Aplicar el design system al chat y pantallas nuevas de las Fases 3-4.
+- [ ] Traer de `ruta` los `components/ui` restantes y el `theme-toggle` (acoplado en ruta a su cookie de tema; adaptar).
+
+---
+
 ## Bloqueos organizacionales (en paralelo, no son de ingeniería)
 
 Estos no dependen de código, pero pueden frenar el lanzamiento si llegan tarde.
 
 - [ ] **Obtener los 8 PDFs oficiales aprobados, con versión definida.** Bloquea la indexación de Fase 3. (1 PDF de prueba basta para la Fase 1.)
-- [ ] Texto y versión de la política de privacidad y los términos. Bloquea el flujo de consentimiento de Fase 2.
+- [ ] Texto y versión de la política de privacidad y los términos. Bloquea el flujo de consentimiento de Fase 2. **Al publicarla: fijar `PRIVACY_POLICY_VERSION` en Vercel (sin esa variable el gate del chat queda abierto a propósito durante la construcción — es requisito del checklist de lanzamiento, §19) y construir la UI de aceptación.**
 - [ ] Decisión del default de `account_status` para menores: `activo` o `pendiente_autorizacion`.
 - [ ] Política de autorización de adulto responsable para usuarios de 15 a 17.
 - [ ] Política de situaciones sensibles, requisito previo a cualquier escalamiento (P2).
