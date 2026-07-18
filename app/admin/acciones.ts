@@ -3,57 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { requerirAdmin } from "@/lib/admin/guard";
 import { crearClienteAdmin } from "@/lib/supabase/admin";
-import { MOTIVOS_PREDEFINIDOS } from "./motivos";
 
 export type EstadoAccion = { error: string | null };
-
-/**
- * Registra el motivo de acceso a una conversación ajena (P-RF-16/17).
- * Sin motivo no hay acceso; el evento es append-only.
- */
-export async function registrarAccesoConversacion(
-  _estadoPrevio: EstadoAccion,
-  formData: FormData
-): Promise<EstadoAccion> {
-  const { user } = await requerirAdmin();
-
-  const conversationId = String(formData.get("conversationId") ?? "");
-  const categoria = String(formData.get("categoria") ?? "").trim();
-  const detalle = String(formData.get("detalle") ?? "").trim();
-
-  if (!conversationId) {
-    return { error: "Falta la conversación." };
-  }
-  // El motivo se valida contra la lista en el servidor: no se confía en las
-  // opciones renderizadas por el cliente.
-  const categoriaValida =
-    (MOTIVOS_PREDEFINIDOS as readonly string[]).includes(categoria) ||
-    categoria === "Otro";
-  if (!categoriaValida) {
-    return { error: "Selecciona un motivo de la lista." };
-  }
-  if (categoria === "Otro" && detalle.length < 10) {
-    return { error: "Describe el motivo (mínimo 10 caracteres)." };
-  }
-
-  const reason = detalle ? `${categoria}: ${detalle}` : categoria;
-
-  const admin = crearClienteAdmin();
-  const { error } = await admin.from("admin_audit_events").insert({
-    admin_user_id: user.id,
-    action: "view_user_conversation",
-    target_type: "conversation",
-    target_id: conversationId,
-    reason,
-  });
-
-  if (error) {
-    return { error: `No se pudo registrar el acceso: ${error.message}` };
-  }
-
-  revalidatePath(`/admin/conversaciones/${conversationId}`);
-  return { error: null };
-}
 
 /**
  * Activa/desactiva un documento con auditoría atómica (RPC): o se aplican

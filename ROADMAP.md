@@ -95,11 +95,11 @@ Verificado e2e en navegador contra Gemini y Supabase reales (2026-07-17): pregun
 ## Fase 4 — Administración y control
 
 - [x] Panel admin (`/admin`, guard de rol en servidor): listar conversaciones de usuarios, con el listado también auditado (`list_user_conversations`). [P-RF-15]
-- [x] Ver conversación ajena: motivo obligatorio (predefinidos del SRS §16 + "Otro" con detalle) → `admin_audit_events` → contenido visible dentro de una ventana de acceso de 30 min por motivo registrado. [P-RF-16, P-RF-17]
+- [x] Ver conversación ajena: acceso directo sin motivo (decisión 2026-07-17, errata 7 del pilot-scope) con log silencioso automático en `admin_audit_events` por cada apertura, fail-closed. [P-RF-17; P-RF-16 derogado]
 - [x] Página admin de documentos: listar (nombre, versión, indexación, error) y activar/desactivar con auditoría; la desactivación sale del `metadataFilter` de inmediato. [P-RF-19, §13.2]
 - [x] Cambios de estado de cuenta desde admin con motivo y auditoría (`change_user_status`); un admin no puede cambiarse a sí mismo.
 
-Verificado e2e en navegador (2026-07-17): motivo-gate sin fugas de contenido, auditoría completa (5 acciones con motivos), toggle de documento reflejado en la base, bloqueo de cuenta efectivo end-to-end, y un scout no accede a `/admin` (redirect).
+Verificado e2e (2026-07-17): acceso directo del admin con log silencioso registrado por apertura, toggle de documento reflejado en la base, bloqueo de cuenta efectivo end-to-end (RPC atómica update+auditoría), y un scout no accede a `/admin` (redirect).
 
 ---
 

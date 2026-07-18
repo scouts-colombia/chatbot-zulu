@@ -68,14 +68,13 @@ async function ListaConversaciones({
     }
   }
 
-  // Solo metadata: el título viene del primer mensaje del usuario, así que
-  // mostrarlo aquí filtraría contenido sin pasar por el motivo (P-RF-16).
   const inicio = (pagina - 1) * TAMANO_PAGINA;
   const { data: conversaciones, count } = await admin
     .from("conversations")
-    .select("id, archived, created_at, updated_at, profiles(nombre, email)", {
-      count: "exact",
-    })
+    .select(
+      "id, title, archived, created_at, updated_at, profiles(nombre, email)",
+      { count: "exact" }
+    )
     .order("updated_at", { ascending: false })
     .range(inicio, inicio + TAMANO_PAGINA - 1);
 
@@ -111,10 +110,10 @@ async function ListaConversaciones({
                   href={`/admin/conversaciones/${conversacion.id}`}
                   prefetch={false}
                 >
-                  Conversación de {dueno?.nombre ?? dueno?.email ?? "—"}
+                  {conversacion.title}
                 </Link>
                 <p className="truncate text-muted-foreground text-xs">
-                  {dueno?.email ?? "—"}
+                  {dueno?.nombre ?? dueno?.email ?? "—"}
                   {conversacion.archived && " · archivada"}
                 </p>
               </div>

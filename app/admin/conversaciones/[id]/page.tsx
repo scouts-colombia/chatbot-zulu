@@ -5,11 +5,6 @@ import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { requerirAdmin } from "@/lib/admin/guard";
 import { crearClienteAdmin } from "@/lib/supabase/admin";
-import { FormularioMotivo } from "./formulario-motivo";
-
-// Ventana de acceso: un motivo registrado cubre los reingresos de la misma
-// sesión de revisión. Pasada la ventana, el acceso exige motivo nuevo.
-const VENTANA_ACCESO_MINUTOS = 30;
 
 export default function PaginaConversacionAdmin({
   params,
@@ -34,11 +29,9 @@ async function DetalleConversacion({
   const { user } = await requerirAdmin();
   const admin = crearClienteAdmin();
 
-  // Antes del motivo solo se consulta metadata: el título se deriva del
-  // primer mensaje del usuario, así que se lee junto con el contenido.
   const { data: conversacion } = await admin
     .from("conversations")
-    .select("id, archived, profiles(nombre, email)")
+    .select("id, title, archived, profiles(nombre, email)")
     .eq("id", id)
     .single();
 
@@ -46,87 +39,45 @@ async function DetalleConversacion({
     notFound();
   }
 
-  // Sin motivo registrado (reciente) no hay acceso al contenido (P-RF-16).
-  const desde = new Date(
-    Date.now() - VENTANA_ACCESO_MINUTOS * 60_000
-  ).toISOString();
-  // La ventana se ancla al registro del motivo: las filas de reapertura se
-  // excluyen para que reabrir no renueve la ventana indefinidamente.
-  const { data: acceso } = await admin
-    .from("admin_audit_events")
-    .select("id, reason, created_at")
-    .eq("admin_user_id", user.id)
-    .eq("action", "view_user_conversation")
-    .eq("target_id", id)
-    .gte("created_at", desde)
-    .not("reason", "like", "Reapertura%")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
   const dueno = conversacion.profiles as unknown as {
     nombre: string | null;
     email: string;
   } | null;
 
-  if (!acceso) {
-    // Sin motivo tampoco se muestra el título: se deriva del primer mensaje
-    // del usuario, así que es contenido, no metadata.
+  // Acceso directo con log silencioso (decisión 2026-07-17): el admin no
+  // registra motivo ni ve fricción, pero cada apertura deja su fila de
+  // auditoría. Sin registro confirmado no se muestra el contenido.
+  const { error: errorAuditoria } = await admin
+    .from("admin_audit_events")
+    .insert({
+      admin_user_id: user.id,
+      action: "view_user_conversation",
+      target_type: "conversation",
+      target_id: id,
+      reason: "Acceso directo desde el panel",
+    });
+
+  if (errorAuditoria) {
     return (
       <div className="space-y-6">
         <Encabezado
           archivada={Boolean(conversacion.archived)}
           dueno={dueno}
-          titulo={null}
+          titulo={conversacion.title as string}
         />
-        <FormularioMotivo conversationId={id} />
+        <p className="text-destructive text-sm" role="alert">
+          No se pudo registrar el acceso, así que la conversación no se muestra.
+          Intenta de nuevo.
+        </p>
       </div>
     );
   }
 
-  // Todo acceso al contenido queda auditado (P-RF-17): las reaperturas dentro
-  // de la ventana registran su propia fila, reusando el motivo vigente. Los
-  // segundos de gracia evitan duplicar la fila que acaba de crear el
-  // formulario de motivo en su primera apertura.
-  const edadAccesoMs =
-    Date.now() - new Date(acceso.created_at as string).getTime();
-  if (edadAccesoMs > 10_000) {
-    const { error: errorReapertura } = await admin
-      .from("admin_audit_events")
-      .insert({
-        admin_user_id: user.id,
-        action: "view_user_conversation",
-        target_type: "conversation",
-        target_id: id,
-        reason: `Reapertura dentro de la ventana (${acceso.reason})`,
-      });
-    // Sin auditoría no hay acceso: si la fila de reapertura no se pudo
-    // registrar, el contenido no se muestra (P-RF-17).
-    if (errorReapertura) {
-      return (
-        <div className="space-y-6">
-          <Encabezado
-            archivada={Boolean(conversacion.archived)}
-            dueno={dueno}
-            titulo={null}
-          />
-          <p className="text-destructive text-sm" role="alert">
-            No se pudo registrar la auditoría de este acceso, así que la
-            conversación no se muestra. Intenta de nuevo.
-          </p>
-        </div>
-      );
-    }
-  }
-
-  const [{ data: conTitulo }, { data: mensajes }] = await Promise.all([
-    admin.from("conversations").select("title").eq("id", id).single(),
-    admin
-      .from("messages")
-      .select("id, sender, content, created_at")
-      .eq("conversation_id", id)
-      .order("created_at", { ascending: true }),
-  ]);
+  const { data: mensajes } = await admin
+    .from("messages")
+    .select("id, sender, content, created_at")
+    .eq("conversation_id", id)
+    .order("created_at", { ascending: true });
 
   // Las citas viven solo en `citations` (D-12) y las preguntas guiadas en
   // sus propias tablas: se componen aparte, igual que en el chat, para que
@@ -156,12 +107,8 @@ async function DetalleConversacion({
       <Encabezado
         archivada={Boolean(conversacion.archived)}
         dueno={dueno}
-        titulo={(conTitulo?.title as string) ?? null}
+        titulo={conversacion.title as string}
       />
-      <p className="rounded-lg bg-muted px-3 py-2 text-muted-foreground text-xs">
-        Acceso auditado: {acceso.reason} ·{" "}
-        {new Date(acceso.created_at as string).toLocaleString("es-CO")}
-      </p>
 
       <div className="space-y-4">
         {(mensajes ?? []).map((mensaje) => {
@@ -238,7 +185,7 @@ function Encabezado({
   dueno,
   archivada,
 }: {
-  titulo: string | null;
+  titulo: string;
   dueno: { nombre: string | null; email: string } | null;
   archivada: boolean;
 }) {
@@ -251,9 +198,7 @@ function Encabezado({
       >
         ← Volver
       </Link>
-      <h2 className="mt-2 font-medium">
-        {titulo ?? `Conversación de ${dueno?.nombre ?? dueno?.email ?? "—"}`}
-      </h2>
+      <h2 className="mt-2 font-medium">{titulo}</h2>
       <p className="text-muted-foreground text-sm">
         {dueno?.nombre ?? "—"} · {dueno?.email ?? "—"}
         {archivada && " · archivada"}
