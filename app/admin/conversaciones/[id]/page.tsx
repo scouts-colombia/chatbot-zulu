@@ -34,9 +34,11 @@ async function DetalleConversacion({
   const { user } = await requerirAdmin();
   const admin = crearClienteAdmin();
 
+  // Antes del motivo solo se consulta metadata: el título se deriva del
+  // primer mensaje del usuario, así que se lee junto con el contenido.
   const { data: conversacion } = await admin
     .from("conversations")
-    .select("id, title, archived, profiles(nombre, email)")
+    .select("id, archived, profiles(nombre, email)")
     .eq("id", id)
     .single();
 
@@ -89,20 +91,42 @@ async function DetalleConversacion({
   const edadAccesoMs =
     Date.now() - new Date(acceso.created_at as string).getTime();
   if (edadAccesoMs > 10_000) {
-    await admin.from("admin_audit_events").insert({
-      admin_user_id: user.id,
-      action: "view_user_conversation",
-      target_type: "conversation",
-      target_id: id,
-      reason: `Reapertura dentro de la ventana (${acceso.reason})`,
-    });
+    const { error: errorReapertura } = await admin
+      .from("admin_audit_events")
+      .insert({
+        admin_user_id: user.id,
+        action: "view_user_conversation",
+        target_type: "conversation",
+        target_id: id,
+        reason: `Reapertura dentro de la ventana (${acceso.reason})`,
+      });
+    // Sin auditoría no hay acceso: si la fila de reapertura no se pudo
+    // registrar, el contenido no se muestra (P-RF-17).
+    if (errorReapertura) {
+      return (
+        <div className="space-y-6">
+          <Encabezado
+            archivada={Boolean(conversacion.archived)}
+            dueno={dueno}
+            titulo={null}
+          />
+          <p className="text-destructive text-sm" role="alert">
+            No se pudo registrar la auditoría de este acceso, así que la
+            conversación no se muestra. Intenta de nuevo.
+          </p>
+        </div>
+      );
+    }
   }
 
-  const { data: mensajes } = await admin
-    .from("messages")
-    .select("id, sender, content, created_at")
-    .eq("conversation_id", id)
-    .order("created_at", { ascending: true });
+  const [{ data: conTitulo }, { data: mensajes }] = await Promise.all([
+    admin.from("conversations").select("title").eq("id", id).single(),
+    admin
+      .from("messages")
+      .select("id, sender, content, created_at")
+      .eq("conversation_id", id)
+      .order("created_at", { ascending: true }),
+  ]);
 
   // Las citas viven solo en `citations` (D-12): se componen aparte, igual
   // que en el chat, para que el admin pueda verificar la fuente citada.
@@ -122,7 +146,7 @@ async function DetalleConversacion({
       <Encabezado
         archivada={Boolean(conversacion.archived)}
         dueno={dueno}
-        titulo={conversacion.title as string}
+        titulo={(conTitulo?.title as string) ?? null}
       />
       <p className="rounded-lg bg-muted px-3 py-2 text-muted-foreground text-xs">
         Acceso auditado: {acceso.reason} ·{" "}

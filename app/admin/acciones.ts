@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requerirAdmin } from "@/lib/admin/guard";
 import { crearClienteAdmin } from "@/lib/supabase/admin";
+import { MOTIVOS_PREDEFINIDOS } from "./motivos";
 
 export type EstadoAccion = { error: string | null };
 
@@ -23,8 +24,13 @@ export async function registrarAccesoConversacion(
   if (!conversationId) {
     return { error: "Falta la conversación." };
   }
-  if (!categoria) {
-    return { error: "Selecciona un motivo." };
+  // El motivo se valida contra la lista en el servidor: no se confía en las
+  // opciones renderizadas por el cliente.
+  const categoriaValida =
+    (MOTIVOS_PREDEFINIDOS as readonly string[]).includes(categoria) ||
+    categoria === "Otro";
+  if (!categoriaValida) {
+    return { error: "Selecciona un motivo de la lista." };
   }
   if (categoria === "Otro" && detalle.length < 10) {
     return { error: "Describe el motivo (mínimo 10 caracteres)." };
