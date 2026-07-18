@@ -104,6 +104,19 @@ async function DetalleConversacion({
     .eq("conversation_id", id)
     .order("created_at", { ascending: true });
 
+  // Las citas viven solo en `citations` (D-12): se componen aparte, igual
+  // que en el chat, para que el admin pueda verificar la fuente citada.
+  const idsAsistente = (mensajes ?? [])
+    .filter((mensaje) => mensaje.sender === "asistente")
+    .map((mensaje) => mensaje.id);
+  const { data: citas } =
+    idsAsistente.length > 0
+      ? await admin
+          .from("citations")
+          .select("id, message_id, document_title_snapshot, page_number")
+          .in("message_id", idsAsistente)
+      : { data: [] as never[] };
+
   return (
     <div className="space-y-6">
       <Encabezado
@@ -117,28 +130,48 @@ async function DetalleConversacion({
       </p>
 
       <div className="space-y-4">
-        {(mensajes ?? []).map((mensaje) => (
-          <div
-            className={
-              mensaje.sender === "usuario"
-                ? "flex justify-end"
-                : "flex justify-start"
-            }
-            key={mensaje.id}
-          >
-            <div className="max-w-[85%] rounded-2xl border bg-card px-4 py-2.5 text-sm">
-              <p className="mb-1 text-muted-foreground text-xs">
-                {mensaje.sender} ·{" "}
-                {new Date(mensaje.created_at as string).toLocaleString("es-CO")}
-              </p>
-              <div className="prose prose-sm dark:prose-invert max-w-none">
-                <Markdown remarkPlugins={[remarkGfm]}>
-                  {mensaje.content}
-                </Markdown>
+        {(mensajes ?? []).map((mensaje) => {
+          const citasMensaje = (citas ?? []).filter(
+            (cita) => cita.message_id === mensaje.id
+          );
+          return (
+            <div
+              className={
+                mensaje.sender === "usuario"
+                  ? "flex justify-end"
+                  : "flex justify-start"
+              }
+              key={mensaje.id}
+            >
+              <div className="max-w-[85%] rounded-2xl border bg-card px-4 py-2.5 text-sm">
+                <p className="mb-1 text-muted-foreground text-xs">
+                  {mensaje.sender} ·{" "}
+                  {new Date(mensaje.created_at as string).toLocaleString(
+                    "es-CO"
+                  )}
+                </p>
+                <div className="prose prose-sm dark:prose-invert max-w-none">
+                  <Markdown remarkPlugins={[remarkGfm]}>
+                    {mensaje.content}
+                  </Markdown>
+                </div>
+                {citasMensaje.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {citasMensaje.map((cita) => (
+                      <span
+                        className="rounded-full bg-muted px-2 py-0.5 text-muted-foreground text-xs"
+                        key={cita.id}
+                      >
+                        {cita.document_title_snapshot}
+                        {cita.page_number != null && `, p. ${cita.page_number}`}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -158,6 +191,7 @@ function Encabezado({
       <Link
         className="text-muted-foreground text-sm hover:text-foreground"
         href="/admin/conversaciones"
+        prefetch={false}
       >
         ← Volver
       </Link>

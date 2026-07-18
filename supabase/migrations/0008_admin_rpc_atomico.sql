@@ -77,3 +77,10 @@ revoke execute on function public.admin_cambiar_estado_cuenta(uuid, uuid, text, 
   from public, anon, authenticated;
 revoke execute on function public.admin_cambiar_documento_activo(uuid, uuid, boolean, text)
   from public, anon, authenticated;
+
+-- Grant explícito: sin él, en proyectos con default privileges restringidos
+-- la service role quedaría sin EXECUTE tras el revoke de public.
+grant execute on function public.admin_cambiar_estado_cuenta(uuid, uuid, text, text)
+  to service_role;
+grant execute on function public.admin_cambiar_documento_activo(uuid, uuid, boolean, text)
+  to service_role;

@@ -75,6 +75,7 @@ async function ListaConversaciones() {
               <Link
                 className="block truncate text-sm hover:underline"
                 href={`/admin/conversaciones/${conversacion.id}`}
+                prefetch={false}
               >
                 Conversación de {dueno?.nombre ?? dueno?.email ?? "—"}
               </Link>

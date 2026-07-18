@@ -17,14 +17,28 @@ export default function LayoutAdmin({
           ← Chat
         </Link>
         <h1 className="font-semibold">Panel admin</h1>
+        {/* Sin prefetch: las páginas admin registran auditoría al renderizar;
+            el acceso debe originarse solo en una navegación intencional. */}
         <nav className="flex gap-3 text-sm">
-          <Link className="hover:underline" href="/admin/conversaciones">
+          <Link
+            className="hover:underline"
+            href="/admin/conversaciones"
+            prefetch={false}
+          >
             Conversaciones
           </Link>
-          <Link className="hover:underline" href="/admin/documentos">
+          <Link
+            className="hover:underline"
+            href="/admin/documentos"
+            prefetch={false}
+          >
             Documentos
           </Link>
-          <Link className="hover:underline" href="/admin/usuarios">
+          <Link
+            className="hover:underline"
+            href="/admin/usuarios"
+            prefetch={false}
+          >
             Usuarios
           </Link>
         </nav>

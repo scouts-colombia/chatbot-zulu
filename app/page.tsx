@@ -69,7 +69,9 @@ async function ContenidoPrincipal() {
         <div className="flex items-center gap-2">
           {perfil?.role === "admin" && (
             <Button asChild size="sm" variant="ghost">
-              <Link href="/admin">Panel admin</Link>
+              <Link href="/admin" prefetch={false}>
+                Panel admin
+              </Link>
             </Button>
           )}
           <form action={cerrarSesion}>
