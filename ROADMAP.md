@@ -2,25 +2,34 @@
 
 Plan por fases derivado del alcance v0.3.1. Las referencias entre corchetes apuntan a requisitos `P-RF`, secciones `§` y decisiones `D` de `docs/pilot-scope-v0.3.1.md`.
 
-Regla de trabajo: las fases van en orden, pero la Fase 1 (spikes) y la Fase 2 (datos/auth) no dependen entre sí; pueden avanzar en paralelo. Nada de Fase 3 sin los spikes verdes.
+Regla de trabajo: las fases van en orden (la regla original de paralelismo entre Fases 1 y 2 ya cumplió su propósito: ambas están cerradas y los spikes quedaron verdes).
 
 ---
 
-## Estado actual (2026-07-15)
+## Estado actual (2026-07-17) — handoff
+
+**Dónde está el proyecto:** Fases 0 a 4 cerradas. Solo queda la Fase 5 (evaluación RAG) como trabajo de ingeniería del piloto; la Fase 6 (design system) va al final por decisión de producto. Los bloqueos restantes son organizacionales, no de código.
 
 **Hecho:**
-- Documentación colocada y con autoridad definida (`docs/pilot-scope-v0.3.1.md` manda; erratas del 2026-06-02 al inicio).
-- Decisiones cerradas: Supabase Auth (fuera NextAuth), sin streaming del proveedor + typewriter local, SQL dueño del esquema, Gemini Developer API con `gemini-3.5-flash`, spikes con criterios de verde.
-- `CLAUDE.md`, `AGENTS.md` y este ROADMAP en la raíz.
-- Fase 0 cerrada salvo un secreto: Supabase creado (**ChatBot Zulú**, `ddimxdrggrrfcvzwwben`) y conectado por MCP; key de Gemini validada; `.env` ajustados; PDF de prueba en `data/pdfs/`.
-- **Fase 1 cerrada: gate de spikes VERDE (7/7) el 2026-07-15.** Ver `docs/notes/spike-file-search-resultado.md`. La Fase 3 queda desbloqueada en cuanto cierre la Fase 2.
+- Fases 0 y 1 cerradas: infra completa (Supabase **ChatBot Zulú** `ddimxdrggrrfcvzwwben`, Gemini Developer API con `gemini-3.5-flash`, Vercel con previews por PR) y gate de spikes VERDE 7/7 (`docs/notes/spike-file-search-resultado.md`).
+- Fase 2 cerrada salvo consentimiento (bloqueado por el texto de la política): migraciones aplicadas, RLS verificada 23/23 (`scripts/verify-rls.mjs`), plantilla podada, Supabase Auth en español. El gate de consentimiento en el chat ya existe y se activa al fijar `PRIVACY_POLICY_VERSION`.
+- **Fase 3 cerrada (PR #5, mergeado):** chat completo contra Gemini File Search — cuota atómica por RPC, citas por `knowledge_document_id` con `metadataFilter` de documentos activos, retry único de JSON, bloqueo del proveedor mapeado, typewriter, preguntas guiadas, `scripts/index-knowledge-documents.ts` idempotente. Verificado e2e contra servicios reales.
+- **Fase 4 cerrada (PR #6, abierto a la espera de merge):** panel admin con guard de rol en servidor — listado paginado de conversaciones, **acceso directo al contenido con log silencioso** (sin motivo; cada apertura registra fila en `admin_audit_events`, fail-closed), transcripción completa (mensajes con usuario en texto plano, citas, preguntas guiadas), documentos y estados de cuenta con RPCs atómicas (migración `0008`). 15 hallazgos de Codex corregidos en 4 rondas + ronda 5 limpia; checks verdes y merge state CLEAN.
+- Migraciones aplicadas al proyecto: `0001`–`0008`. El store de File Search tiene 1 PDF de prueba indexado (Reglamento Red De Jóvenes v2018).
 
-- Fase 2 / Esquema y RLS cerrado: migraciones 0001–0005 aplicadas al proyecto, RLS verificada 23/23 (`scripts/verify-rls.mjs`), seed de admin documentado.
-- Fase 2 / Poda y auth cerrados: plantilla podada (fuera NextAuth, Drizzle, artefactos, streams; ~40 dependencias menos), Supabase Auth con UI en español verificada en navegador contra el proyecto real. Despliegue en Vercel activo con previews por PR.
+**Decisiones nuevas (2026-07-17):**
+- **Acceso admin sin motivo obligatorio**: errata 7 de `docs/pilot-scope-v0.3.1.md` (deroga P-RF-16; P-RF-17 se mantiene vía log silencioso automático). Reflejada en `CLAUDE.md` y `AGENTS.md`. **No reintroducir el formulario de motivo.**
+- Design system al final (Fase 6); la rama `feat/design-system` se conserva sin borrar.
 
-**Siguiente:** Fase 3 — chat con Gemini File Search (los spikes ya están verdes). El consentimiento (Fase 2) queda bloqueado por el texto de la política.
+**Flujo de trabajo vigente** (detalle en `CONTRIBUTING.md`): rama → PR → CI verde → revisión de Codex (responder cada comentario, resolver hilos, reinvocar con `@codex review` hasta ronda limpia) → squash and merge, que hace el dueño del repo personalmente.
 
-**Pendiente de decisión/gestión:** obtención de los 8 PDFs oficiales, ejecutar el seed del admin cuando se registre, eliminar `AUTH_SECRET` de Vercel (ya no se usa), bloqueos organizacionales (abajo).
+**Siguiente:** merge del PR #6 (lo hace el dueño) → **Fase 5**: cargar los 30 casos en `rag_eval_cases` (12/6/6/4/2) y construir el runner que persista en `rag_eval_runs`.
+
+**Pendiente de gestión:**
+- Ejecutar `scripts/seed-admin.sql` cuando el admin real se registre.
+- Eliminar `AUTH_SECRET` de Vercel (ya no se usa).
+- 16 alertas de Dependabot en master (3 altas): hacer una pasada de `pnpm update` en rama propia.
+- Bloqueos organizacionales (sección al final): 8 PDFs oficiales, política de privacidad (`PRIVACY_POLICY_VERSION` + UI de aceptación), defaults para menores.
 
 ---
 
@@ -109,8 +118,8 @@ Verificado e2e (2026-07-17): acceso directo del admin con log silencioso registr
 - [ ] Runner de evaluación que ejecute contra la API real y guarde resultados en `rag_eval_runs`.
 - [ ] Ajustar prompts según resultados; repetir hasta cumplir los umbrales de §14.2.
 - [ ] Pruebas: citas reales, preguntas fuera de alcance sin inventar fuente, adversariales e inyección, bloqueo de seguridad, JSON inválido con retry.
-- [ ] Revisión de RLS y recorrido completo de la Definition of Done (§18) y el checklist técnico (§19).
-- [ ] Despliegue en Vercel.
+- [ ] Revisión de RLS y recorrido completo de la Definition of Done (§18, con la errata 7) y el checklist técnico (§19).
+- [x] Despliegue en Vercel: activo desde la Fase 2 (previews por PR + producción en master). Queda solo verificar variables de producción en el recorrido del checklist.
 
 ---
 
