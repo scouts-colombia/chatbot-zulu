@@ -128,18 +128,28 @@ async function DetalleConversacion({
       .order("created_at", { ascending: true }),
   ]);
 
-  // Las citas viven solo en `citations` (D-12): se componen aparte, igual
-  // que en el chat, para que el admin pueda verificar la fuente citada.
+  // Las citas viven solo en `citations` (D-12) y las preguntas guiadas en
+  // sus propias tablas: se componen aparte, igual que en el chat, para que
+  // el admin vea la transcripción completa que vio el Scout.
   const idsAsistente = (mensajes ?? [])
     .filter((mensaje) => mensaje.sender === "asistente")
     .map((mensaje) => mensaje.id);
-  const { data: citas } =
+  const [{ data: citas }, { data: preguntas }] = await Promise.all([
     idsAsistente.length > 0
-      ? await admin
+      ? admin
           .from("citations")
           .select("id, message_id, document_title_snapshot, page_number")
           .in("message_id", idsAsistente)
-      : { data: [] as never[] };
+      : Promise.resolve({ data: [] as never[] }),
+    idsAsistente.length > 0
+      ? admin
+          .from("guided_questions")
+          .select(
+            "id, message_id, text, guided_question_options(id, label, order_index)"
+          )
+          .in("message_id", idsAsistente)
+      : Promise.resolve({ data: [] as never[] }),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -158,6 +168,9 @@ async function DetalleConversacion({
           const citasMensaje = (citas ?? []).filter(
             (cita) => cita.message_id === mensaje.id
           );
+          const preguntaMensaje = (preguntas ?? []).find(
+            (pregunta) => pregunta.message_id === mensaje.id
+          );
           return (
             <div
               className={
@@ -174,11 +187,30 @@ async function DetalleConversacion({
                     "es-CO"
                   )}
                 </p>
-                <div className="prose prose-sm dark:prose-invert max-w-none">
-                  <Markdown remarkPlugins={[remarkGfm]}>
-                    {mensaje.content}
-                  </Markdown>
-                </div>
+                {mensaje.sender === "usuario" ? (
+                  // Texto plano, como en el chat: el contenido del usuario no
+                  // se interpreta como Markdown (evita cargas externas al
+                  // revisar, p. ej. imágenes hacia terceros).
+                  <p className="whitespace-pre-wrap">{mensaje.content}</p>
+                ) : (
+                  <div className="prose prose-sm dark:prose-invert max-w-none">
+                    <Markdown remarkPlugins={[remarkGfm]}>
+                      {mensaje.content}
+                    </Markdown>
+                  </div>
+                )}
+                {preguntaMensaje && (
+                  <div className="mt-2 rounded-lg bg-muted px-3 py-2 text-xs">
+                    <p className="font-medium">{preguntaMensaje.text}</p>
+                    <ul className="mt-1 list-inside list-disc text-muted-foreground">
+                      {[...(preguntaMensaje.guided_question_options ?? [])]
+                        .sort((a, b) => a.order_index - b.order_index)
+                        .map((opcion) => (
+                          <li key={opcion.id}>{opcion.label}</li>
+                        ))}
+                    </ul>
+                  </div>
+                )}
                 {citasMensaje.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {citasMensaje.map((cita) => (
