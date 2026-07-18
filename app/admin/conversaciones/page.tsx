@@ -13,21 +13,41 @@ export default function PaginaConversacionesAdmin() {
   );
 }
 
+// Ventana corta para no duplicar el evento de listado en recargas seguidas
+// de la misma sesión de revisión; cada sesión nueva vuelve a quedar auditada.
+const VENTANA_LISTADO_MINUTOS = 5;
+
 async function ListaConversaciones() {
   const { user } = await requerirAdmin();
   const admin = crearClienteAdmin();
 
   // El listado también queda auditado (acción list_user_conversations, §8.8).
-  await admin.from("admin_audit_events").insert({
-    admin_user_id: user.id,
-    action: "list_user_conversations",
-    target_type: "conversation_list",
-    reason: "Listado desde el panel admin",
-  });
+  const desde = new Date(
+    Date.now() - VENTANA_LISTADO_MINUTOS * 60_000
+  ).toISOString();
+  const { data: listadoReciente } = await admin
+    .from("admin_audit_events")
+    .select("id")
+    .eq("admin_user_id", user.id)
+    .eq("action", "list_user_conversations")
+    .gte("created_at", desde)
+    .limit(1)
+    .maybeSingle();
 
+  if (!listadoReciente) {
+    await admin.from("admin_audit_events").insert({
+      admin_user_id: user.id,
+      action: "list_user_conversations",
+      target_type: "conversation_list",
+      reason: "Listado desde el panel admin",
+    });
+  }
+
+  // Solo metadata: el título viene del primer mensaje del usuario, así que
+  // mostrarlo aquí filtraría contenido sin pasar por el motivo (P-RF-16).
   const { data: conversaciones } = await admin
     .from("conversations")
-    .select("id, title, archived, updated_at, profiles(nombre, email)")
+    .select("id, archived, created_at, updated_at, profiles(nombre, email)")
     .order("updated_at", { ascending: false })
     .limit(100);
 
@@ -56,10 +76,10 @@ async function ListaConversaciones() {
                 className="block truncate text-sm hover:underline"
                 href={`/admin/conversaciones/${conversacion.id}`}
               >
-                {conversacion.title}
+                Conversación de {dueno?.nombre ?? dueno?.email ?? "—"}
               </Link>
               <p className="truncate text-muted-foreground text-xs">
-                {dueno?.nombre ?? dueno?.email ?? "—"}
+                {dueno?.email ?? "—"}
                 {conversacion.archived && " · archivada"}
               </p>
             </div>

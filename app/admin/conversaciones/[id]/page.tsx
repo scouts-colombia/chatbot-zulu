@@ -48,6 +48,8 @@ async function DetalleConversacion({
   const desde = new Date(
     Date.now() - VENTANA_ACCESO_MINUTOS * 60_000
   ).toISOString();
+  // La ventana se ancla al registro del motivo: las filas de reapertura se
+  // excluyen para que reabrir no renueve la ventana indefinidamente.
   const { data: acceso } = await admin
     .from("admin_audit_events")
     .select("id, reason, created_at")
@@ -55,6 +57,7 @@ async function DetalleConversacion({
     .eq("action", "view_user_conversation")
     .eq("target_id", id)
     .gte("created_at", desde)
+    .not("reason", "like", "Reapertura%")
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -65,16 +68,34 @@ async function DetalleConversacion({
   } | null;
 
   if (!acceso) {
+    // Sin motivo tampoco se muestra el título: se deriva del primer mensaje
+    // del usuario, así que es contenido, no metadata.
     return (
       <div className="space-y-6">
         <Encabezado
           archivada={Boolean(conversacion.archived)}
           dueno={dueno}
-          titulo={conversacion.title as string}
+          titulo={null}
         />
         <FormularioMotivo conversationId={id} />
       </div>
     );
+  }
+
+  // Todo acceso al contenido queda auditado (P-RF-17): las reaperturas dentro
+  // de la ventana registran su propia fila, reusando el motivo vigente. Los
+  // segundos de gracia evitan duplicar la fila que acaba de crear el
+  // formulario de motivo en su primera apertura.
+  const edadAccesoMs =
+    Date.now() - new Date(acceso.created_at as string).getTime();
+  if (edadAccesoMs > 10_000) {
+    await admin.from("admin_audit_events").insert({
+      admin_user_id: user.id,
+      action: "view_user_conversation",
+      target_type: "conversation",
+      target_id: id,
+      reason: `Reapertura dentro de la ventana (${acceso.reason})`,
+    });
   }
 
   const { data: mensajes } = await admin
@@ -128,7 +149,7 @@ function Encabezado({
   dueno,
   archivada,
 }: {
-  titulo: string;
+  titulo: string | null;
   dueno: { nombre: string | null; email: string } | null;
   archivada: boolean;
 }) {
@@ -140,7 +161,9 @@ function Encabezado({
       >
         ← Volver
       </Link>
-      <h2 className="mt-2 font-medium">{titulo}</h2>
+      <h2 className="mt-2 font-medium">
+        {titulo ?? `Conversación de ${dueno?.nombre ?? dueno?.email ?? "—"}`}
+      </h2>
       <p className="text-muted-foreground text-sm">
         {dueno?.nombre ?? "—"} · {dueno?.email ?? "—"}
         {archivada && " · archivada"}

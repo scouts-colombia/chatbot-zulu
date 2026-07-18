@@ -1,8 +1,7 @@
 import { Suspense } from "react";
-import { Button } from "@/components/ui/button";
 import { requerirAdmin } from "@/lib/admin/guard";
 import { crearClienteAdmin } from "@/lib/supabase/admin";
-import { cambiarEstadoDocumento } from "../acciones";
+import { FormularioDocumento } from "./formulario-documento";
 
 export default function PaginaDocumentosAdmin() {
   return (
@@ -20,7 +19,9 @@ async function ListaDocumentos() {
 
   const { data: documentos } = await admin
     .from("knowledge_documents")
-    .select("id, display_name, version, active, indexed_at, last_index_error")
+    .select(
+      "id, display_name, version, active, indexed_at, metadata_synced_at, last_index_error"
+    )
     .order("display_name");
 
   if (!documentos || documentos.length === 0) {
@@ -62,17 +63,14 @@ async function ListaDocumentos() {
             >
               {documento.active ? "Activo" : "Inactivo"}
             </span>
-            <form action={cambiarEstadoDocumento}>
-              <input name="id" type="hidden" value={documento.id} />
-              <input
-                name="activar"
-                type="hidden"
-                value={String(!documento.active)}
-              />
-              <Button size="sm" type="submit" variant="outline">
-                {documento.active ? "Desactivar" : "Activar"}
-              </Button>
-            </form>
+            <FormularioDocumento
+              activo={Boolean(documento.active)}
+              id={documento.id as string}
+              listoParaActivar={
+                Boolean(documento.metadata_synced_at) &&
+                !documento.last_index_error
+              }
+            />
           </li>
         ))}
       </ul>

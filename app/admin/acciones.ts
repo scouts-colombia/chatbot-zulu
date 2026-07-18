@@ -49,34 +49,45 @@ export async function registrarAccesoConversacion(
   return { error: null };
 }
 
-export async function cambiarEstadoDocumento(formData: FormData) {
+/**
+ * Activa/desactiva un documento con auditoría atómica (RPC): o se aplican
+ * el cambio y el evento juntos, o no se aplica ninguno. Activar exige que
+ * el documento tenga metadata sincronizada y sin error de indexación.
+ */
+export async function cambiarEstadoDocumento(
+  _estadoPrevio: EstadoAccion,
+  formData: FormData
+): Promise<EstadoAccion> {
   const { user } = await requerirAdmin();
 
   const id = String(formData.get("id") ?? "");
   const activar = String(formData.get("activar") ?? "") === "true";
   if (!id) {
-    return;
+    return { error: "Falta el documento." };
   }
 
   const admin = crearClienteAdmin();
-  const { error } = await admin
-    .from("knowledge_documents")
-    .update({ active: activar })
-    .eq("id", id);
+  const { error } = await admin.rpc("admin_cambiar_documento_activo", {
+    p_admin_user_id: user.id,
+    p_document_id: id,
+    p_activar: activar,
+    p_reason: activar
+      ? "Activación manual desde el panel"
+      : "Desactivación manual desde el panel",
+  });
 
-  if (!error) {
-    await admin.from("admin_audit_events").insert({
-      admin_user_id: user.id,
-      action: "change_document_active",
-      target_type: "knowledge_document",
-      target_id: id,
-      reason: activar
-        ? "Activación manual desde el panel"
-        : "Desactivación manual desde el panel",
-    });
+  if (error) {
+    if (error.message.includes("documento_no_listo")) {
+      return {
+        error:
+          "El documento no está listo para activarse: no tiene metadata confirmada con el proveedor o tiene un error de indexación.",
+      };
+    }
+    return { error: `No se pudo cambiar el documento: ${error.message}` };
   }
 
   revalidatePath("/admin/documentos");
+  return { error: null };
 }
 
 export async function cambiarEstadoCuenta(
@@ -99,23 +110,22 @@ export async function cambiarEstadoCuenta(
     return { error: "No puedes cambiar tu propio estado." };
   }
 
+  // RPC atómica: el cambio de estado y su evento de auditoría se confirman
+  // juntos; si la auditoría no se puede registrar, el cambio no ocurre.
   const admin = crearClienteAdmin();
-  const { error } = await admin
-    .from("profiles")
-    .update({ account_status: estado })
-    .eq("id", userId);
+  const { error } = await admin.rpc("admin_cambiar_estado_cuenta", {
+    p_admin_user_id: user.id,
+    p_user_id: userId,
+    p_estado: estado,
+    p_reason: `→ ${estado}: ${motivo}`,
+  });
 
   if (error) {
+    if (error.message.includes("perfil_no_encontrado")) {
+      return { error: "No existe ese usuario." };
+    }
     return { error: `No se pudo cambiar el estado: ${error.message}` };
   }
-
-  await admin.from("admin_audit_events").insert({
-    admin_user_id: user.id,
-    action: "change_user_status",
-    target_type: "profile",
-    target_id: userId,
-    reason: `→ ${estado}: ${motivo}`,
-  });
 
   revalidatePath("/admin/usuarios");
   return { error: null };
