@@ -58,13 +58,18 @@ async function DetalleConversacion({
     });
 
   if (errorAuditoria) {
+    // Fail-closed: sin auditoría confirmada no se muestra NADA de la
+    // conversación, ni siquiera el título (derivado del primer mensaje del
+    // usuario) o el dueño. Solo el aviso y el enlace de vuelta.
     return (
       <div className="space-y-6">
-        <Encabezado
-          archivada={Boolean(conversacion.archived)}
-          dueno={dueno}
-          titulo={conversacion.title as string}
-        />
+        <Link
+          className="text-muted-foreground text-sm hover:text-foreground"
+          href="/admin/conversaciones"
+          prefetch={false}
+        >
+          ← Volver
+        </Link>
         <p className="text-destructive text-sm" role="alert">
           No se pudo registrar el acceso, así que la conversación no se muestra.
           Intenta de nuevo.
@@ -141,7 +146,13 @@ async function DetalleConversacion({
                   <p className="whitespace-pre-wrap">{mensaje.content}</p>
                 ) : (
                   <div className="prose prose-sm dark:prose-invert max-w-none">
-                    <Markdown remarkPlugins={[remarkGfm]}>
+                    {/* Sin <img>: un mensaje del asistente influido por el
+                    Scout podría incluir `![](url)` y filtrar la IP/actividad
+                    del revisor al abrir la transcripción. */}
+                    <Markdown
+                      disallowedElements={["img"]}
+                      remarkPlugins={[remarkGfm]}
+                    >
                       {mensaje.content}
                     </Markdown>
                   </div>

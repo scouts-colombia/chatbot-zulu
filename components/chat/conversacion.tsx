@@ -58,7 +58,11 @@ function TextoTypewriter({
 
   return (
     <div className="prose prose-sm dark:prose-invert max-w-none">
-      <Markdown remarkPlugins={[remarkGfm]}>{texto.slice(0, visible)}</Markdown>
+      {/* Sin <img>: la respuesta del asistente puede incluir `![](url)` y
+      cargar recursos de terceros al renderizar. */}
+      <Markdown disallowedElements={["img"]} remarkPlugins={[remarkGfm]}>
+        {texto.slice(0, visible)}
+      </Markdown>
     </div>
   );
 }
