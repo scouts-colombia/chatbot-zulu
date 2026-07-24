@@ -78,11 +78,32 @@ async function DetalleConversacion({
     );
   }
 
-  const { data: mensajes } = await admin
+  const { data: mensajes, error: errorMensajes } = await admin
     .from("messages")
     .select("id, sender, content, created_at")
     .eq("conversation_id", id)
     .order("created_at", { ascending: true });
+
+  // Un fallo de la consulta (error transitorio o de permisos) dejaría
+  // `mensajes` en null y pintaría la conversación como vacía; el requisito es
+  // mostrar el historial completo, así que mostramos el error, no una
+  // transcripción falsamente vacía. Una conversación sin mensajes sí devuelve
+  // un arreglo vacío sin error y se renderiza normal.
+  if (errorMensajes) {
+    return (
+      <div className="space-y-6">
+        <Encabezado
+          archivada={Boolean(conversacion.archived)}
+          dueno={dueno}
+          titulo={conversacion.title as string}
+        />
+        <p className="text-destructive text-sm" role="alert">
+          No se pudieron cargar los mensajes de la conversación. Intenta de
+          nuevo.
+        </p>
+      </div>
+    );
+  }
 
   // Las citas viven solo en `citations` (D-12) y las preguntas guiadas en
   // sus propias tablas: se componen aparte, igual que en el chat, para que
