@@ -62,7 +62,7 @@ Estas reglas vienen de decisiones tomadas a propósito. No reintroducir lo que s
 - NO guardar raw provider response por defecto.
 - Consentimiento append-only en `consent_acceptance_events`. `profiles` solo cachea la última versión aceptada, y esa caché la escribe el backend con la service role.
 - RLS real: la lectura de lo propio y la inserción de mensajes del usuario (`sender = 'usuario'`) usan un cliente Supabase con el JWT del usuario. La secret key (service role) SALTA la RLS; resérvala para lo que el cliente no debe poder forjar: mensajes del asistente/sistema, `citations`, preguntas guiadas, `model_request_events`, auditoría admin, caché de consentimiento e indexación. Si el camino del usuario usa la secret key, la RLS no protege.
-- El acceso del admin a conversaciones ajenas NO es por RLS. Va por endpoint de servidor con motivo obligatorio + registro en `admin_audit_events`. NUNCA dar al admin lectura amplia por RLS.
+- El acceso del admin a conversaciones ajenas NO es por RLS. Va por páginas de servidor que verifican rol admin. Decisión 2026-07-17: el admin abre conversaciones a libre albedrío, SIN motivo obligatorio ni fricción; cada apertura se registra automáticamente en `admin_audit_events` (log silencioso, fail-closed: si el registro falla, no se muestra el contenido). NO reintroducir el formulario de motivo. NUNCA dar al admin lectura amplia por RLS.
 - `role` y `account_status` no se cambian desde el cliente; un trigger los protege.
 - Secretos (Gemini, Supabase service role) solo en servidor. Nunca exponer la service role al cliente.
 - El chat verifica `account_status = 'activo'` y consentimiento aceptado antes de responder. Esto es lógica de API, no RLS.

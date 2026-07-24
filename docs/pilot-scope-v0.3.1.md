@@ -12,6 +12,7 @@
 > 4. **Gemini Developer API, no Vertex AI.** `customMetadata` en el grounding no está soportado en Vertex AI. File Search se usa por la Gemini Developer API.
 > 5. **Modelo:** `gemini-3.5-flash` como default firme (documentado con File Search + structured output, en Preview), validando disponibilidad de cuenta/región y versión del SDK.
 > 6. **Nombre del parámetro de schema (D-09):** no fijar `responseSchema`; usar el parámetro de structured output del SDK concreto (`response_format` / `responseFormat` / `generationConfig.responseFormat.text.schema`).
+> 7. **Acceso admin sin motivo obligatorio (2026-07-17).** El administrador abre conversaciones ajenas directamente, sin registrar motivo y sin ventana de acceso. Cada apertura se registra automáticamente en `admin_audit_events` como log silencioso (`view_user_conversation`, fail-closed: sin registro no se muestra contenido). Deroga P-RF-16 y el formulario de motivo de §12; P-RF-17 (todo acceso auditado) se mantiene vía registro automático. Ajusta la fila "Admin" de §2.1, el Definition of Done (§18) y el checklist (§19) donde exigen motivo.
 >
 > Detalle y criterios de validación: `docs/notes/gemini-file-search-validacion.md` y `ROADMAP.md` (Semana 1).
 

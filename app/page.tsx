@@ -66,11 +66,20 @@ async function ContenidoPrincipal() {
             {perfil?.role === "admin" && " · admin"}
           </p>
         </div>
-        <form action={cerrarSesion}>
-          <Button size="sm" type="submit" variant="outline">
-            Cerrar sesión
-          </Button>
-        </form>
+        <div className="flex items-center gap-2">
+          {perfil?.role === "admin" && (
+            <Button asChild size="sm" variant="ghost">
+              <Link href="/admin" prefetch={false}>
+                Panel admin
+              </Link>
+            </Button>
+          )}
+          <form action={cerrarSesion}>
+            <Button size="sm" type="submit" variant="outline">
+              Cerrar sesión
+            </Button>
+          </form>
+        </div>
       </header>
 
       <main className="flex-1 py-6">
