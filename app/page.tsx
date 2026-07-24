@@ -69,9 +69,10 @@ async function ContenidoPrincipal() {
         <div className="flex items-center gap-2">
           {perfil?.role === "admin" && (
             <Button asChild size="sm" variant="ghost">
-              <Link href="/admin" prefetch={false}>
-                Panel admin
-              </Link>
+              {/* <a>, no <Link>: el panel admin audita al renderizar en
+                  servidor y no debe entrar a la caché de cliente del router
+                  (invariante en app/admin/layout.tsx). */}
+              <a href="/admin">Panel admin</a>
             </Button>
           )}
           <form action={cerrarSesion}>

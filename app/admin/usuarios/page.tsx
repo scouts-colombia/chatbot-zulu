@@ -17,11 +17,20 @@ async function ListaUsuarios() {
   const { user } = await requerirAdmin();
   const admin = crearClienteAdmin();
 
-  const { data: perfiles } = await admin
+  const { data: perfiles, error: errorPerfiles } = await admin
     .from("profiles")
     .select("id, nombre, email, role, account_status, created_at")
     .order("created_at", { ascending: false })
     .limit(200);
+
+  // Un fallo de la consulta dejaría la lista vacía como si no hubiera usuarios.
+  if (errorPerfiles) {
+    return (
+      <p className="text-destructive text-sm" role="alert">
+        No se pudieron cargar los usuarios. Intenta de nuevo.
+      </p>
+    );
+  }
 
   return (
     <div className="space-y-4">

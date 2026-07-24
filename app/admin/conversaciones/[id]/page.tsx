@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import Markdown from "react-markdown";
@@ -29,11 +28,23 @@ async function DetalleConversacion({
   const { user } = await requerirAdmin();
   const admin = crearClienteAdmin();
 
-  const { data: conversacion } = await admin
+  const { data: conversacion, error: errorConversacion } = await admin
     .from("conversations")
     .select("id, title, archived, profiles(nombre, email)")
     .eq("id", id)
-    .single();
+    .maybeSingle();
+
+  // Un fallo de la consulta no es lo mismo que "no existe": no lo disfrazamos
+  // de 404, porque el admin necesita distinguir un id inválido de una caída.
+  // `maybeSingle` deja el "no hay fila" como data null sin error.
+  if (errorConversacion) {
+    return (
+      <div className="space-y-6">
+        <Volver />
+        <Aviso>No se pudo cargar la conversación. Intenta de nuevo.</Aviso>
+      </div>
+    );
+  }
 
   if (!conversacion) {
     notFound();
@@ -63,17 +74,11 @@ async function DetalleConversacion({
     // usuario) o el dueño. Solo el aviso y el enlace de vuelta.
     return (
       <div className="space-y-6">
-        <Link
-          className="text-muted-foreground text-sm hover:text-foreground"
-          href="/admin/conversaciones"
-          prefetch={false}
-        >
-          ← Volver
-        </Link>
-        <p className="text-destructive text-sm" role="alert">
+        <Volver />
+        <Aviso>
           No se pudo registrar el acceso, así que la conversación no se muestra.
           Intenta de nuevo.
-        </p>
+        </Aviso>
       </div>
     );
   }
@@ -97,10 +102,10 @@ async function DetalleConversacion({
           dueno={dueno}
           titulo={conversacion.title as string}
         />
-        <p className="text-destructive text-sm" role="alert">
+        <Aviso>
           No se pudieron cargar los mensajes de la conversación. Intenta de
           nuevo.
-        </p>
+        </Aviso>
       </div>
     );
   }
@@ -111,13 +116,16 @@ async function DetalleConversacion({
   const idsAsistente = (mensajes ?? [])
     .filter((mensaje) => mensaje.sender === "asistente")
     .map((mensaje) => mensaje.id);
-  const [{ data: citas }, { data: preguntas }] = await Promise.all([
+  const [
+    { data: citas, error: errorCitas },
+    { data: preguntas, error: errorPreguntas },
+  ] = await Promise.all([
     idsAsistente.length > 0
       ? admin
           .from("citations")
           .select("id, message_id, document_title_snapshot, page_number")
           .in("message_id", idsAsistente)
-      : Promise.resolve({ data: [] as never[] }),
+      : Promise.resolve({ data: [] as never[], error: null }),
     idsAsistente.length > 0
       ? admin
           .from("guided_questions")
@@ -125,8 +133,27 @@ async function DetalleConversacion({
             "id, message_id, text, guided_question_options(id, label, order_index)"
           )
           .in("message_id", idsAsistente)
-      : Promise.resolve({ data: [] as never[] }),
+      : Promise.resolve({ data: [] as never[], error: null }),
   ]);
+
+  // Citas y preguntas guiadas son parte de la transcripción que vio el Scout:
+  // si su consulta falla, mostrarla sin ellas presentaría una revisión
+  // incompleta como si fuera íntegra.
+  if (errorCitas || errorPreguntas) {
+    return (
+      <div className="space-y-6">
+        <Encabezado
+          archivada={Boolean(conversacion.archived)}
+          dueno={dueno}
+          titulo={conversacion.title as string}
+        />
+        <Aviso>
+          No se pudieron cargar las citas o las preguntas guiadas, así que la
+          transcripción no se muestra: estaría incompleta. Intenta de nuevo.
+        </Aviso>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -212,6 +239,28 @@ async function DetalleConversacion({
   );
 }
 
+function Volver() {
+  // <a>, no <Link>: ver la invariante en app/admin/layout.tsx. Una navegación
+  // SPA dejaría esta transcripción en la caché de cliente y Atrás la revelaría
+  // sin auditar la reapertura.
+  return (
+    <a
+      className="block text-muted-foreground text-sm hover:text-foreground"
+      href="/admin/conversaciones"
+    >
+      ← Volver
+    </a>
+  );
+}
+
+function Aviso({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="text-destructive text-sm" role="alert">
+      {children}
+    </p>
+  );
+}
+
 function Encabezado({
   titulo,
   dueno,
@@ -223,13 +272,7 @@ function Encabezado({
 }) {
   return (
     <div>
-      <Link
-        className="text-muted-foreground text-sm hover:text-foreground"
-        href="/admin/conversaciones"
-        prefetch={false}
-      >
-        ← Volver
-      </Link>
+      <Volver />
       <h2 className="mt-2 font-medium">{titulo}</h2>
       <p className="text-muted-foreground text-sm">
         {dueno?.nombre ?? "—"} · {dueno?.email ?? "—"}

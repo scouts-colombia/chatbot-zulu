@@ -17,12 +17,23 @@ async function ListaDocumentos() {
   await requerirAdmin();
   const admin = crearClienteAdmin();
 
-  const { data: documentos } = await admin
+  const { data: documentos, error: errorDocumentos } = await admin
     .from("knowledge_documents")
     .select(
       "id, display_name, version, active, indexed_at, metadata_synced_at, last_index_error"
     )
     .order("display_name");
+
+  // Un fallo de la consulta no se presenta como "no hay documentos": ese texto
+  // sugiere correr el script de indexación, una acción con efectos sobre File
+  // Search que nadie debería ejecutar por un error transitorio.
+  if (errorDocumentos) {
+    return (
+      <p className="text-destructive text-sm" role="alert">
+        No se pudieron cargar los documentos. Intenta de nuevo.
+      </p>
+    );
+  }
 
   if (!documentos || documentos.length === 0) {
     return (

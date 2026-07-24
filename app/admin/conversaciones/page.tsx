@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { Suspense } from "react";
 import { requerirAdmin } from "@/lib/admin/guard";
 import { crearClienteAdmin } from "@/lib/supabase/admin";
@@ -38,14 +37,19 @@ async function ListaConversaciones({
 
   // El listado también queda auditado (acción list_user_conversations, §8.8).
   // Sin auditoría confirmada no hay listado (fail-closed, como el detalle).
+  // La página entra en la clave de deduplicación porque cada una entrega 50
+  // títulos distintos, y el título deriva del primer mensaje del Scout: pasar
+  // a la página siguiente es acceso a contenido nuevo, no una recarga.
   const desde = new Date(
     Date.now() - VENTANA_LISTADO_MINUTOS * 60_000
   ).toISOString();
+  const motivo = `Listado desde el panel admin · página ${pagina}`;
   const { data: listadoReciente, error: errorConsulta } = await admin
     .from("admin_audit_events")
     .select("id")
     .eq("admin_user_id", user.id)
     .eq("action", "list_user_conversations")
+    .eq("reason", motivo)
     .gte("created_at", desde)
     .limit(1)
     .maybeSingle();
@@ -61,7 +65,7 @@ async function ListaConversaciones({
         admin_user_id: user.id,
         action: "list_user_conversations",
         target_type: "conversation_list",
-        reason: "Listado desde el panel admin",
+        reason: motivo,
       });
     if (errorAuditoria) {
       return <ErrorAuditoria />;
@@ -69,7 +73,11 @@ async function ListaConversaciones({
   }
 
   const inicio = (pagina - 1) * TAMANO_PAGINA;
-  const { data: conversaciones, count } = await admin
+  const {
+    data: conversaciones,
+    count,
+    error: errorConversaciones,
+  } = await admin
     .from("conversations")
     .select(
       "id, title, archived, created_at, updated_at, profiles(nombre, email)",
@@ -77,6 +85,17 @@ async function ListaConversaciones({
     )
     .order("updated_at", { ascending: false })
     .range(inicio, inicio + TAMANO_PAGINA - 1);
+
+  // Un fallo de la consulta no se presenta como "no hay conversaciones": esta
+  // es la vista de supervisión, y confundir una caída con vacío deja al admin
+  // creyendo que no hay nada que revisar.
+  if (errorConversaciones) {
+    return (
+      <p className="text-destructive text-sm" role="alert">
+        No se pudieron cargar las conversaciones. Intenta de nuevo.
+      </p>
+    );
+  }
 
   if (!conversaciones || conversaciones.length === 0) {
     return (
@@ -88,8 +107,16 @@ async function ListaConversaciones({
     );
   }
 
-  const total = count ?? conversaciones.length;
-  const totalPaginas = Math.max(1, Math.ceil(total / TAMANO_PAGINA));
+  // Si el conteo no viene, no fingimos un total (caería a 1 página y ocultaría
+  // la navegación, dando a entender que no hay más): se ofrece "Siguiente"
+  // mientras la página venga llena.
+  const totalPaginas =
+    count == null ? null : Math.max(1, Math.ceil(count / TAMANO_PAGINA));
+  const hayAnterior = pagina > 1;
+  const haySiguiente =
+    totalPaginas === null
+      ? conversaciones.length === TAMANO_PAGINA
+      : pagina < totalPaginas;
 
   return (
     <div className="space-y-4">
@@ -105,13 +132,13 @@ async function ListaConversaciones({
               key={conversacion.id}
             >
               <div className="min-w-0 flex-1">
-                <Link
+                {/* <a>, no <Link>: ver la invariante en app/admin/layout.tsx. */}
+                <a
                   className="block truncate text-sm hover:underline"
                   href={`/admin/conversaciones/${conversacion.id}`}
-                  prefetch={false}
                 >
                   {conversacion.title}
-                </Link>
+                </a>
                 <p className="truncate text-muted-foreground text-xs">
                   {dueno?.nombre ?? dueno?.email ?? "—"}
                   {conversacion.archived && " · archivada"}
@@ -127,30 +154,30 @@ async function ListaConversaciones({
         })}
       </ul>
 
-      {totalPaginas > 1 && (
+      {(hayAnterior || haySiguiente) && (
         <nav className="flex items-center justify-between text-sm">
-          {pagina > 1 ? (
-            <Link
+          {hayAnterior ? (
+            <a
               className="hover:underline"
               href={`/admin/conversaciones?pagina=${pagina - 1}`}
-              prefetch={false}
             >
               ← Anterior
-            </Link>
+            </a>
           ) : (
             <span />
           )}
           <span className="text-muted-foreground text-xs">
-            Página {pagina} de {totalPaginas} · {total} conversaciones
+            {totalPaginas === null
+              ? `Página ${pagina} · total desconocido`
+              : `Página ${pagina} de ${totalPaginas} · ${count} conversaciones`}
           </span>
-          {pagina < totalPaginas ? (
-            <Link
+          {haySiguiente ? (
+            <a
               className="hover:underline"
               href={`/admin/conversaciones?pagina=${pagina + 1}`}
-              prefetch={false}
             >
               Siguiente →
-            </Link>
+            </a>
           ) : (
             <span />
           )}

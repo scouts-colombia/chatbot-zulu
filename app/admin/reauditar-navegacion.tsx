@@ -1,41 +1,40 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
 /**
- * Las páginas admin registran su acceso al renderizar en servidor. En
- * navegación atrás/adelante el App Router puede restaurar la página desde su
- * caché de cliente sin re-ejecutar el server component, así que esa reapertura
- * mostraría el contenido de nuevo sin dejar fila en `admin_audit_events`,
- * contra el requisito de auditar cada apertura (P-RF-17).
+ * Las páginas admin registran su acceso al renderizar en servidor, así que una
+ * reapertura que no pase por el servidor no dejaría fila en
+ * `admin_audit_events`. El panel evita ese camino navegando con `<a>` (ninguna
+ * ruta admin entra a la caché de cliente del App Router) y respondiendo con
+ * `no-store`, de modo que atrás/adelante vuelve a pedir el documento.
  *
- * Vive en el layout admin (que persiste entre rutas /admin/*), así que su
- * listener sobrevive a las navegaciones internas y fuerza un `router.refresh()`
- * —re-ejecución del server component y, en el detalle, un nuevo evento de
- * auditoría— en cada restauración por historial (`popstate`) o por bfcache del
- * navegador (`pageshow` con `persisted`). `refresh()` no toca la URL ni el
- * historial, así que no genera bucles.
+ * Queda un camino que no pasa por el servidor: el bfcache del navegador, que
+ * revive el documento congelado sin pedir nada (Chrome lo hace incluso con
+ * `no-store`). Ahí forzamos una recarga completa en vez de `router.refresh()`:
+ * `refresh()` es asíncrono, fusiona sobre el árbol visible y no se puede
+ * esperar, así que puede quedar pendiente dejando el contenido anterior a la
+ * vista sin fila para esa apertura. Una recarga siempre termina en render
+ * nuevo, redirección (si el rol fue revocado) o error del navegador. No hay
+ * bucle: la recarga entra con `persisted === false`.
+ *
+ * Limitación aceptada: el frame restaurado puede pintarse un instante antes de
+ * que corra este handler; ninguna API del navegador corre antes de ese paint.
+ * Ese frame es una transcripción que este mismo admin ya abrió en esta sesión
+ * con su fila confirmada.
  */
 export function ReauditarNavegacion() {
-  const router = useRouter();
-
   useEffect(() => {
-    const alNavegarHistorial = () => router.refresh();
     const alRestaurar = (evento: PageTransitionEvent) => {
       if (evento.persisted) {
-        router.refresh();
+        window.location.reload();
       }
     };
 
-    window.addEventListener("popstate", alNavegarHistorial);
     window.addEventListener("pageshow", alRestaurar);
 
-    return () => {
-      window.removeEventListener("popstate", alNavegarHistorial);
-      window.removeEventListener("pageshow", alRestaurar);
-    };
-  }, [router]);
+    return () => window.removeEventListener("pageshow", alRestaurar);
+  }, []);
 
   return null;
 }
