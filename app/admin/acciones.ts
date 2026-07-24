@@ -7,6 +7,32 @@ import { crearClienteAdmin } from "@/lib/supabase/admin";
 export type EstadoAccion = { error: string | null };
 
 /**
+ * Errores que las RPC administrativas levantan a propósito (0008, 0009). El
+ * detalle crudo de Postgres —nombres de funciones, columnas, constraints— no
+ * llega a la UI: se registra en servidor y el admin ve algo accionable.
+ */
+const MENSAJES_ERROR: Record<string, string> = {
+  admin_no_autorizado:
+    "Tu sesión de administrador ya no está activa. Vuelve a iniciar sesión.",
+  documento_no_listo:
+    "El documento no está listo para activarse: no tiene metadata confirmada con el proveedor o tiene un error de indexación.",
+  documento_no_encontrado: "No existe ese documento.",
+  perfil_no_encontrado: "No existe ese usuario.",
+  estado_invalido: "Estado inválido.",
+  auto_cambio_no_permitido: "No puedes cambiar tu propio estado.",
+};
+
+function mensajeDeError(error: { message: string }, contexto: string): string {
+  for (const [codigo, mensaje] of Object.entries(MENSAJES_ERROR)) {
+    if (error.message.includes(codigo)) {
+      return mensaje;
+    }
+  }
+  console.error(`[admin] ${contexto}`, error);
+  return "No se pudo aplicar el cambio. Intenta de nuevo.";
+}
+
+/**
  * Activa/desactiva un documento con auditoría atómica (RPC): o se aplican
  * el cambio y el evento juntos, o no se aplica ninguno. Activar exige que
  * el documento tenga metadata sincronizada y sin error de indexación.
@@ -34,13 +60,7 @@ export async function cambiarEstadoDocumento(
   });
 
   if (error) {
-    if (error.message.includes("documento_no_listo")) {
-      return {
-        error:
-          "El documento no está listo para activarse: no tiene metadata confirmada con el proveedor o tiene un error de indexación.",
-      };
-    }
-    return { error: `No se pudo cambiar el documento: ${error.message}` };
+    return { error: mensajeDeError(error, "cambiarEstadoDocumento") };
   }
 
   revalidatePath("/admin/documentos");
@@ -78,10 +98,7 @@ export async function cambiarEstadoCuenta(
   });
 
   if (error) {
-    if (error.message.includes("perfil_no_encontrado")) {
-      return { error: "No existe ese usuario." };
-    }
-    return { error: `No se pudo cambiar el estado: ${error.message}` };
+    return { error: mensajeDeError(error, "cambiarEstadoCuenta") };
   }
 
   revalidatePath("/admin/usuarios");

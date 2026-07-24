@@ -5,14 +5,8 @@ import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { ETIQUETAS_ESTADO } from "@/lib/chat/contrato";
 import type { MensajeUI } from "./tipos";
-
-const ETIQUETAS_ESTADO: Record<string, string> = {
-  sin_fuente: "Sin fuente en los manuales",
-  necesita_aclaracion: "Necesita aclaración",
-  bloqueado_por_seguridad: "Tema bloqueado por seguridad",
-  error: "Error",
-};
 
 /**
  * Revela texto ya completo y validado con efecto typewriter (D-04).
