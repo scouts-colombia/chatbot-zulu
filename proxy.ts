@@ -72,6 +72,15 @@ export async function proxy(request: NextRequest) {
     return redirigirA("/");
   }
 
+  // El panel admin audita al renderizar en servidor: si el navegador sirviera
+  // /admin desde su caché HTTP en atrás/adelante, esa reapertura no dejaría
+  // fila en admin_audit_events. Next ya manda no-store en rutas dinámicas,
+  // pero con `cacheComponents` el shell puede cachearse, así que se fija
+  // explícito para que la garantía no dependa de ese detalle.
+  if (pathname.startsWith("/admin")) {
+    response.headers.set("Cache-Control", "no-store, must-revalidate");
+  }
+
   return response;
 }
 

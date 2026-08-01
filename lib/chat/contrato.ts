@@ -103,3 +103,16 @@ export type RespuestaAsistente = {
   advertencias?: string[];
   metadata: MetadataServidor;
 };
+
+/**
+ * Etiqueta visible por estado. `respondido` no lleva etiqueta: es el caso
+ * normal. Vive aquí y no en el componente del chat porque el panel admin debe
+ * mostrar exactamente la misma indicación que vio el Scout; si divergieran, un
+ * revisor no podría distinguir una respuesta normal de una ruta de seguridad.
+ */
+export const ETIQUETAS_ESTADO: Record<string, string> = {
+  sin_fuente: "Sin fuente en los manuales",
+  necesita_aclaracion: "Necesita aclaración",
+  bloqueado_por_seguridad: "Tema bloqueado por seguridad",
+  error: "Error",
+};

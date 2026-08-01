@@ -66,11 +66,21 @@ async function ContenidoPrincipal() {
             {perfil?.role === "admin" && " · admin"}
           </p>
         </div>
-        <form action={cerrarSesion}>
-          <Button size="sm" type="submit" variant="outline">
-            Cerrar sesión
-          </Button>
-        </form>
+        <div className="flex items-center gap-2">
+          {perfil?.role === "admin" && (
+            <Button asChild size="sm" variant="ghost">
+              {/* <a>, no <Link>: el panel admin audita al renderizar en
+                  servidor y no debe entrar a la caché de cliente del router
+                  (invariante en app/admin/layout.tsx). */}
+              <a href="/admin">Panel admin</a>
+            </Button>
+          )}
+          <form action={cerrarSesion}>
+            <Button size="sm" type="submit" variant="outline">
+              Cerrar sesión
+            </Button>
+          </form>
+        </div>
       </header>
 
       <main className="flex-1 py-6">
