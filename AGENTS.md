@@ -8,5 +8,7 @@ Reglas mínimas si solo lees este archivo:
 - **Plan de trabajo:** `ROADMAP.md`. Toma la primera tarea sin marcar de la fase más temprana disponible; marca el checkbox al cerrarla. La Fase 3 no empieza sin los spikes de Fase 1 verdes.
 - **Hay menores de edad (desde 15 años):** minimización de datos, sin raw provider response, sin flujos de salvaguarda improvisados.
 - **No reintroducir lo descartado:** NextAuth, streaming del proveedor, Drizzle como dueño de esquema, RAG manual/pgvector, delimitadores `<documento>`, citas cruzadas por título, score/confianza en el contrato del modelo, ni el formulario de motivo para el acceso admin a conversaciones (decisión 2026-07-17: acceso directo con log silencioso).
+- **Ningún `next/link` dentro de `/admin`:** todo el panel navega con `<a>` porque audita al renderizar en servidor; una navegación SPA permitiría reabrir la ruta desde la caché de cliente sin dejar fila de auditoría. El porqué completo está en `CLAUDE.md` y en el handoff del `ROADMAP.md`.
+- **Un fallo de consulta no es ausencia de datos:** si Supabase devuelve error, muestra un aviso; nunca una lista vacía, un 404 ni una transcripción incompleta. Y pagina con `count` exacto lo que pueda crecer: PostgREST corta en `db-max-rows` sin avisar.
 - **Commits:** en español, sin `Co-Authored-By`. No pushear sin confirmación.
 - **Secretos:** Gemini y Supabase service role solo en servidor. La service role salta la RLS; el camino del chat usa el JWT del usuario.

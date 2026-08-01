@@ -6,29 +6,56 @@ Regla de trabajo: las fases van en orden (la regla original de paralelismo entre
 
 ---
 
-## Estado actual (2026-07-17) — handoff
+## Estado actual (2026-07-31) — handoff
 
-**Dónde está el proyecto:** Fases 0 a 4 cerradas. Solo queda la Fase 5 (evaluación RAG) como trabajo de ingeniería del piloto; la Fase 6 (design system) va al final por decisión de producto. Los bloqueos restantes son organizacionales, no de código.
+**Dónde está el proyecto:** Fases 0 a 4 cerradas y en master. Solo queda la Fase 5 (evaluación RAG) como trabajo de ingeniería del piloto; la Fase 6 (design system) va al final por decisión de producto. El camino crítico ya no es código: sin los 8 PDFs oficiales y sin el texto de la política, el piloto no puede lanzarse.
 
 **Hecho:**
 - Fases 0 y 1 cerradas: infra completa (Supabase **ChatBot Zulú** `ddimxdrggrrfcvzwwben`, Gemini Developer API con `gemini-3.5-flash`, Vercel con previews por PR) y gate de spikes VERDE 7/7 (`docs/notes/spike-file-search-resultado.md`).
 - Fase 2 cerrada salvo consentimiento (bloqueado por el texto de la política): migraciones aplicadas, RLS verificada 23/23 (`scripts/verify-rls.mjs`), plantilla podada, Supabase Auth en español. El gate de consentimiento en el chat ya existe y se activa al fijar `PRIVACY_POLICY_VERSION`.
 - **Fase 3 cerrada (PR #5, mergeado):** chat completo contra Gemini File Search — cuota atómica por RPC, citas por `knowledge_document_id` con `metadataFilter` de documentos activos, retry único de JSON, bloqueo del proveedor mapeado, typewriter, preguntas guiadas, `scripts/index-knowledge-documents.ts` idempotente. Verificado e2e contra servicios reales.
-- **Fase 4 cerrada (PR #6, abierto a la espera de merge):** panel admin con guard de rol en servidor — listado paginado de conversaciones, **acceso directo al contenido con log silencioso** (sin motivo; cada apertura registra fila en `admin_audit_events`, fail-closed), transcripción completa (mensajes con usuario en texto plano, citas, preguntas guiadas), documentos y estados de cuenta con RPCs atómicas (migración `0008`). 15 hallazgos de Codex corregidos en 4 rondas + ronda 5 limpia; checks verdes y merge state CLEAN.
-- Migraciones aplicadas al proyecto: `0001`–`0008`. El store de File Search tiene 1 PDF de prueba indexado (Reglamento Red De Jóvenes v2018).
+- **Fase 4 cerrada (PR #6, mergeado con squash el 2026-07-31, commit `2b53369`):** panel admin con guard de rol en servidor — listado paginado de conversaciones, **acceso directo al contenido con log silencioso** (sin motivo; cada apertura registra fila en `admin_audit_events`, fail-closed), transcripción paginada con citas, preguntas guiadas y estado de cada respuesta, documentos y estados de cuenta con RPCs atómicas. 8 rondas de revisión de Codex, 31 hilos resueltos, ninguno abierto.
+- Migraciones aplicadas al proyecto: `0001`–`0010`. El store de File Search tiene 1 PDF de prueba indexado (Reglamento Red De Jóvenes v2018).
 
-**Decisiones nuevas (2026-07-17):**
-- **Acceso admin sin motivo obligatorio**: errata 7 de `docs/pilot-scope-v0.3.1.md` (deroga P-RF-16; P-RF-17 se mantiene vía log silencioso automático). Reflejada en `CLAUDE.md` y `AGENTS.md`. **No reintroducir el formulario de motivo.**
+**Decisiones e invariantes vigentes:**
+- **Acceso admin sin motivo obligatorio** (2026-07-17): errata 7 de `docs/pilot-scope-v0.3.1.md` (deroga P-RF-16; P-RF-17 se mantiene vía log silencioso automático). **No reintroducir el formulario de motivo.**
+- **Ningún `next/link` dentro de `/admin`** (2026-07-31), ni para entrar ni para salir: todo el panel navega con `<a>` y el proxy responde `no-store` para `/admin/*`. Las páginas admin auditan al renderizar en servidor, y una navegación SPA deja la ruta en la caché de cliente del App Router (con `cacheComponents`, hasta 3 árboles en un `<Activity>` oculto), así que volver con Atrás la revelaría sin re-ejecutar el server component: sin fila de auditoría y sin pasar por `requerirAdmin`. Verificado en el código de Next 16.2: en atrás/adelante el router sirve del bfcache con `needsDynamicRequest: false` y `staleTimes` excluye ese caso por diseño. `router.refresh()` no sirve como parche (es asíncrono, fusiona sobre el árbol visible y no se puede esperar); el guard de bfcache usa `location.reload()`.
+- **Una sola versión activa por manual** (migración `0010`): activar un documento retira en la misma transacción las otras versiones activas del mismo `display_name` y audita cada retiro. Sin eso, dos versiones entraban al `metadataFilter` y una respuesta podía fundamentarse en el manual obsoleto.
+- **Las RPC administrativas revalidan al admin** (migración `0009`) dentro de la transacción del cambio, con `select ... for share` sobre su perfil. `requerirAdmin()` es barrera de UI, no de integridad. Ambas siguen siendo `security invoker` a propósito: `service_role` ya salta la RLS, y `definer` convertiría cualquier grant futuro en escalamiento.
+- **Un fallo de consulta nunca se presenta como ausencia de datos** en el panel: error de Supabase ⇒ aviso `role="alert"`, no lista vacía ni 404. Y las consultas que pueden crecer se paginan con `count` exacto, porque PostgREST corta en `db-max-rows` (1000 por defecto) sin devolver error.
 - Design system al final (Fase 6); la rama `feat/design-system` se conserva sin borrar.
 
 **Flujo de trabajo vigente** (detalle en `CONTRIBUTING.md`): rama → PR → CI verde → revisión de Codex (responder cada comentario, resolver hilos, reinvocar con `@codex review` hasta ronda limpia) → squash and merge, que hace el dueño del repo personalmente.
 
-**Siguiente:** merge del PR #6 (lo hace el dueño) → **Fase 5**: cargar los 30 casos en `rag_eval_cases` (12/6/6/4/2) y construir el runner que persista en `rag_eval_runs`.
+**Siguiente:** **Fase 5** — cargar los 30 casos en `rag_eval_cases` (12/6/6/4/2) y construir el runner que persista en `rag_eval_runs`. Con 1 solo PDF indexado la corrida es parcial: sirve para validar el runner y las categorías que no dependen del corpus (fuera de alcance, adversariales, ambiguas), no para los umbrales de §14.2.
+
+**Deuda técnica conocida (en master).** Auditoría del 2026-07-31 contra código y base; el panel admin ya está corregido, el camino del Scout no.
+
+Alta:
+- **El chat del Scout trunca su historial en silencio.** `app/chat/[id]/page.tsx` consulta `messages`, `citations` y `guided_questions` sin `.range()`, sin `count` y sin revisar `error`: PostgREST corta en `db-max-rows` sin avisar. Con 30 turnos/día (2 filas por turno) un hilo cruza 1000 filas en ~17 días, y `citations` antes (una fila por chunk de grounding, ~7 días). El Scout vería sus mensajes antiguos con el input habilitado, repetiría la pregunta y gastaría otro turno. Necesita "cargar mensajes anteriores", que es decisión de UX. La misma pasada debe resolver que hoy se renderiza la conversación completa sin ventana ni virtualización, con un `react-markdown` por burbuja.
+- **La ventana de cuota corre en UTC.** `0006_turno_atomico.sql:69` usa `date_trunc('day', now())`, así que el contador se reinicia a las 00:00 UTC, que en Bogotá son las 19:00: el usuario recibe una segunda tanda de 30 turnos por la tarde y el mensaje "vuelve mañana" es falso. Hay que anclar la ventana a la zona de la organización.
+- **Un fallo de consulta se presenta como negación o como ausencia de datos** en el camino del Scout, el patrón que ya se corrigió en `/admin`. `app/chat/[id]/page.tsx` usa `.single()` y manda cualquier error a `notFound()` ("tu conversación no existe" por una caída de un segundo); `app/page.tsx` lee `conversations` sin revisar error y pinta "aún no tienes conversaciones"; las lecturas de perfil convierten un error en "tu cuenta no está habilitada", el mensaje más alarmante posible para alguien de 15 años.
+
+Media:
+- **Errores crudos de Postgres llegan a la UI del Scout**: `app/api/chat/route.ts` devuelve `errorTurno?.message` tal cual y el cliente lo pinta. El panel admin ya sanitiza con `MENSAJES_ERROR`; el chat no. Y `components/chat/conversacion.tsx` hace `respuesta.json()` antes de comprobar `respuesta.ok`, así que un 500 o 504 sin cuerpo JSON se muestra como "no hay conexión con el servidor" cuando el turno ya se gastó.
+- **`/admin/documentos` y `/admin/usuarios` no auditan su apertura**, aunque el de usuarios muestra nombres y correos de todos los perfiles. P-RF-17 exige auditar el acceso a *conversaciones* (eso sí está), así que no es incumplimiento literal, pero es inconsistente con el criterio del propio panel, que sí audita el listado de conversaciones.
+- **Nada asigna `pendiente_autorizacion`.** El estado existe, la home lo explica y el admin puede aplicarlo, pero toda cuenta nueva nace `activo`: cualquiera con un correo válido obtiene 30 llamadas a Gemini por día. La decisión de fondo es organizacional; la mitigación (default distinto o allowlist de correos) es de una línea.
+- **El panel admin nunca se ha ejercitado con un admin real:** 0 perfiles con `role = 'admin'` y `admin_audit_events` vacía. Todo lo verificado hasta hoy fue con usuarios sintéticos y `rollback`.
+- **Rutas implementadas pero nunca ejercitadas:** 0 filas con `status = 'blocked'` y 0 con `error_code = 'invalid_model_json'` en `model_request_events`. El bloqueo del proveedor y el retry de JSON están escritos y sin probar.
+
+Baja:
+- `app/page.tsx` lista las conversaciones del usuario sin `.range()` (crear conversación no consume cuota, pero 1000 conversaciones dejarían las antiguas inalcanzables).
+- Archivar una conversación no revisa el error del `update` y siempre redirige, así que un fallo se lee como botón roto. Tampoco hay desarchivar desde la UI.
+- Claves foráneas sin índice de cobertura en `citations.knowledge_document_id` y en los tres `*_message_id`/`conversation_id` de `model_request_events`, las tablas que más crecen. Con el `statement_timeout` de 8 s del rol `authenticated`, un scan secuencial no se vuelve lento: falla.
+- Poda de la plantilla incompleta: 16 componentes de `components/ui` sin ningún consumidor, más `hooks/use-mobile.ts` y `lib/constants.ts`. La Fase 6 decide qué se queda. No hay ningún TODO/FIXME en el código.
 
 **Pendiente de gestión:**
-- Ejecutar `scripts/seed-admin.sql` cuando el admin real se registre.
+- Ejecutar `scripts/seed-admin.sql` cuando el admin real se registre (hoy la base tiene 0 admins activos) y recorrer el panel completo end-to-end.
+- Activar **protección de contraseñas filtradas** en Supabase Auth (Dashboard → Auth → Password security). Hoy está desactivada y el piloto tiene menores.
+- Confirmar el valor real de **Max rows** del proyecto (Dashboard → Settings → API). Todo el análisis de paginación asume el default de 1000; si estuviera más bajo, los truncamientos llegan antes.
 - Eliminar `AUTH_SECRET` de Vercel (ya no se usa).
-- 16 alertas de Dependabot en master (3 altas): hacer una pasada de `pnpm update` en rama propia.
+- **Dependabot: el conteo está inflado.** De las 48 alertas abiertas, 28 son de paquetes que ya no están en el lockfile (`next-auth`, `@auth/core`, `dompurify`, `undici`, `linkify-it`, `markdown-it`, `@opentelemetry/core`), eliminados al podar la plantilla. Lo realmente vivo son ~6 altas (`next`, `sharp`, `postcss`, `ws`), y subir `next` a >= 16.2.11 cierra la mayoría, incluida una de bypass de proxy. Descartar las obsoletas como "dependencia eliminada" para que el número signifique algo.
+- Los 4 avisos `rls_enabled_no_policy` de los advisors son intencionales (0001 §5.7: RLS sin políticas = solo servidor). No "arreglarlos".
 - Bloqueos organizacionales (sección al final): 8 PDFs oficiales, política de privacidad (`PRIVACY_POLICY_VERSION` + UI de aceptación), defaults para menores.
 
 ---
@@ -105,20 +132,30 @@ Verificado e2e en navegador contra Gemini y Supabase reales (2026-07-17): pregun
 
 - [x] Panel admin (`/admin`, guard de rol en servidor): listar conversaciones de usuarios, con el listado también auditado (`list_user_conversations`). [P-RF-15]
 - [x] Ver conversación ajena: acceso directo sin motivo (decisión 2026-07-17, errata 7 del pilot-scope) con log silencioso automático en `admin_audit_events` por cada apertura, fail-closed. [P-RF-17; P-RF-16 derogado]
-- [x] Página admin de documentos: listar (nombre, versión, indexación, error) y activar/desactivar con auditoría; la desactivación sale del `metadataFilter` de inmediato. [P-RF-19, §13.2]
-- [x] Cambios de estado de cuenta desde admin con motivo y auditoría (`change_user_status`); un admin no puede cambiarse a sí mismo.
+- [x] Página admin de documentos: listar (nombre, versión, indexación, error) y activar/desactivar con auditoría; la desactivación sale del `metadataFilter` de inmediato. Activar exige metadata sincronizada sin error de indexación y retira las otras versiones del mismo manual (`0010`). [P-RF-19, §13.2]
+- [x] Cambios de estado de cuenta desde admin con motivo y auditoría (`change_user_status`); un admin no puede cambiarse a sí mismo. Listado de usuarios paginado.
+- [x] Endurecimiento tras las 8 rondas de revisión: navegación por documento en todo `/admin` (invariante de `next/link`), `no-store` para `/admin/*`, transcripción paginada con detección de truncamiento por `count`, estado persistido de cada respuesta visible para el revisor, `<img>` bloqueado en el Markdown del asistente, revalidación del admin dentro de las RPC (`0009`) y errores de Supabase que ya no se presentan como ausencia de datos.
 
 Verificado e2e (2026-07-17): acceso directo del admin con log silencioso registrado por apertura, toggle de documento reflejado en la base, bloqueo de cuenta efectivo end-to-end (RPC atómica update+auditoría), y un scout no accede a `/admin` (redirect).
+
+Verificado en base (2026-07-31), con bloques SQL con `rollback` y sin residuo: reactivar una versión retira la hermana y deja los dos eventos de auditoría; un admin bloqueado recibe `admin_no_autorizado` en ambas RPC y un admin activo sí aplica el cambio.
 
 ---
 
 ## Fase 5 — Calidad y endurecimiento
 
-- [ ] Cargar 30 casos en `rag_eval_cases` con la distribución 12/6/6/4/2. [P-RF-21, §14]
-- [ ] Runner de evaluación que ejecute contra la API real y guarde resultados en `rag_eval_runs`.
-- [ ] Ajustar prompts según resultados; repetir hasta cumplir los umbrales de §14.2.
-- [ ] Pruebas: citas reales, preguntas fuera de alcance sin inventar fuente, adversariales e inyección, bloqueo de seguridad, JSON inválido con retry.
+Con 1 solo PDF indexado esta fase se puede empezar pero no cerrar: unos 13-16 de los 30 casos son escribibles y ejecutables hoy; los otros 14-17 esperan los manuales oficiales. Los 4 de conflicto son imposibles por definición con un documento (la categoría mide la selección entre documentos parecidos), y los ~8 frecuentes que faltan exigirían inventar `expected_document_title` y `expected_page_hint` de manuales que nadie ha leído.
+
+- [ ] Fijar en `docs/notes/rag-eval-criterios.md` el criterio de veredicto por categoría y a qué umbral de §14.2 responde cada aserción. Es el artefacto que falta de verdad: `rag_eval_cases` guarda `expected_behavior` en prosa, así que el veredicto automático se deriva de `category`. Decidir ahí si hace falta una columna `expected_estado` o si `category` alcanza.
+- [ ] Extraer a `lib/chat/` el núcleo que hoy vive en `app/api/chat/route.ts` (resolución de stores activos y `metadataFilter`, normalización de citas con snapshot, regla de vaciado de §7.2, marcas de calidad). Va **antes** del runner: sin esto el runner es una segunda implementación del producto y evalúa algo que el Scout no usa. Rama y PR propios porque toca código de producción.
+- [ ] Cargar los casos ejecutables en `rag_eval_cases` (`scripts/seed-rag-eval-cases.sql`, mismo canal que `seed-admin.sql`). Dejar fuera los bloqueados en lugar de sembrarlos con expectativas inventadas. Requiere leer el Reglamento Red de Jóvenes. [P-RF-21, §14]
+- [ ] Runner `scripts/run-rag-eval.ts` que llame la capa de Gemini **directo, no el endpoint HTTP**: el endpoint consume la cuota de 30 turnos (una corrida agota el día), escribe mensajes y citas reales que ensucian el panel y las métricas, y `model_request_events.user_id` es `not null` con FK a `profiles`. Una fila por corrida en `rag_eval_runs`; el detalle por caso a `data/rag-eval-<timestamp>.json`, fuera de Git (el detalle por caso en base es P1, §14.3). Guardar las citas **crudas del grounding** además de las visibles: si solo se miran las visibles, "fuera de alcance no inventa fuente" pasa por construcción, porque el servidor ya las vació. Prever un veredicto `revisar` y un modo `--revision` para registrar el juicio humano sin gastar otra corrida.
+- [ ] Ajustar prompts según resultados; repetir hasta cumplir los umbrales de §14.2 (solo certificable con los 8 manuales).
+- [ ] Pruebas del checklist que no son parte de los 30 casos y sí van contra el endpoint, patrón `verify-rls.mjs` (no hay framework de tests y no hace falta): límite diario bajando `max_chat_turns_per_user_per_day` a 2, opción guiada que consume el mismo contador, bloqueo del proveedor mapeado a `bloqueado_por_seguridad`, y JSON inválido con retry único (este no se puede provocar desde fuera con el schema puesto: hace falta un script que llame al SDK sin `responseJsonSchema`).
+- [ ] Tests donde un error sale caro: `normalizarCitas` (función pura) e `insertar_turno_usuario`.
 - [ ] Revisión de RLS y recorrido completo de la Definition of Done (§18, con la errata 7) y el checklist técnico (§19).
+
+Notas de la auditoría útiles para las pruebas de citas: `retrievedContext` no trae `documentName` ni `mediaId`, así que `citations.file_search_document_name` y `media_id` quedan nulos y las pruebas no deben esperarlos. `knowledge_documents.file_search_document_name` también quedó nulo en la única fila (el proveedor no lo entregó en `operation.response.document.name`); no rompe las citas, pero revisar con los PDFs reales.
 - [x] Despliegue en Vercel: activo desde la Fase 2 (previews por PR + producción en master). Queda solo verificar variables de producción en el recorrido del checklist.
 
 ---
@@ -135,10 +172,10 @@ Primero toda la funcionalidad; la capa visual se aplica al final sobre pantallas
 
 ## Bloqueos organizacionales (en paralelo, no son de ingeniería)
 
-Estos no dependen de código, pero pueden frenar el lanzamiento si llegan tarde.
+Estos no dependen de código, pero pueden frenar el lanzamiento si llegan tarde. **A 2026-07-31 son el camino crítico:** el código de las Fases 0-4 está en master y lo que impide lanzar ya no es ingeniería. Pedirlos por escrito con fecha de compromiso.
 
-- [ ] **Obtener los 8 PDFs oficiales aprobados, con versión definida.** Bloquea la indexación de Fase 3. (1 PDF de prueba basta para la Fase 1.)
-- [ ] Texto y versión de la política de privacidad y los términos. Bloquea el flujo de consentimiento de Fase 2. **Al publicarla: fijar `PRIVACY_POLICY_VERSION` en Vercel (sin esa variable el gate del chat queda abierto a propósito durante la construcción — es requisito del checklist de lanzamiento, §19) y construir la UI de aceptación.**
+- [ ] **Obtener los 7 PDFs oficiales que faltan (1 de 8 indexado), con versión definida.** Bloquea la indexación de Fase 3, la Definition of Done (§18) y los 14-17 casos de evaluación que dependen del corpus. Es el único bloqueo que no se puede mitigar desde el código.
+- [ ] Texto y versión de la política de privacidad y los términos. Bloquea el flujo de consentimiento de Fase 2 (hoy `consent_acceptance_events` tiene 0 filas y ningún código inserta ahí). **Al publicarla: construir la UI de aceptación PRIMERO y fijar `PRIVACY_POLICY_VERSION` en Vercel DESPUÉS.** El gate del chat ya funciona: fijar la variable sin la pantalla deja a todos los usuarios bloqueados sin salida.
 - [ ] Decisión del default de `account_status` para menores: `activo` o `pendiente_autorizacion`.
 - [ ] Política de autorización de adulto responsable para usuarios de 15 a 17.
 - [ ] Política de situaciones sensibles, requisito previo a cualquier escalamiento (P2).
