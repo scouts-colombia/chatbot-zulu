@@ -45,10 +45,17 @@ const supabase = createClient(NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SECRET_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 
+/**
+ * El nombre del archivo ES el título visible: los PDFs oficiales ya vienen con
+ * su nombre correcto y ese texto es lo que el Scout lee en las citas.
+ *
+ * Antes se capitalizaba cada palabra con `/\b\w/g`, que en JavaScript no trata
+ * las vocales acentuadas como caracteres de palabra: "Guía para el Dirigente de
+ * Clan" salía como "GuíA Para El Dirigente De Clan" y "Jóvenes" como "JóVenes".
+ * Solo se recorta el espacio sobrante.
+ */
 function nombreVisible(archivo: string) {
-  return basename(archivo, ".pdf")
-    .replaceAll("-", " ")
-    .replace(/\b\w/g, (letra) => letra.toUpperCase());
+  return basename(archivo, ".pdf").replace(/\s+/g, " ").trim();
 }
 
 async function obtenerOCrearStore() {
