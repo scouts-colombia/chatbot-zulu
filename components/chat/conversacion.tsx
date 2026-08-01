@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { cargarMensajesAnteriores } from "@/app/chat/acciones";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ETIQUETAS_ESTADO } from "@/lib/chat/contrato";
@@ -153,23 +154,65 @@ export function Conversacion({
   conversationId,
   mensajesIniciales,
   archivada = false,
+  hayMasAntiguos = false,
+  adjuntosIncompletos = false,
 }: {
   conversationId: string;
   mensajesIniciales: MensajeUI[];
   archivada?: boolean;
+  hayMasAntiguos?: boolean;
+  adjuntosIncompletos?: boolean;
 }) {
   const [mensajes, setMensajes] = useState<MensajeUI[]>(mensajesIniciales);
   const [borrador, setBorrador] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [animandoId, setAnimandoId] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
+  const [masAntiguos, setMasAntiguos] = useState(hayMasAntiguos);
+  const [cargandoAntiguos, setCargandoAntiguos] = useState(false);
+  const [fuentesIncompletas, setFuentesIncompletas] =
+    useState(adjuntosIncompletos);
   const finalRef = useRef<HTMLDivElement>(null);
+  // Cuántos mensajes se han traído del servidor. Los optimistas locales no
+  // cuentan: el desplazamiento del siguiente tramo se mide contra la base.
+  const cargadosDelServidor = useRef(mensajesIniciales.length);
 
-  // El indicador y los mensajes nuevos siempre quedan a la vista.
+  // El indicador y los mensajes nuevos siempre quedan a la vista, salvo cuando
+  // se prependen mensajes viejos: ahí el usuario está mirando hacia arriba.
   // biome-ignore lint/correctness/useExhaustiveDependencies: el scroll depende del número de mensajes y del estado de envío
   useEffect(() => {
+    if (cargandoAntiguos) {
+      return;
+    }
     finalRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [mensajes.length, enviando]);
+
+  async function verAnteriores() {
+    if (cargandoAntiguos) {
+      return;
+    }
+    setCargandoAntiguos(true);
+    try {
+      const tramo = await cargarMensajesAnteriores(
+        conversationId,
+        cargadosDelServidor.current
+      );
+      if (tramo.error) {
+        setAviso("No se pudieron cargar los mensajes anteriores.");
+        return;
+      }
+      cargadosDelServidor.current += tramo.mensajes.length;
+      setMensajes((previos) => [...tramo.mensajes, ...previos]);
+      setMasAntiguos(tramo.hayMasAntiguos);
+      if (tramo.adjuntosIncompletos) {
+        setFuentesIncompletas(true);
+      }
+    } catch {
+      setAviso("No se pudieron cargar los mensajes anteriores.");
+    } finally {
+      setCargandoAntiguos(false);
+    }
+  }
 
   async function enviar(texto: string) {
     const limpio = texto.trim();
@@ -198,7 +241,11 @@ export function Conversacion({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ conversationId, mensaje: limpio }),
       });
-      const datos = await respuesta.json();
+      // El cuerpo se parsea con tolerancia y DESPUÉS de mirar el status: un
+      // 500 sin cuerpo o un 504 del gateway devuelven HTML, y parsear primero
+      // mandaba ese caso al catch, que dice "no hay conexión" cuando sí hubo
+      // servidor y el turno ya se consumió.
+      const datos = await respuesta.json().catch(() => null);
 
       if (!respuesta.ok) {
         revertir();
@@ -206,6 +253,12 @@ export function Conversacion({
           datos?.mensaje ??
             "No se pudo enviar el mensaje. Inténtalo de nuevo en un momento."
         );
+        return;
+      }
+
+      if (!datos) {
+        revertir();
+        setAviso("No se pudo leer la respuesta. Inténtalo de nuevo.");
         return;
       }
 
@@ -240,6 +293,25 @@ export function Conversacion({
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-6">
+        {masAntiguos && (
+          <div className="flex justify-center">
+            <Button
+              disabled={cargandoAntiguos}
+              onClick={verAnteriores}
+              size="sm"
+              type="button"
+              variant="ghost"
+            >
+              {cargandoAntiguos ? "Cargando..." : "Ver mensajes anteriores"}
+            </Button>
+          </div>
+        )}
+        {fuentesIncompletas && (
+          <p className="text-center text-muted-foreground text-xs">
+            No pudimos cargar todas las fuentes de esta conversación. Algunas
+            respuestas pueden verse sin sus citas.
+          </p>
+        )}
         {mensajes.length === 0 && (
           <p className="pt-12 text-center text-muted-foreground text-sm">
             Pregunta sobre los manuales oficiales: recibirás la respuesta con

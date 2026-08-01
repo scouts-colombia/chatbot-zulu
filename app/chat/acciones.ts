@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { cargarTramo } from "@/lib/chat/transcripcion";
 import { crearClienteServidor } from "@/lib/supabase/server";
 
 export async function crearConversacion() {
@@ -32,7 +33,37 @@ export async function archivarConversacion(formData: FormData) {
     return;
   }
   const supabase = await crearClienteServidor();
-  await supabase.from("conversations").update({ archived: true }).eq("id", id);
+  // La RLS ya limita a conversaciones propias; un id ajeno afecta cero filas
+  // sin error, así que se pide el id de vuelta para saber si pasó algo.
+  const { data, error } = await supabase
+    .from("conversations")
+    .update({ archived: true })
+    .eq("id", id)
+    .select("id")
+    .maybeSingle();
   revalidatePath("/");
+  // Sin esto, un fallo devolvía al listado con la conversación aún ahí y sin
+  // ningún aviso: la lectura natural es que el botón está roto.
+  if (error || !data) {
+    redirect("/?aviso=archivar");
+  }
   redirect("/");
+}
+
+/**
+ * Devuelve el tramo anterior de la transcripción para el botón "Ver mensajes
+ * anteriores". La RLS limita a conversaciones propias, así que `saltar` no
+ * puede usarse para leer un hilo ajeno.
+ */
+export async function cargarMensajesAnteriores(
+  conversationId: string,
+  yaCargados: number
+) {
+  const tramo = await cargarTramo(conversationId, yaCargados);
+  return {
+    mensajes: tramo.mensajes,
+    hayMasAntiguos: tramo.hayMasAntiguos,
+    error: tramo.error,
+    adjuntosIncompletos: tramo.adjuntosIncompletos,
+  };
 }

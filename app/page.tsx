@@ -13,7 +13,11 @@ const MENSAJES_ESTADO: Record<string, string> = {
     "Tu cuenta está bloqueada. Si crees que es un error, contacta a la organización.",
 };
 
-export default function PaginaPrincipal() {
+export default function PaginaPrincipal({
+  searchParams,
+}: {
+  searchParams: Promise<{ aviso?: string }>;
+}) {
   return (
     <Suspense
       fallback={
@@ -22,12 +26,17 @@ export default function PaginaPrincipal() {
         </div>
       }
     >
-      <ContenidoPrincipal />
+      <ContenidoPrincipal searchParams={searchParams} />
     </Suspense>
   );
 }
 
-async function ContenidoPrincipal() {
+async function ContenidoPrincipal({
+  searchParams,
+}: {
+  searchParams: Promise<{ aviso?: string }>;
+}) {
+  const { aviso } = await searchParams;
   const supabase = await crearClienteServidor();
 
   const {
@@ -48,13 +57,17 @@ async function ContenidoPrincipal() {
     ? MENSAJES_ESTADO[perfil.account_status]
     : "No pudimos cargar tu perfil. Cierra sesión e inténtalo de nuevo; si persiste, contacta a la organización.";
 
-  const { data: conversaciones } = mensajeEstado
-    ? { data: [] }
+  // Acotada: PostgREST corta en `db-max-rows` sin error, y un fallo de la
+  // consulta no debe leerse como "aún no tienes conversaciones", que llevaría
+  // al Scout a crear un hilo duplicado creyendo que perdió el anterior.
+  const { data: conversaciones, error: errorConversaciones } = mensajeEstado
+    ? { data: [], error: null }
     : await supabase
         .from("conversations")
         .select("id, title, updated_at")
         .eq("archived", false)
-        .order("updated_at", { ascending: false });
+        .order("updated_at", { ascending: false })
+        .range(0, 199);
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col px-4">
@@ -96,6 +109,12 @@ async function ContenidoPrincipal() {
               </Button>
             </form>
 
+            {aviso === "archivar" && (
+              <p className="text-center text-destructive text-sm" role="alert">
+                No se pudo archivar la conversación. Intenta de nuevo.
+              </p>
+            )}
+
             {conversaciones && conversaciones.length > 0 ? (
               <ul className="space-y-2">
                 {conversaciones.map((conversacion) => (
@@ -119,9 +138,17 @@ async function ContenidoPrincipal() {
                 ))}
               </ul>
             ) : (
-              <p className="text-center text-muted-foreground text-sm">
-                Aún no tienes conversaciones. Crea una y pregunta sobre los
-                manuales oficiales.
+              <p
+                className={
+                  errorConversaciones
+                    ? "text-center text-destructive text-sm"
+                    : "text-center text-muted-foreground text-sm"
+                }
+                role={errorConversaciones ? "alert" : undefined}
+              >
+                {errorConversaciones
+                  ? "No pudimos cargar tus conversaciones. Recarga la página; si el problema sigue, vuelve en un momento."
+                  : "Aún no tienes conversaciones. Crea una y pregunta sobre los manuales oficiales."}
               </p>
             )}
           </div>
