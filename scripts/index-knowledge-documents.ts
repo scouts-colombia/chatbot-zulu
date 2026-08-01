@@ -149,7 +149,9 @@ async function indexarArchivo(storeName: string, archivo: string) {
   // 1) Reservar/reutilizar la fila local ANTES de importar.
   const { data: existente, error: errorExistente } = await supabase
     .from("knowledge_documents")
-    .select("id, metadata_synced_at, version, display_name, active")
+    .select(
+      "id, metadata_synced_at, version, display_name, active, last_index_error"
+    )
     .eq("sha256", sha256)
     .maybeSingle();
   // Sin esto, dos filas con el mismo sha (no hay unique) devuelven error con
@@ -186,7 +188,12 @@ async function indexarArchivo(storeName: string, archivo: string) {
     }
   }
 
-  if (existente?.metadata_synced_at && !FORZAR) {
+  // El atajo exige que la corrida anterior haya terminado limpia: con
+  // `last_index_error` puesto puede haber quedado trabajo a medias (por ejemplo
+  // una copia vieja sin retirar del store, que seguiría entrando al
+  // metadataFilter con el mismo knowledge_document_id), y saltar aquí lo dejaría
+  // así para siempre. Con error, se reintenta.
+  if (existente?.metadata_synced_at && !existente.last_index_error && !FORZAR) {
     // El displayName y el customMetadata viajan dentro del documento del
     // proveedor y no se pueden editar en sitio (el SDK solo ofrece
     // list/get/delete), así que alinearlos exige borrar y volver a subir.
@@ -271,19 +278,11 @@ async function indexarArchivo(storeName: string, archivo: string) {
     (operation.response as { documentName?: string } | undefined)
       ?.documentName ?? null;
 
-  // La copia nueva ya está arriba: ahora sí se retiran las anteriores. Si esto
-  // falla, el peor caso es un documento de más en el store (visible con la
-  // marca de calidad y limpiable en la siguiente corrida), no un manual que
-  // desaparece del chat.
-  for (const anterior of anteriores) {
-    await ai.fileSearchStores.documents.delete({
-      name: anterior,
-      config: { force: true },
-    });
-    console.log(`RETIRADO del store el documento anterior (${anterior})`);
-  }
-
-  // 3) Confirmar la sincronización local.
+  // 3) Confirmar la sincronización local ANTES de limpiar el store: así la fila
+  // apunta al documento nuevo aunque el retiro falle. Si se limpiara primero y
+  // el borrado lanzara, la fila conservaría el `metadata_synced_at` viejo y las
+  // corridas normales siguientes tomarían el atajo, dejando las dos copias
+  // vivas para siempre con el mismo knowledge_document_id.
   const { error: errorUpdate } = await supabase
     .from("knowledge_documents")
     .update({
@@ -301,17 +300,38 @@ async function indexarArchivo(storeName: string, archivo: string) {
     throw new Error(`No se pudo confirmar la fila: ${errorUpdate.message}`);
   }
 
-  // 4) Retirar versiones anteriores del mismo documento (mismo display_name,
+  // 4) Retirar del store las copias anteriores de este mismo documento. Va al
+  // final porque el peor caso aceptable es un documento de más en el store
+  // (ambas copias declaran el mismo knowledge_document_id y el grounding podría
+  // citar la vieja), nunca un manual sin documento remoto. Si esto falla, el
+  // catch de main() deja `last_index_error` y la próxima corrida reintenta,
+  // porque el atajo ya no se aplica a filas con error.
+  for (const anterior of anteriores) {
+    await ai.fileSearchStores.documents.delete({
+      name: anterior,
+      config: { force: true },
+    });
+    console.log(`RETIRADO del store el documento anterior (${anterior})`);
+  }
+
+  // 5) Retirar versiones anteriores del mismo documento (mismo display_name,
   // distinto sha256): active=false las excluye del metadataFilter del chat,
   // y las citas históricas conservan su snapshot. El versionado completo es
   // P1; este retiro evita citar versiones obsoletas junto a la nueva.
-  const { data: retiradas } = await supabase
+  const { data: retiradas, error: errorRetiro } = await supabase
     .from("knowledge_documents")
     .update({ active: false })
     .eq("display_name", displayName)
     .eq("active", true)
     .neq("id", knowledgeDocumentId)
     .select("id");
+  // Sin esto un retiro fallido pasaba en silencio y el script imprimía OK con
+  // dos versiones del mismo manual activas dentro del metadataFilter.
+  if (errorRetiro) {
+    throw new Error(
+      `No se pudieron retirar las versiones anteriores: ${errorRetiro.message}`
+    );
+  }
   for (const retirada of retiradas ?? []) {
     console.log(`RETIRADA versión anterior (id=${retirada.id})`);
   }
