@@ -51,19 +51,19 @@ export async function archivarConversacion(formData: FormData) {
 }
 
 /**
- * Devuelve el tramo anterior de la transcripción para el botón "Ver mensajes
- * anteriores". La RLS limita a conversaciones propias, así que `saltar` no
+ * Devuelve el tramo anterior a `cursor` para el botón "Ver mensajes
+ * anteriores". La RLS limita a conversaciones propias, así que el cursor no
  * puede usarse para leer un hilo ajeno.
  */
 export async function cargarMensajesAnteriores(
   conversationId: string,
-  yaCargados: number
+  cursor: string
 ) {
-  const tramo = await cargarTramo(conversationId, yaCargados);
+  const tramo = await cargarTramo(conversationId, cursor);
   return {
     mensajes: tramo.mensajes,
     hayMasAntiguos: tramo.hayMasAntiguos,
+    cursor: tramo.cursor,
     error: tramo.error,
-    adjuntosIncompletos: tramo.adjuntosIncompletos,
   };
 }

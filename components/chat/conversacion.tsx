@@ -155,13 +155,13 @@ export function Conversacion({
   mensajesIniciales,
   archivada = false,
   hayMasAntiguos = false,
-  adjuntosIncompletos = false,
+  cursorInicial = null,
 }: {
   conversationId: string;
   mensajesIniciales: MensajeUI[];
   archivada?: boolean;
   hayMasAntiguos?: boolean;
-  adjuntosIncompletos?: boolean;
+  cursorInicial?: string | null;
 }) {
   const [mensajes, setMensajes] = useState<MensajeUI[]>(mensajesIniciales);
   const [borrador, setBorrador] = useState("");
@@ -170,43 +170,49 @@ export function Conversacion({
   const [aviso, setAviso] = useState<string | null>(null);
   const [masAntiguos, setMasAntiguos] = useState(hayMasAntiguos);
   const [cargandoAntiguos, setCargandoAntiguos] = useState(false);
-  const [fuentesIncompletas, setFuentesIncompletas] =
-    useState(adjuntosIncompletos);
   const finalRef = useRef<HTMLDivElement>(null);
-  // Cuántos mensajes se han traído del servidor. Los optimistas locales no
-  // cuentan: el desplazamiento del siguiente tramo se mide contra la base.
-  const cargadosDelServidor = useRef(mensajesIniciales.length);
+  // Cursor del mensaje más antiguo cargado. Un contador se desfasaría en cuanto
+  // el usuario envía un turno: la conversación crece por el final y el tramo
+  // siguiente repetiría mensajes ya visibles.
+  const cursor = useRef<string | null>(cursorInicial);
+  // Un ref y no `cargandoAntiguos`: React agrupa el setMensajes con el
+  // setCargandoAntiguos(false) del finally, así que el render que ve los
+  // mensajes nuevos ya tendría el estado en false y el scroll saltaría al
+  // final, justo encima del tramo que el usuario quería leer.
+  const acabaDePrepender = useRef(false);
 
   // El indicador y los mensajes nuevos siempre quedan a la vista, salvo cuando
   // se prependen mensajes viejos: ahí el usuario está mirando hacia arriba.
   // biome-ignore lint/correctness/useExhaustiveDependencies: el scroll depende del número de mensajes y del estado de envío
   useEffect(() => {
-    if (cargandoAntiguos) {
+    if (acabaDePrepender.current) {
+      acabaDePrepender.current = false;
       return;
     }
     finalRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [mensajes.length, enviando]);
 
   async function verAnteriores() {
-    if (cargandoAntiguos) {
+    if (cargandoAntiguos || !cursor.current) {
       return;
     }
     setCargandoAntiguos(true);
+    // Se limpia al empezar: si el intento anterior falló y este funciona, la
+    // pantalla no puede seguir diciendo que no se pudieron cargar.
+    setAviso(null);
     try {
       const tramo = await cargarMensajesAnteriores(
         conversationId,
-        cargadosDelServidor.current
+        cursor.current
       );
       if (tramo.error) {
         setAviso("No se pudieron cargar los mensajes anteriores.");
         return;
       }
-      cargadosDelServidor.current += tramo.mensajes.length;
+      cursor.current = tramo.cursor;
+      acabaDePrepender.current = true;
       setMensajes((previos) => [...tramo.mensajes, ...previos]);
       setMasAntiguos(tramo.hayMasAntiguos);
-      if (tramo.adjuntosIncompletos) {
-        setFuentesIncompletas(true);
-      }
     } catch {
       setAviso("No se pudieron cargar los mensajes anteriores.");
     } finally {
@@ -305,12 +311,6 @@ export function Conversacion({
               {cargandoAntiguos ? "Cargando..." : "Ver mensajes anteriores"}
             </Button>
           </div>
-        )}
-        {fuentesIncompletas && (
-          <p className="text-center text-muted-foreground text-xs">
-            No pudimos cargar todas las fuentes de esta conversación. Algunas
-            respuestas pueden verse sin sus citas.
-          </p>
         )}
         {mensajes.length === 0 && (
           <p className="pt-12 text-center text-muted-foreground text-sm">

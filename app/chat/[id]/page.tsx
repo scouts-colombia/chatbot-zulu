@@ -105,9 +105,9 @@ async function ContenidoConversacion({
         )}
       </header>
       <Conversacion
-        adjuntosIncompletos={tramo.adjuntosIncompletos}
         archivada={conversacion.archived}
         conversationId={conversacion.id}
+        cursorInicial={tramo.cursor}
         hayMasAntiguos={tramo.hayMasAntiguos}
         mensajesIniciales={tramo.mensajes}
       />

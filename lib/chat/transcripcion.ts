@@ -17,53 +17,61 @@ export type Tramo = {
   mensajes: MensajeUI[];
   /** Quedan mensajes más antiguos por cargar. */
   hayMasAntiguos: boolean;
-  /** La consulta de mensajes falló: no es lo mismo que una conversación vacía. */
-  error: boolean;
   /**
-   * Citas o preguntas guiadas incompletas (consulta fallida o cortada por
-   * `db-max-rows`). Los mensajes sí se muestran, pero la UI avisa en vez de
-   * dejar una respuesta fundamentada como si no tuviera fuentes.
+   * `created_at` del mensaje más antiguo de este tramo. Es el cursor para pedir
+   * el siguiente: un desplazamiento numérico se desfasa en cuanto el usuario
+   * envía un turno nuevo (la conversación crece por el final), y el tramo
+   * siguiente repetiría mensajes ya visibles.
    */
-  adjuntosIncompletos: boolean;
+  cursor: string | null;
+  /**
+   * La carga falló. Incluye el fallo de las consultas de citas y preguntas
+   * guiadas: renderizar los mensajes sin ellas mostraría respuestas
+   * fundamentadas como si no tuvieran fuentes y aclaraciones sin sus opciones.
+   */
+  error: boolean;
 };
 
 /**
  * Carga un tramo de la transcripción, del más reciente hacia atrás.
- * `saltar` es cuántos mensajes omitir contando desde el final, así que el
- * tramo 0 son los últimos `MENSAJES_POR_TRAMO`.
+ * Sin `antesDe` devuelve el tramo final; con él, los anteriores a ese instante.
  *
  * La RLS limita a conversaciones propias, así que este cliente (JWT del
  * usuario) no puede leer un hilo ajeno.
  */
 export async function cargarTramo(
   conversationId: string,
-  saltar = 0
+  antesDe?: string
 ): Promise<Tramo> {
   const supabase = await crearClienteServidor();
   const vacio: Tramo = {
     mensajes: [],
     hayMasAntiguos: false,
+    cursor: null,
     error: false,
-    adjuntosIncompletos: false,
   };
 
-  const {
-    data: filasDesc,
-    count: totalMensajes,
-    error: errorMensajes,
-  } = await supabase
+  // Se pide uno de más para saber si quedan anteriores sin depender de un
+  // `count` total, que con cursor no diría nada sobre este tramo.
+  let consulta = supabase
     .from("messages")
-    .select("id, sender, content, response_json", { count: "exact" })
+    .select("id, sender, content, created_at, response_json")
     .eq("conversation_id", conversationId)
     .order("created_at", { ascending: false })
-    .range(saltar, saltar + MENSAJES_POR_TRAMO - 1);
+    .limit(MENSAJES_POR_TRAMO + 1);
+  if (antesDe) {
+    consulta = consulta.lt("created_at", antesDe);
+  }
+  const { data: filasDesc, error: errorMensajes } = await consulta;
 
   if (errorMensajes) {
     return { ...vacio, error: true };
   }
 
-  const filas = [...(filasDesc ?? [])].reverse();
-  const hayMasAntiguos = (totalMensajes ?? 0) > saltar + filas.length;
+  const recibidas = filasDesc ?? [];
+  const hayMasAntiguos = recibidas.length > MENSAJES_POR_TRAMO;
+  const filas = [...recibidas.slice(0, MENSAJES_POR_TRAMO)].reverse();
+  const cursor = (filas.at(0)?.created_at as string | undefined) ?? null;
 
   const idsAsistente = filas
     .filter((fila) => fila.sender === "asistente")
@@ -92,13 +100,20 @@ export async function cargarTramo(
       : Promise.resolve({ data: [] as never[], count: 0, error: null }),
   ]);
 
-  // El `count` frente a las filas recibidas delata el corte por `db-max-rows`,
-  // que llega sin error.
+  // Adjuntos incompletos hacen fallar el tramo entero: mostrar los mensajes sin
+  // ellos dejaría una respuesta fundamentada sin sus fuentes y una aclaración
+  // sin sus opciones, sin que el usuario tenga forma de notarlo. El `count`
+  // frente a las filas recibidas delata además el corte por `db-max-rows`, que
+  // llega sin error.
   const adjuntosIncompletos =
     Boolean(errorCitas) ||
     Boolean(errorPreguntas) ||
     (totalCitas ?? 0) > (citas ?? []).length ||
     (totalPreguntas ?? 0) > (preguntas ?? []).length;
+
+  if (adjuntosIncompletos) {
+    return { ...vacio, error: true };
+  }
 
   const mensajes: MensajeUI[] = filas.map((fila) => {
     const estado = (fila.response_json as { estado?: string } | null)?.estado;
@@ -125,5 +140,5 @@ export async function cargarTramo(
     };
   });
 
-  return { mensajes, hayMasAntiguos, error: false, adjuntosIncompletos };
+  return { mensajes, hayMasAntiguos, cursor, error: false };
 }
