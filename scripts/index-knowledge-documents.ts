@@ -119,10 +119,11 @@ async function obtenerOCrearStore() {
  * `file_search_document_name`, porque las filas indexadas antes de arreglar la
  * lectura de `documentName` lo tienen en null.
  */
-async function borrarDocumentoRemoto(
+async function buscarDocumentosRemotos(
   storeName: string,
   knowledgeDocumentId: string
 ) {
+  const encontrados: string[] = [];
   const pager = await ai.fileSearchStores.documents.list({
     parent: storeName,
     config: { pageSize: 20 },
@@ -132,15 +133,10 @@ async function borrarDocumentoRemoto(
       (m) => m.key === "knowledge_document_id"
     )?.stringValue;
     if (id === knowledgeDocumentId && documento.name) {
-      await ai.fileSearchStores.documents.delete({
-        name: documento.name,
-        config: { force: true },
-      });
-      console.log(
-        `RETIRADO del store el documento anterior (${documento.name})`
-      );
+      encontrados.push(documento.name);
     }
   }
+  return encontrados;
 }
 
 async function indexarArchivo(storeName: string, archivo: string) {
@@ -224,11 +220,17 @@ async function indexarArchivo(storeName: string, archivo: string) {
   }
 
   // 2) Importar con custom_metadata (regla P0 de D-07).
-  // Antes hay que retirar del proveedor el documento anterior de este mismo
-  // knowledge_document_id: subir no reemplaza, crea otro documento con nombre
-  // aleatorio, y ambos declararían el mismo id en su metadata, así que los dos
-  // pasarían el metadataFilter y el grounding podría citar la copia vieja.
-  await borrarDocumentoRemoto(storeName, knowledgeDocumentId);
+  // Subir no reemplaza: crea otro documento con nombre aleatorio, y ambos
+  // declararían el mismo knowledge_document_id, así que los dos pasarían el
+  // metadataFilter y el grounding podría citar la copia vieja. Hay que retirar
+  // la anterior, pero DESPUÉS de que la nueva esté arriba: si se borra primero
+  // y la subida falla, la fila queda activa (sigue en el metadataFilter) con su
+  // documento remoto ya eliminado, y el manual desaparece del chat sin aviso.
+  // Los nombres se capturan antes de subir para no borrar la copia nueva.
+  const anteriores = await buscarDocumentosRemotos(
+    storeName,
+    knowledgeDocumentId
+  );
 
   console.log(`Indexando ${displayName} ...`);
   let operation = await ai.fileSearchStores.uploadToFileSearchStore({
@@ -268,6 +270,18 @@ async function indexarArchivo(storeName: string, archivo: string) {
   const documentName =
     (operation.response as { documentName?: string } | undefined)
       ?.documentName ?? null;
+
+  // La copia nueva ya está arriba: ahora sí se retiran las anteriores. Si esto
+  // falla, el peor caso es un documento de más en el store (visible con la
+  // marca de calidad y limpiable en la siguiente corrida), no un manual que
+  // desaparece del chat.
+  for (const anterior of anteriores) {
+    await ai.fileSearchStores.documents.delete({
+      name: anterior,
+      config: { force: true },
+    });
+    console.log(`RETIRADO del store el documento anterior (${anterior})`);
+  }
 
   // 3) Confirmar la sincronización local.
   const { error: errorUpdate } = await supabase

@@ -29,7 +29,9 @@ Regla de trabajo: las fases van en orden (la regla original de paralelismo entre
 
 **Flujo de trabajo vigente** (detalle en `CONTRIBUTING.md`): rama → PR → CI verde → revisión de Codex (responder cada comentario, resolver hilos, reinvocar con `@codex review` hasta ronda limpia) → squash and merge, que hace el dueño del repo personalmente.
 
-**Siguiente:** **Fase 5** — cargar los 30 casos en `rag_eval_cases` (12/6/6/4/2) y construir el runner que persista en `rag_eval_runs`. Con los 5 manuales indexados las 5 categorías son ejecutables, incluidas conflicto y adversariales; la corrida solo se repite si el corpus cambia.
+**Siguiente:** **el flujo de consentimiento de la Fase 2**, que dejó de estar bloqueado al quedar definida la política (ver el ítem en Fase 2). Es la primera tarea sin marcar de la fase más temprana, y va antes que la Fase 5 porque sin la pantalla de aceptación no se puede activar `PRIVACY_POLICY_VERSION`, que es requisito del checklist de lanzamiento (§19).
+
+Después, **Fase 5** — cargar los 30 casos en `rag_eval_cases` (12/6/6/4/2) y construir el runner que persista en `rag_eval_runs`. Con los 5 manuales indexados las 5 categorías son ejecutables, incluidas conflicto y adversariales; la corrida solo se repite si el corpus cambia.
 
 **Deuda técnica conocida (en master).** Auditoría del 2026-07-31 contra código y base. El camino del Scout se endureció en el PR #7 (mergeado el 2026-08-01): transcripción paginada con cursor, ventana de cuota anclada a la zona de la organización (migración `0011`), fallos que ya no se leen como "no existe" ni como lista vacía, errores crudos de Postgres fuera de la UI y archivado con aviso. Lo que sigue abierto:
 
@@ -101,7 +103,7 @@ Capacidad documentada para Gemini 3 / `gemini-3.5-flash`; lo que se valida es qu
 - [x] Supabase Auth: registro/login por correo con UI en español (`app/(auth)`, server actions, errores traducidos). Verificado en navegador contra el proyecto real: login → home con perfil vía RLS → logout. Nota: GoTrue valida entregabilidad del dominio del correo en signUp (dominios inventados fallan; correos reales pasan).
 - [x] Protección de rutas en `proxy.ts` con la sesión de Supabase (`@supabase/ssr`): sin sesión → `/login`; con sesión, `/login`/`/registro` → `/`.
 - [x] Estados de cuenta en la home: mensaje de bloqueo si `account_status != 'activo'`. El gate de API se implementa con el endpoint de chat (Fase 3).
-- [ ] Flujo de consentimiento: insertar `consent_acceptance_events` y actualizar la caché en `profiles` (backend con secret key). Bloquea el chat hasta aceptar. **Bloqueado por el texto/versión de la política (organizacional).** [P-RF-04, D-10]
+- [ ] **Flujo de consentimiento (siguiente tarea).** Pantalla de aceptación de la política, inserción append-only en `consent_acceptance_events` y actualización de la caché en `profiles` (backend con secret key). **Ya no está bloqueado:** la política es el Acuerdo del Consejo Scout Nacional No. 369 (Resolución CSN No. 004-20), vigente desde el 9 de marzo de 2020, publicada en https://scout.org.co/politica-privacidad. Aplica igual a todas las edades (decisión del 2026-08-01: sin autorización de adulto responsable). **Orden obligatorio: primero la pantalla, después fijar `PRIVACY_POLICY_VERSION` en Vercel**, porque el gate del chat ya funciona y la variable sin pantalla deja a todos bloqueados sin salida. [P-RF-04, D-10]
 
 ---
 
