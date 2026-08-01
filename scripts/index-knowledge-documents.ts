@@ -31,6 +31,21 @@ const VERSION =
   indiceVersion > -1 ? process.argv[indiceVersion + 1] : "piloto-v1";
 const FORZAR = process.env.FORCE === "1";
 
+/**
+ * Versión oficial por documento. Cada manual tiene la suya (el Manual de Cargos
+ * declara "Segunda edición: 2024", el Reglamento de Asambleas se reformó por
+ * Acuerdo C.S.N. Nº 556 de 2022), así que una sola `--version` para toda la
+ * corrida etiquetaría mal las citas. `--version` queda como respaldo para los
+ * archivos que no estén en el mapa.
+ */
+const VERSIONES: Record<string, string> = JSON.parse(
+  readFileSync(resolve("scripts/versiones-documentos.json"), "utf8")
+);
+
+function versionDe(archivo: string) {
+  return VERSIONES[archivo] ?? VERSION;
+}
+
 const { GEMINI_API_KEY, NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SECRET_KEY } =
   process.env;
 if (!(GEMINI_API_KEY && NEXT_PUBLIC_SUPABASE_URL && SUPABASE_SECRET_KEY)) {
@@ -98,7 +113,7 @@ async function indexarArchivo(storeName: string, archivo: string) {
       .from("knowledge_documents")
       .insert({
         display_name: displayName,
-        version: VERSION,
+        version: versionDe(archivo),
         active: false,
         file_search_store_name: storeName,
         sha256,
@@ -120,7 +135,10 @@ async function indexarArchivo(storeName: string, archivo: string) {
       displayName,
       customMetadata: [
         { key: "knowledge_document_id", stringValue: knowledgeDocumentId },
-        { key: "document_version", stringValue: existente?.version ?? VERSION },
+        {
+          key: "document_version",
+          stringValue: existente?.version ?? versionDe(archivo),
+        },
         { key: "sha256", stringValue: sha256 },
       ],
     },
@@ -191,9 +209,11 @@ async function main() {
   }
 
   const storeName = await obtenerOCrearStore();
-  console.log(
-    `Store: ${storeName} — ${archivos.length} PDF(s), versión ${VERSION}\n`
-  );
+  console.log(`Store: ${storeName} — ${archivos.length} PDF(s)`);
+  for (const archivo of archivos) {
+    console.log(`  · ${nombreVisible(archivo)} → v${versionDe(archivo)}`);
+  }
+  console.log("");
 
   let fallidos = 0;
   for (const archivo of archivos) {
