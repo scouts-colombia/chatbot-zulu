@@ -223,8 +223,17 @@ export async function POST(request: Request) {
         { status: 429 }
       );
     }
+    // El detalle crudo de Postgres (funciones, columnas, constraints, timeouts
+    // del rol) no va a la pantalla de un Scout: se registra en servidor.
+    if (errorTurno) {
+      console.error("[chat] insertar_turno_usuario", errorTurno);
+    }
     return NextResponse.json(
-      { codigo: "no_se_pudo_guardar", mensaje: errorTurno?.message },
+      {
+        codigo: "no_se_pudo_guardar",
+        mensaje:
+          "No pudimos registrar tu pregunta. Inténtalo de nuevo en un momento.",
+      },
       { status: 500 }
     );
   }

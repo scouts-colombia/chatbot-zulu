@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import { Conversacion } from "@/components/chat/conversacion";
-import type { MensajeUI } from "@/components/chat/tipos";
+import { cargarTramo } from "@/lib/chat/transcripcion";
 import { crearClienteServidor } from "@/lib/supabase/server";
 
 export const metadata = { title: "Conversación" };
@@ -40,78 +40,51 @@ async function ContenidoConversacion({
     redirect("/login");
   }
 
-  const { data: perfil } = await supabase
+  // Un fallo al leer el perfil no significa "cuenta no habilitada": mandar al
+  // usuario a la home con ese mensaje por una caída de un segundo es alarmante
+  // y falso, sobre todo con usuarios de 15 años.
+  const { data: perfil, error: errorPerfil } = await supabase
     .from("profiles")
     .select("account_status")
     .eq("id", user.id)
-    .single();
+    .maybeSingle();
+  if (errorPerfil) {
+    return (
+      <AvisoPantalla>
+        No pudimos verificar tu cuenta en este momento. Intenta de nuevo.
+      </AvisoPantalla>
+    );
+  }
   if (perfil?.account_status !== "activo") {
     redirect("/");
   }
 
-  // La RLS limita a conversaciones propias: ajena = no encontrada.
-  const { data: conversacion } = await supabase
+  // La RLS limita a conversaciones propias: ajena = no encontrada. Un error de
+  // la consulta es otra cosa y no debe presentarse como "no existe".
+  const { data: conversacion, error: errorConversacion } = await supabase
     .from("conversations")
     .select("id, title, archived")
     .eq("id", id)
-    .single();
+    .maybeSingle();
+  if (errorConversacion) {
+    return (
+      <AvisoPantalla>
+        No pudimos abrir la conversación en este momento. Intenta de nuevo.
+      </AvisoPantalla>
+    );
+  }
   if (!conversacion) {
     notFound();
   }
 
-  const { data: filas } = await supabase
-    .from("messages")
-    .select("id, sender, content, response_json")
-    .eq("conversation_id", id)
-    .order("created_at", { ascending: true });
-
-  const mensajesBase = filas ?? [];
-  const idsAsistente = mensajesBase
-    .filter((m) => m.sender === "asistente")
-    .map((m) => m.id);
-
-  const [{ data: citas }, { data: preguntas }] = await Promise.all([
-    idsAsistente.length > 0
-      ? supabase
-          .from("citations")
-          .select("message_id, document_title_snapshot, page_number")
-          .in("message_id", idsAsistente)
-      : Promise.resolve({ data: [] as never[] }),
-    idsAsistente.length > 0
-      ? supabase
-          .from("guided_questions")
-          .select(
-            "id, message_id, text, guided_question_options(label, order_index)"
-          )
-          .in("message_id", idsAsistente)
-      : Promise.resolve({ data: [] as never[] }),
-  ]);
-
-  const mensajes: MensajeUI[] = mensajesBase.map((mensaje) => {
-    const estado = (mensaje.response_json as { estado?: string } | null)
-      ?.estado;
-    const pregunta = (preguntas ?? []).find((p) => p.message_id === mensaje.id);
-    return {
-      id: mensaje.id,
-      sender: mensaje.sender as MensajeUI["sender"],
-      content: mensaje.content,
-      estado: estado === "respondido" ? undefined : estado,
-      citas: (citas ?? [])
-        .filter((cita) => cita.message_id === mensaje.id)
-        .map((cita) => ({
-          titulo: cita.document_title_snapshot,
-          pagina: cita.page_number,
-        })),
-      preguntaGuiada: pregunta
-        ? {
-            texto: pregunta.text,
-            opciones: [...(pregunta.guided_question_options ?? [])]
-              .sort((a, b) => a.order_index - b.order_index)
-              .map((opcion) => opcion.label),
-          }
-        : undefined,
-    };
-  });
+  const tramo = await cargarTramo(id);
+  if (tramo.error) {
+    return (
+      <AvisoPantalla>
+        No pudimos cargar los mensajes de esta conversación. Intenta de nuevo.
+      </AvisoPantalla>
+    );
+  }
 
   return (
     <div className="mx-auto flex h-dvh w-full max-w-2xl flex-col">
@@ -134,8 +107,26 @@ async function ContenidoConversacion({
       <Conversacion
         archivada={conversacion.archived}
         conversationId={conversacion.id}
-        mensajesIniciales={mensajes}
+        cursorInicial={tramo.cursor}
+        hayMasAntiguos={tramo.hayMasAntiguos}
+        mensajesIniciales={tramo.mensajes}
       />
+    </div>
+  );
+}
+
+function AvisoPantalla({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="mx-auto flex h-dvh w-full max-w-2xl flex-col items-center justify-center gap-4 px-4">
+      <p className="text-center text-destructive text-sm" role="alert">
+        {children}
+      </p>
+      <Link
+        className="text-muted-foreground text-sm hover:text-foreground"
+        href="/"
+      >
+        ← Conversaciones
+      </Link>
     </div>
   );
 }
