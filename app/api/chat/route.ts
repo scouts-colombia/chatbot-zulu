@@ -431,21 +431,29 @@ export async function POST(request: Request) {
     ),
   ];
   if (idsDocumentos.length > 0) {
-    const { data: versiones } = await admin
+    const { data: documentos } = await admin
       .from("knowledge_documents")
-      .select("id, version")
+      .select("id, version, display_name")
       .in("id", idsDocumentos);
-    const versionPorId = new Map(
-      (versiones ?? []).map((doc) => [doc.id as string, doc.version as string])
+    const docPorId = new Map(
+      (documentos ?? []).map((doc) => [doc.id as string, doc])
     );
-    citas = citas.map((cita) =>
-      cita.knowledgeDocumentId && versionPorId.has(cita.knowledgeDocumentId)
+    // El título también sale de la fila local, no solo la versión: el título
+    // del grounding es el `displayName` que se le dio al documento el día que
+    // se subió, y el proveedor no permite editarlo en sitio. Sin esto, corregir
+    // el nombre de un manual no llega nunca al chip que ve el Scout.
+    citas = citas.map((cita) => {
+      const doc = cita.knowledgeDocumentId
+        ? docPorId.get(cita.knowledgeDocumentId)
+        : undefined;
+      return doc
         ? {
             ...cita,
-            documentVersionSnapshot: versionPorId.get(cita.knowledgeDocumentId),
+            documentTitleSnapshot: doc.display_name as string,
+            documentVersionSnapshot: doc.version as string,
           }
-        : cita
-    );
+        : cita;
+    });
   }
 
   const marcasCalidad: string[] = [];
