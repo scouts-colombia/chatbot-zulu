@@ -3,25 +3,49 @@ import { requerirAdmin } from "@/lib/admin/guard";
 import { crearClienteAdmin } from "@/lib/supabase/admin";
 import { FormularioEstado } from "./formulario-estado";
 
-export default function PaginaUsuariosAdmin() {
+// Paginado y no un tope fijo: con un `.limit()` a secas, pasar de ese número
+// deja los perfiles más antiguos inalcanzables desde el panel y sin señal de
+// que se recortó la lista, así que un admin no podría bloquear una cuenta que
+// no ve.
+const TAMANO_PAGINA = 50;
+
+export default function PaginaUsuariosAdmin({
+  searchParams,
+}: {
+  searchParams: Promise<{ pagina?: string }>;
+}) {
   return (
     <Suspense
       fallback={<p className="text-muted-foreground text-sm">Cargando...</p>}
     >
-      <ListaUsuarios />
+      <ListaUsuarios searchParams={searchParams} />
     </Suspense>
   );
 }
 
-async function ListaUsuarios() {
+async function ListaUsuarios({
+  searchParams,
+}: {
+  searchParams: Promise<{ pagina?: string }>;
+}) {
   const { user } = await requerirAdmin();
   const admin = crearClienteAdmin();
 
-  const { data: perfiles, error: errorPerfiles } = await admin
+  const { pagina: paginaParam } = await searchParams;
+  const pagina = Math.max(1, Number.parseInt(paginaParam ?? "1", 10) || 1);
+  const inicio = (pagina - 1) * TAMANO_PAGINA;
+
+  const {
+    data: perfiles,
+    count,
+    error: errorPerfiles,
+  } = await admin
     .from("profiles")
-    .select("id, nombre, email, role, account_status, created_at")
+    .select("id, nombre, email, role, account_status, created_at", {
+      count: "exact",
+    })
     .order("created_at", { ascending: false })
-    .limit(200);
+    .range(inicio, inicio + TAMANO_PAGINA - 1);
 
   // Un fallo de la consulta dejaría la lista vacía como si no hubiera usuarios.
   if (errorPerfiles) {
@@ -68,6 +92,69 @@ async function ListaUsuarios() {
           </li>
         ))}
       </ul>
+
+      <Paginacion
+        cantidadEnPagina={(perfiles ?? []).length}
+        pagina={pagina}
+        total={count}
+      />
     </div>
+  );
+}
+
+/**
+ * Si no viene `count` no se finge un total: se ofrece "Siguiente" mientras la
+ * página venga llena, en vez de ocultar la navegación y dar a entender que no
+ * hay más perfiles.
+ */
+function Paginacion({
+  pagina,
+  total,
+  cantidadEnPagina,
+}: {
+  pagina: number;
+  total: number | null;
+  cantidadEnPagina: number;
+}) {
+  const totalPaginas =
+    total == null ? null : Math.max(1, Math.ceil(total / TAMANO_PAGINA));
+  const haySiguiente =
+    totalPaginas === null
+      ? cantidadEnPagina === TAMANO_PAGINA
+      : pagina < totalPaginas;
+  const hayAnterior = pagina > 1;
+
+  if (!(hayAnterior || haySiguiente)) {
+    return null;
+  }
+
+  return (
+    <nav className="flex items-center justify-between text-sm">
+      {hayAnterior ? (
+        <a
+          className="hover:underline"
+          href={`/admin/usuarios?pagina=${pagina - 1}`}
+        >
+          ← Anterior
+        </a>
+      ) : (
+        <span />
+      )}
+      <span className="text-muted-foreground text-xs">
+        {totalPaginas === null
+          ? `Página ${pagina}`
+          : `Página ${pagina} de ${totalPaginas} · ${total} usuarios`}
+      </span>
+      {haySiguiente ? (
+        <a
+          className="hover:underline"
+          href={`/admin/usuarios?pagina=${pagina + 1}`}
+        >
+          Siguiente →
+        </a>
+      ) : (
+        <span />
+      )}
+    </nav>
   );
 }

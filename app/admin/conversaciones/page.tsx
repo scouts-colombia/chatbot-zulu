@@ -16,9 +16,6 @@ export default function PaginaConversacionesAdmin({
   );
 }
 
-// Ventana corta para no duplicar el evento de listado en recargas seguidas
-// de la misma sesión de revisión; cada sesión nueva vuelve a quedar auditada.
-const VENTANA_LISTADO_MINUTOS = 5;
 const TAMANO_PAGINA = 50;
 
 async function ListaConversaciones({
@@ -35,41 +32,24 @@ async function ListaConversaciones({
     Number.parseInt(parametros.pagina ?? "1", 10) || 1
   );
 
-  // El listado también queda auditado (acción list_user_conversations, §8.8).
+  // Cada carga del listado deja su fila (acción list_user_conversations, §8.8):
+  // los títulos derivan del primer mensaje del Scout, así que esto es acceso a
+  // contenido y P-RF-17 pide auditarlo sin excepciones. Antes se deduplicaba en
+  // una ventana de 5 minutos para no repetir filas en recargas seguidas, pero
+  // esa clave no distinguía sesiones: un segundo navegador del mismo admin no
+  // dejaba rastro. Una fila por carga es más ruidosa y no promete de menos.
   // Sin auditoría confirmada no hay listado (fail-closed, como el detalle).
-  // La página entra en la clave de deduplicación porque cada una entrega 50
-  // títulos distintos, y el título deriva del primer mensaje del Scout: pasar
-  // a la página siguiente es acceso a contenido nuevo, no una recarga.
-  const desde = new Date(
-    Date.now() - VENTANA_LISTADO_MINUTOS * 60_000
-  ).toISOString();
-  const motivo = `Listado desde el panel admin · página ${pagina}`;
-  const { data: listadoReciente, error: errorConsulta } = await admin
+  const { error: errorAuditoria } = await admin
     .from("admin_audit_events")
-    .select("id")
-    .eq("admin_user_id", user.id)
-    .eq("action", "list_user_conversations")
-    .eq("reason", motivo)
-    .gte("created_at", desde)
-    .limit(1)
-    .maybeSingle();
+    .insert({
+      admin_user_id: user.id,
+      action: "list_user_conversations",
+      target_type: "conversation_list",
+      reason: `Listado desde el panel admin · página ${pagina}`,
+    });
 
-  if (errorConsulta) {
+  if (errorAuditoria) {
     return <ErrorAuditoria />;
-  }
-
-  if (!listadoReciente) {
-    const { error: errorAuditoria } = await admin
-      .from("admin_audit_events")
-      .insert({
-        admin_user_id: user.id,
-        action: "list_user_conversations",
-        target_type: "conversation_list",
-        reason: motivo,
-      });
-    if (errorAuditoria) {
-      return <ErrorAuditoria />;
-    }
   }
 
   const inicio = (pagina - 1) * TAMANO_PAGINA;
