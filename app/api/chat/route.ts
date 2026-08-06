@@ -439,22 +439,33 @@ export async function POST(request: Request) {
         .filter((id): id is string => Boolean(id))
     ),
   ];
+  // El título NO se sobrescribe con `display_name`: §7.1 regla 4 pide guardar
+  // `retrievedContext.title` como título visible citado, o sea el nombre del
+  // artefacto que el grounding devolvió de verdad. Pisarlo con la etiqueta
+  // (mutable) de la base ocultaría un desajuste entre el store y la tabla, así
+  // que cuando difieren se emite una marca de calidad y se reindexa el
+  // documento, que es lo que corrige el origen.
+  let tituloDesalineado = false;
   if (idsDocumentos.length > 0) {
-    const { data: versiones } = await admin
+    const { data: documentos } = await admin
       .from("knowledge_documents")
-      .select("id, version")
+      .select("id, version, display_name")
       .in("id", idsDocumentos);
-    const versionPorId = new Map(
-      (versiones ?? []).map((doc) => [doc.id as string, doc.version as string])
+    const docPorId = new Map(
+      (documentos ?? []).map((doc) => [doc.id as string, doc])
     );
-    citas = citas.map((cita) =>
-      cita.knowledgeDocumentId && versionPorId.has(cita.knowledgeDocumentId)
-        ? {
-            ...cita,
-            documentVersionSnapshot: versionPorId.get(cita.knowledgeDocumentId),
-          }
-        : cita
-    );
+    citas = citas.map((cita) => {
+      const doc = cita.knowledgeDocumentId
+        ? docPorId.get(cita.knowledgeDocumentId)
+        : undefined;
+      if (!doc) {
+        return cita;
+      }
+      if (doc.display_name !== cita.documentTitleSnapshot) {
+        tituloDesalineado = true;
+      }
+      return { ...cita, documentVersionSnapshot: doc.version as string };
+    });
   }
 
   const marcasCalidad: string[] = [];
@@ -463,6 +474,12 @@ export async function POST(request: Request) {
   }
   if (faltaKnowledgeDocumentId && modelo.estado === "respondido") {
     marcasCalidad.push("missing_knowledge_document_id");
+  }
+  // El documento del store y su fila local llevan títulos distintos: el store
+  // quedó desactualizado (su displayName no se puede editar en sitio) y hay que
+  // reindexar ese documento. Se registra en vez de taparlo pisando el snapshot.
+  if (tituloDesalineado) {
+    marcasCalidad.push("titulo_desalineado");
   }
 
   const asistenteId = await guardarMensajeAsistente(

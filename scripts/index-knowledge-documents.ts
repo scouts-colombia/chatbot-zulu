@@ -31,6 +31,40 @@ const VERSION =
   indiceVersion > -1 ? process.argv[indiceVersion + 1] : "piloto-v1";
 const FORZAR = process.env.FORCE === "1";
 
+/**
+ * Versión oficial por documento. Cada manual tiene la suya (el Manual de Cargos
+ * declara "Segunda edición: 2024", el Reglamento de Asambleas se reformó por
+ * Acuerdo C.S.N. Nº 556 de 2022), así que una sola `--version` para toda la
+ * corrida etiquetaría mal las citas. `--version` queda como respaldo para los
+ * archivos que no estén en el mapa.
+ */
+const VERSIONES: Record<string, string> = JSON.parse(
+  readFileSync(resolve("scripts/versiones-documentos.json"), "utf8")
+);
+
+/**
+ * La búsqueda normaliza a NFC y no distingue mayúsculas en la extensión: un
+ * PDF que venga de macOS trae los acentos descompuestos (NFD) y no casaría con
+ * la clave del JSON, y `Manual.PDF` tampoco. Un fallo silencioso aquí escribe
+ * una versión inventada en la fila, en el proveedor y en el chip que lee el
+ * Scout, así que un archivo fuera del mapa se avisa en voz alta.
+ */
+function versionDe(archivo: string) {
+  const clave = archivo.normalize("NFC").toLowerCase();
+  for (const [nombre, version] of Object.entries(VERSIONES)) {
+    if (nombre.startsWith("_")) {
+      continue;
+    }
+    if (nombre.normalize("NFC").toLowerCase() === clave) {
+      return version;
+    }
+  }
+  console.warn(
+    `AVISO    ${archivo} no está en scripts/versiones-documentos.json; se usará la versión "${VERSION}"`
+  );
+  return VERSION;
+}
+
 const { GEMINI_API_KEY, NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SECRET_KEY } =
   process.env;
 if (!(GEMINI_API_KEY && NEXT_PUBLIC_SUPABASE_URL && SUPABASE_SECRET_KEY)) {
@@ -45,10 +79,17 @@ const supabase = createClient(NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SECRET_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 
+/**
+ * El nombre del archivo ES el título visible: los PDFs oficiales ya vienen con
+ * su nombre correcto y ese texto es lo que el Scout lee en las citas.
+ *
+ * Antes se capitalizaba cada palabra con `/\b\w/g`, que en JavaScript no trata
+ * las vocales acentuadas como caracteres de palabra: "Guía para el Dirigente de
+ * Clan" salía como "GuíA Para El Dirigente De Clan" y "Jóvenes" como "JóVenes".
+ * Solo se recorta el espacio sobrante.
+ */
 function nombreVisible(archivo: string) {
-  return basename(archivo, ".pdf")
-    .replaceAll("-", " ")
-    .replace(/\b\w/g, (letra) => letra.toUpperCase());
+  return basename(archivo, ".pdf").replace(/\s+/g, " ").trim();
 }
 
 async function obtenerOCrearStore() {
@@ -68,20 +109,101 @@ async function obtenerOCrearStore() {
   return store.name;
 }
 
+/**
+ * Borra del store el documento que declare este `knowledge_document_id`, si
+ * existe. El SDK no ofrece update ni upsert de documentos (solo list/get/
+ * delete), así que reindexar es borrar y volver a subir; sin el borrado el
+ * store acumula copias del mismo manual en cada corrida con FORCE=1.
+ *
+ * Se localiza listando el store y cruzando por metadata en vez de por
+ * `file_search_document_name`, porque las filas indexadas antes de arreglar la
+ * lectura de `documentName` lo tienen en null.
+ */
+async function buscarDocumentosRemotos(
+  storeName: string,
+  knowledgeDocumentId: string
+) {
+  const encontrados: string[] = [];
+  const pager = await ai.fileSearchStores.documents.list({
+    parent: storeName,
+    config: { pageSize: 20 },
+  });
+  for await (const documento of pager) {
+    const id = documento.customMetadata?.find(
+      (m) => m.key === "knowledge_document_id"
+    )?.stringValue;
+    if (id === knowledgeDocumentId && documento.name) {
+      encontrados.push(documento.name);
+    }
+  }
+  return encontrados;
+}
+
 async function indexarArchivo(storeName: string, archivo: string) {
   const ruta = join(CARPETA_PDFS, archivo);
   const sha256 = createHash("sha256").update(readFileSync(ruta)).digest("hex");
   const displayName = nombreVisible(archivo);
 
+  const version = versionDe(archivo);
+
   // 1) Reservar/reutilizar la fila local ANTES de importar.
-  const { data: existente } = await supabase
+  const { data: existente, error: errorExistente } = await supabase
     .from("knowledge_documents")
-    .select("id, metadata_synced_at, version")
+    .select(
+      "id, metadata_synced_at, version, display_name, active, last_index_error"
+    )
     .eq("sha256", sha256)
     .maybeSingle();
+  // Sin esto, dos filas con el mismo sha (no hay unique) devuelven error con
+  // data null y el PDF se trataría como nuevo, insertando una tercera.
+  if (errorExistente) {
+    throw new Error(
+      `No se pudo consultar la fila por sha256: ${errorExistente.message}`
+    );
+  }
 
-  if (existente?.metadata_synced_at && !FORZAR) {
-    console.log(`OMITIDO  ${displayName} (ya indexado; FORCE=1 para repetir)`);
+  // El título y la versión se reconcilian SIEMPRE, aunque el PDF no haya
+  // cambiado: si se corrige la capitalización del nombre o una versión del
+  // mapa, ese cambio tiene que llegar a la fila. Antes el return temprano
+  // saltaba incluso este update.
+  if (existente) {
+    const cambios: Record<string, string> = {};
+    if (existente.display_name !== displayName) {
+      cambios.display_name = displayName;
+    }
+    if (existente.version !== version) {
+      cambios.version = version;
+    }
+    if (Object.keys(cambios).length > 0) {
+      const { error } = await supabase
+        .from("knowledge_documents")
+        .update(cambios)
+        .eq("id", existente.id);
+      if (error) {
+        throw new Error(`No se pudo reconciliar la fila: ${error.message}`);
+      }
+      console.log(
+        `ACTUALIZADO ${displayName} en la base (${Object.keys(cambios).join(", ")})`
+      );
+    }
+  }
+
+  // El atajo exige que la corrida anterior haya terminado limpia: con
+  // `last_index_error` puesto puede haber quedado trabajo a medias (por ejemplo
+  // una copia vieja sin retirar del store, que seguiría entrando al
+  // metadataFilter con el mismo knowledge_document_id), y saltar aquí lo dejaría
+  // así para siempre. Con error, se reintenta.
+  if (existente?.metadata_synced_at && !existente.last_index_error && !FORZAR) {
+    // El displayName y el customMetadata viajan dentro del documento del
+    // proveedor y no se pueden editar en sitio (el SDK solo ofrece
+    // list/get/delete), así que alinearlos exige borrar y volver a subir.
+    const desalineado =
+      existente.display_name !== displayName || existente.version !== version;
+    console.log(
+      desalineado
+        ? `OMITIDO  ${displayName} (fila corregida; el documento del proveedor sigue con los valores viejos — FORCE=1 para reindexarlo)`
+        : `OMITIDO  ${displayName} (ya indexado; FORCE=1 para repetir)`
+    );
     return;
   }
 
@@ -91,7 +213,7 @@ async function indexarArchivo(storeName: string, archivo: string) {
       .from("knowledge_documents")
       .insert({
         display_name: displayName,
-        version: VERSION,
+        version: versionDe(archivo),
         active: false,
         file_search_store_name: storeName,
         sha256,
@@ -105,6 +227,18 @@ async function indexarArchivo(storeName: string, archivo: string) {
   }
 
   // 2) Importar con custom_metadata (regla P0 de D-07).
+  // Subir no reemplaza: crea otro documento con nombre aleatorio, y ambos
+  // declararían el mismo knowledge_document_id, así que los dos pasarían el
+  // metadataFilter y el grounding podría citar la copia vieja. Hay que retirar
+  // la anterior, pero DESPUÉS de que la nueva esté arriba: si se borra primero
+  // y la subida falla, la fila queda activa (sigue en el metadataFilter) con su
+  // documento remoto ya eliminado, y el manual desaparece del chat sin aviso.
+  // Los nombres se capturan antes de subir para no borrar la copia nueva.
+  const anteriores = await buscarDocumentosRemotos(
+    storeName,
+    knowledgeDocumentId
+  );
+
   console.log(`Indexando ${displayName} ...`);
   let operation = await ai.fileSearchStores.uploadToFileSearchStore({
     file: ruta,
@@ -113,7 +247,9 @@ async function indexarArchivo(storeName: string, archivo: string) {
       displayName,
       customMetadata: [
         { key: "knowledge_document_id", stringValue: knowledgeDocumentId },
-        { key: "document_version", stringValue: existente?.version ?? VERSION },
+        // La versión sale SIEMPRE del mapa: la fila es una copia, el mapa es
+        // la fuente. Con `existente?.version` una corrección nunca llegaba.
+        { key: "document_version", stringValue: version },
         { key: "sha256", stringValue: sha256 },
       ],
     },
@@ -134,15 +270,25 @@ async function indexarArchivo(storeName: string, archivo: string) {
     );
   }
 
+  // El SDK devuelve UploadToFileSearchStoreResponse { parent, documentName }.
+  // Antes se leía `response.document.name`, que no existe, así que la columna
+  // quedaba siempre en null y la fila se quedaba sin puntero al documento del
+  // proveedor (sin él no se puede borrar ni auditar desde la base).
   const documentName =
-    (operation.response as { document?: { name?: string } } | undefined)
-      ?.document?.name ?? null;
+    (operation.response as { documentName?: string } | undefined)
+      ?.documentName ?? null;
 
-  // 3) Confirmar la sincronización local.
+  // 3) Confirmar la sincronización local ANTES de limpiar el store: así la fila
+  // apunta al documento nuevo aunque el retiro falle. Si se limpiara primero y
+  // el borrado lanzara, la fila conservaría el `metadata_synced_at` viejo y las
+  // corridas normales siguientes tomarían el atajo, dejando las dos copias
+  // vivas para siempre con el mismo knowledge_document_id.
   const { error: errorUpdate } = await supabase
     .from("knowledge_documents")
     .update({
       active: true,
+      display_name: displayName,
+      version,
       file_search_store_name: storeName,
       file_search_document_name: documentName,
       indexed_at: new Date().toISOString(),
@@ -154,17 +300,38 @@ async function indexarArchivo(storeName: string, archivo: string) {
     throw new Error(`No se pudo confirmar la fila: ${errorUpdate.message}`);
   }
 
-  // 4) Retirar versiones anteriores del mismo documento (mismo display_name,
+  // 4) Retirar del store las copias anteriores de este mismo documento. Va al
+  // final porque el peor caso aceptable es un documento de más en el store
+  // (ambas copias declaran el mismo knowledge_document_id y el grounding podría
+  // citar la vieja), nunca un manual sin documento remoto. Si esto falla, el
+  // catch de main() deja `last_index_error` y la próxima corrida reintenta,
+  // porque el atajo ya no se aplica a filas con error.
+  for (const anterior of anteriores) {
+    await ai.fileSearchStores.documents.delete({
+      name: anterior,
+      config: { force: true },
+    });
+    console.log(`RETIRADO del store el documento anterior (${anterior})`);
+  }
+
+  // 5) Retirar versiones anteriores del mismo documento (mismo display_name,
   // distinto sha256): active=false las excluye del metadataFilter del chat,
   // y las citas históricas conservan su snapshot. El versionado completo es
   // P1; este retiro evita citar versiones obsoletas junto a la nueva.
-  const { data: retiradas } = await supabase
+  const { data: retiradas, error: errorRetiro } = await supabase
     .from("knowledge_documents")
     .update({ active: false })
     .eq("display_name", displayName)
     .eq("active", true)
     .neq("id", knowledgeDocumentId)
     .select("id");
+  // Sin esto un retiro fallido pasaba en silencio y el script imprimía OK con
+  // dos versiones del mismo manual activas dentro del metadataFilter.
+  if (errorRetiro) {
+    throw new Error(
+      `No se pudieron retirar las versiones anteriores: ${errorRetiro.message}`
+    );
+  }
   for (const retirada of retiradas ?? []) {
     console.log(`RETIRADA versión anterior (id=${retirada.id})`);
   }
@@ -184,9 +351,11 @@ async function main() {
   }
 
   const storeName = await obtenerOCrearStore();
-  console.log(
-    `Store: ${storeName} — ${archivos.length} PDF(s), versión ${VERSION}\n`
-  );
+  console.log(`Store: ${storeName} — ${archivos.length} PDF(s)`);
+  for (const archivo of archivos) {
+    console.log(`  · ${nombreVisible(archivo)} → v${versionDe(archivo)}`);
+  }
+  console.log("");
 
   let fallidos = 0;
   for (const archivo of archivos) {

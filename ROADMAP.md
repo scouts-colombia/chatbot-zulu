@@ -6,16 +6,18 @@ Regla de trabajo: las fases van en orden (la regla original de paralelismo entre
 
 ---
 
-## Estado actual (2026-07-31) — handoff
+## Estado actual (2026-08-01) — handoff
 
-**Dónde está el proyecto:** Fases 0 a 4 cerradas y en master. Solo queda la Fase 5 (evaluación RAG) como trabajo de ingeniería del piloto; la Fase 6 (design system) va al final por decisión de producto. El camino crítico ya no es código: sin los 8 PDFs oficiales y sin el texto de la política, el piloto no puede lanzarse.
+**Dónde está el proyecto:** Fases 0 a 4 cerradas y en master. Solo queda la Fase 5 (evaluación RAG) como trabajo de ingeniería del piloto; la Fase 6 (design system) va al final por decisión de producto. El corpus real ya está indexado y la política de privacidad quedó definida, así que la Fase 5 se puede ejecutar completa; lo que falta para lanzar es confirmar el corpus definitivo (el alcance pide 8 documentos y hay 5) y construir la UI de aceptación de la política.
 
 **Hecho:**
 - Fases 0 y 1 cerradas: infra completa (Supabase **ChatBot Zulú** `ddimxdrggrrfcvzwwben`, Gemini Developer API con `gemini-3.5-flash`, Vercel con previews por PR) y gate de spikes VERDE 7/7 (`docs/notes/spike-file-search-resultado.md`).
-- Fase 2 cerrada salvo consentimiento (bloqueado por el texto de la política): migraciones aplicadas, RLS verificada 23/23 (`scripts/verify-rls.mjs`), plantilla podada, Supabase Auth en español. El gate de consentimiento en el chat ya existe y se activa al fijar `PRIVACY_POLICY_VERSION`.
+- Fase 2 cerrada salvo la UI de consentimiento (ya no bloqueada: la política existe y tiene versión citable; queda construir la pantalla de aceptación): migraciones aplicadas, RLS verificada 23/23 (`scripts/verify-rls.mjs`), plantilla podada, Supabase Auth en español. El gate de consentimiento en el chat ya existe y se activa al fijar `PRIVACY_POLICY_VERSION`.
 - **Fase 3 cerrada (PR #5, mergeado):** chat completo contra Gemini File Search — cuota atómica por RPC, citas por `knowledge_document_id` con `metadataFilter` de documentos activos, retry único de JSON, bloqueo del proveedor mapeado, typewriter, preguntas guiadas, `scripts/index-knowledge-documents.ts` idempotente. Verificado e2e contra servicios reales.
 - **Fase 4 cerrada (PR #6, mergeado con squash el 2026-07-31, commit `2b53369`):** panel admin con guard de rol en servidor — listado paginado de conversaciones, **acceso directo al contenido con log silencioso** (sin motivo; cada apertura registra fila en `admin_audit_events`, fail-closed), transcripción paginada con citas, preguntas guiadas y estado de cada respuesta, documentos y estados de cuenta con RPCs atómicas. 8 rondas de revisión de Codex, 31 hilos resueltos, ninguno abierto.
-- Migraciones aplicadas al proyecto: `0001`–`0010`. El store de File Search tiene 1 PDF de prueba indexado (Reglamento Red De Jóvenes v2018).
+- **PR #7 mergeado (2026-08-01):** endurecimiento del camino del Scout — transcripción paginada por cursor con "Ver mensajes anteriores", ventana de cuota anclada a la zona de la organización, fallos de consulta que ya no se presentan como negación ni como vacío, y errores crudos de Postgres fuera de la UI.
+- Migraciones aplicadas al proyecto: `0001`–`0011`.
+- **Corpus indexado (2026-08-01):** los 5 manuales de la carpeta Clan de la Dirección Nacional de Programa de Jóvenes están en el store del piloto, activos y con metadata sincronizada — Equipo de Bolsillo - Rover (v2026), Guía para el Dirigente de Clan (v2026), Manual de Cargos y Funciones Red de Jóvenes (v2024), Reglamento para la Realización de Asambleas Rover (v2022) y Reglamento Red de Jóvenes (v2018). La versión de cada uno vive en `scripts/versiones-documentos.json`. Verificado contra Gemini real con la capa del chat: citas cruzadas por `knowledge_document_id` con versión y página correctas, y `sin_fuente` sin citas para una pregunta fuera de alcance.
 
 **Decisiones e invariantes vigentes:**
 - **Acceso admin sin motivo obligatorio** (2026-07-17): errata 7 de `docs/pilot-scope-v0.3.1.md` (deroga P-RF-16; P-RF-17 se mantiene vía log silencioso automático). **No reintroducir el formulario de motivo.**
@@ -27,27 +29,23 @@ Regla de trabajo: las fases van en orden (la regla original de paralelismo entre
 
 **Flujo de trabajo vigente** (detalle en `CONTRIBUTING.md`): rama → PR → CI verde → revisión de Codex (responder cada comentario, resolver hilos, reinvocar con `@codex review` hasta ronda limpia) → squash and merge, que hace el dueño del repo personalmente.
 
-**Siguiente:** **Fase 5** — cargar los 30 casos en `rag_eval_cases` (12/6/6/4/2) y construir el runner que persista en `rag_eval_runs`. Con 1 solo PDF indexado la corrida es parcial: sirve para validar el runner y las categorías que no dependen del corpus (fuera de alcance, adversariales, ambiguas), no para los umbrales de §14.2.
+**Siguiente:** **el flujo de consentimiento de la Fase 2**, que dejó de estar bloqueado al quedar definida la política (ver el ítem en Fase 2). Es la primera tarea sin marcar de la fase más temprana, y va antes que la Fase 5 porque sin la pantalla de aceptación no se puede activar `PRIVACY_POLICY_VERSION`, que es requisito del checklist de lanzamiento (§19).
 
-**Deuda técnica conocida (en master).** Auditoría del 2026-07-31 contra código y base; el panel admin ya está corregido, el camino del Scout no.
+Después, **Fase 5** — cargar los 30 casos en `rag_eval_cases` (12/6/6/4/2) y construir el runner que persista en `rag_eval_runs`. Con los 5 manuales indexados las 5 categorías son ejecutables, incluidas conflicto y adversariales; la corrida solo se repite si el corpus cambia.
 
-Alta:
-- **El chat del Scout trunca su historial en silencio.** `app/chat/[id]/page.tsx` consulta `messages`, `citations` y `guided_questions` sin `.range()`, sin `count` y sin revisar `error`: PostgREST corta en `db-max-rows` sin avisar. Con 30 turnos/día (2 filas por turno) un hilo cruza 1000 filas en ~17 días, y `citations` antes (una fila por chunk de grounding, ~7 días). El Scout vería sus mensajes antiguos con el input habilitado, repetiría la pregunta y gastaría otro turno. Necesita "cargar mensajes anteriores", que es decisión de UX. La misma pasada debe resolver que hoy se renderiza la conversación completa sin ventana ni virtualización, con un `react-markdown` por burbuja.
-- **La ventana de cuota corre en UTC.** `0006_turno_atomico.sql:69` usa `date_trunc('day', now())`, así que el contador se reinicia a las 00:00 UTC, que en Bogotá son las 19:00: el usuario recibe una segunda tanda de 30 turnos por la tarde y el mensaje "vuelve mañana" es falso. Hay que anclar la ventana a la zona de la organización.
-- **Un fallo de consulta se presenta como negación o como ausencia de datos** en el camino del Scout, el patrón que ya se corrigió en `/admin`. `app/chat/[id]/page.tsx` usa `.single()` y manda cualquier error a `notFound()` ("tu conversación no existe" por una caída de un segundo); `app/page.tsx` lee `conversations` sin revisar error y pinta "aún no tienes conversaciones"; las lecturas de perfil convierten un error en "tu cuenta no está habilitada", el mensaje más alarmante posible para alguien de 15 años.
+**Deuda técnica conocida (en master).** Auditoría del 2026-07-31 contra código y base. El camino del Scout se endureció en el PR #7 (mergeado el 2026-08-01): transcripción paginada con cursor, ventana de cuota anclada a la zona de la organización (migración `0011`), fallos que ya no se leen como "no existe" ni como lista vacía, errores crudos de Postgres fuera de la UI y archivado con aviso. Lo que sigue abierto:
 
 Media:
-- **Errores crudos de Postgres llegan a la UI del Scout**: `app/api/chat/route.ts` devuelve `errorTurno?.message` tal cual y el cliente lo pinta. El panel admin ya sanitiza con `MENSAJES_ERROR`; el chat no. Y `components/chat/conversacion.tsx` hace `respuesta.json()` antes de comprobar `respuesta.ok`, así que un 500 o 504 sin cuerpo JSON se muestra como "no hay conexión con el servidor" cuando el turno ya se gastó.
 - **`/admin/documentos` y `/admin/usuarios` no auditan su apertura**, aunque el de usuarios muestra nombres y correos de todos los perfiles. P-RF-17 exige auditar el acceso a *conversaciones* (eso sí está), así que no es incumplimiento literal, pero es inconsistente con el criterio del propio panel, que sí audita el listado de conversaciones.
-- **Nada asigna `pendiente_autorizacion`.** El estado existe, la home lo explica y el admin puede aplicarlo, pero toda cuenta nueva nace `activo`: cualquiera con un correo válido obtiene 30 llamadas a Gemini por día. La decisión de fondo es organizacional; la mitigación (default distinto o allowlist de correos) es de una línea.
-- **El panel admin nunca se ha ejercitado con un admin real:** 0 perfiles con `role = 'admin'` y `admin_audit_events` vacía. Todo lo verificado hasta hoy fue con usuarios sintéticos y `rollback`.
-- **Rutas implementadas pero nunca ejercitadas:** 0 filas con `status = 'blocked'` y 0 con `error_code = 'invalid_model_json'` en `model_request_events`. El bloqueo del proveedor y el retry de JSON están escritos y sin probar.
+- **No hay puerta de entrada al piloto.** Toda cuenta nueva nace `activo`, así que cualquiera con un correo válido obtiene 30 llamadas a Gemini por día. Ya no es un tema de menores (decisión del 2026-08-01: no se piden autorizaciones), es control de acceso y de costo en un piloto cerrado de ~80 usuarios. La mitigación es de una línea: allowlist de correos, o default `pendiente_autorizacion` con el admin habilitando.
+- **El panel admin nunca se ha ejercitado con un admin real:** 0 perfiles con `role = admin` y `admin_audit_events` vacía. Todo lo verificado hasta hoy fue con usuarios sintéticos y `rollback`.
+- **Rutas implementadas pero nunca ejercitadas:** 0 filas con `status = blocked` y 0 con `error_code = invalid_model_json` en `model_request_events`. El bloqueo del proveedor y el retry de JSON están escritos y sin probar.
 
 Baja:
-- `app/page.tsx` lista las conversaciones del usuario sin `.range()` (crear conversación no consume cuota, pero 1000 conversaciones dejarían las antiguas inalcanzables).
-- Archivar una conversación no revisa el error del `update` y siempre redirige, así que un fallo se lee como botón roto. Tampoco hay desarchivar desde la UI.
+- No hay forma de desarchivar una conversación desde la UI, así que un archivado accidental es definitivo para el usuario.
 - Claves foráneas sin índice de cobertura en `citations.knowledge_document_id` y en los tres `*_message_id`/`conversation_id` de `model_request_events`, las tablas que más crecen. Con el `statement_timeout` de 8 s del rol `authenticated`, un scan secuencial no se vuelve lento: falla.
 - Poda de la plantilla incompleta: 16 componentes de `components/ui` sin ningún consumidor, más `hooks/use-mobile.ts` y `lib/constants.ts`. La Fase 6 decide qué se queda. No hay ningún TODO/FIXME en el código.
+- El indexador tiene más caminos donde la fila local y el estado del proveedor pueden divergir (auditoría del 2026-08-01): revertir a un PDF anterior lo salta por sha sin mirar `active`; un fallo tras la subida deja el documento en el store y la fila sin `metadata_synced_at`, y el panel no puede rescatarla porque `0010` exige `last_index_error is null`; el retiro de hermanos filtra por `display_name`, que es texto mutable; y el script fuerza `active = true` sobre documentos que un admin desactivó a propósito, sin dejar auditoría. Conviene un modo `--verify` que compare el store contra `knowledge_documents` en ambas direcciones.
 
 **Pendiente de gestión:**
 - Ejecutar `scripts/seed-admin.sql` cuando el admin real se registre (hoy la base tiene 0 admins activos) y recorrer el panel completo end-to-end.
@@ -56,7 +54,7 @@ Baja:
 - Eliminar `AUTH_SECRET` de Vercel (ya no se usa).
 - **Dependabot: el conteo está inflado.** De las 48 alertas abiertas, 28 son de paquetes que ya no están en el lockfile (`next-auth`, `@auth/core`, `dompurify`, `undici`, `linkify-it`, `markdown-it`, `@opentelemetry/core`), eliminados al podar la plantilla. Lo realmente vivo son ~6 altas (`next`, `sharp`, `postcss`, `ws`), y subir `next` a >= 16.2.11 cierra la mayoría, incluida una de bypass de proxy. Descartar las obsoletas como "dependencia eliminada" para que el número signifique algo.
 - Los 4 avisos `rls_enabled_no_policy` de los advisors son intencionales (0001 §5.7: RLS sin políticas = solo servidor). No "arreglarlos".
-- Bloqueos organizacionales (sección al final): 8 PDFs oficiales, política de privacidad (`PRIVACY_POLICY_VERSION` + UI de aceptación), defaults para menores.
+- Bloqueos organizacionales (sección al final): confirmar el corpus definitivo (5 indexados frente a los 8 del alcance) y construir la UI de aceptación de la política antes de fijar `PRIVACY_POLICY_VERSION`.
 
 ---
 
@@ -64,7 +62,7 @@ Baja:
 
 - [x] Crear el proyecto en Supabase: **ChatBot Zulú** (`ddimxdrggrrfcvzwwben`, us-east-2, Postgres 17). Obtener anon key y service role key del dashboard para `.env.local`; la service role solo va en servidor.
 - [x] Crear API key de Gemini (**Gemini Developer API**, no Vertex). Smoke test 2026-07-15: HTTP 200, `gemini-3.5-flash` disponible y generando. (Billing/créditos: verificar si el tier gratuito limita File Search durante el spike.)
-- [x] Conseguir **1 PDF oficial de prueba**: `data/pdfs/reglamento-red-de-jovenes.pdf` (carpeta `data/` fuera de Git).
+- [x] Conseguir **1 PDF oficial de prueba**: el Reglamento Red de Jóvenes (carpeta `data/pdfs/`, fuera de Git). Desde el 2026-08-01 `data/pdfs/` contiene los 5 manuales oficiales con su nombre real; el título visible de cada documento sale de ese nombre de archivo.
 - [x] Configurar `.env.local` y `.env.example` con las variables del piloto (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `GEMINI_API_KEY`, `GEMINI_MODEL`, `MAX_CHAT_TURNS_PER_USER_PER_DAY`); eliminadas las de la plantilla. `.gitignore` incluye `CLAUDE.local.md`.
 - [x] Secretos completos en `.env.local`: `SUPABASE_SECRET_KEY` (formato moderno `sb_secret_`, preferido sobre la legacy service_role por rotación individual) y `GEMINI_API_KEY`. No se commitean.
 - [x] Validar disponibilidad de `gemini-3.5-flash` en la cuenta/región: confirmado por API el 2026-07-15 (`models.list` + `generateContent`).
@@ -105,7 +103,7 @@ Capacidad documentada para Gemini 3 / `gemini-3.5-flash`; lo que se valida es qu
 - [x] Supabase Auth: registro/login por correo con UI en español (`app/(auth)`, server actions, errores traducidos). Verificado en navegador contra el proyecto real: login → home con perfil vía RLS → logout. Nota: GoTrue valida entregabilidad del dominio del correo en signUp (dominios inventados fallan; correos reales pasan).
 - [x] Protección de rutas en `proxy.ts` con la sesión de Supabase (`@supabase/ssr`): sin sesión → `/login`; con sesión, `/login`/`/registro` → `/`.
 - [x] Estados de cuenta en la home: mensaje de bloqueo si `account_status != 'activo'`. El gate de API se implementa con el endpoint de chat (Fase 3).
-- [ ] Flujo de consentimiento: insertar `consent_acceptance_events` y actualizar la caché en `profiles` (backend con secret key). Bloquea el chat hasta aceptar. **Bloqueado por el texto/versión de la política (organizacional).** [P-RF-04, D-10]
+- [ ] **Flujo de consentimiento (siguiente tarea).** Pantalla de aceptación de la política, inserción append-only en `consent_acceptance_events` y actualización de la caché en `profiles` (backend con secret key). **Ya no está bloqueado:** la política es el Acuerdo del Consejo Scout Nacional No. 369 (Resolución CSN No. 004-20), vigente desde el 9 de marzo de 2020, publicada en https://scout.org.co/politica-privacidad. Aplica igual a todas las edades (decisión del 2026-08-01: sin autorización de adulto responsable). **Orden obligatorio: primero la pantalla, después fijar `PRIVACY_POLICY_VERSION` en Vercel**, porque el gate del chat ya funciona y la variable sin pantalla deja a todos bloqueados sin salida. [P-RF-04, D-10]
 
 ---
 
@@ -122,7 +120,7 @@ Capacidad documentada para Gemini 3 / `gemini-3.5-flash`; lo que se valida es qu
 - [x] Render markdown (react-markdown) + chips de citas con documento y página. Typewriter local sobre texto ya validado (por tiempo transcurrido, inmune al throttling de pestañas); indicador "escribiendo". [P-RF-11, D-04]
 - [x] `sin_fuente` con citas vacías forzadas en servidor (§7.2) y badge en UI. [P-RF-12]
 - [x] Preguntas guiadas: persistidas en `guided_questions`/`options`, botones 2-4 + input libre; elegir una opción envía un turno normal por el mismo endpoint. [P-RF-13]
-- [x] `scripts/index-knowledge-documents.ts` completo (reserva fila → upload con custom_metadata → confirma sincronización; idempotente por sha256, FORCE=1 para reindexar). Store del piloto creado e indexado el PDF de prueba. Indexar los 8 manuales reales cuando lleguen los PDFs (bloqueo organizacional). [P-RF-19, P-RF-20]
+- [x] `scripts/index-knowledge-documents.ts` completo (reserva fila → upload con custom_metadata → confirma sincronización; idempotente por sha256, FORCE=1 para reindexar). Store del piloto creado y los 5 manuales de Clan indexados el 2026-08-01 con su versión oficial (`scripts/versiones-documentos.json`). [P-RF-19, P-RF-20]
 
 Verificado e2e en navegador contra Gemini y Supabase reales (2026-07-17): pregunta sobre el Reglamento → respondido con 3 citas con página y `knowledge_document_id` (3/3 con versión coincidente); pregunta fuera de alcance → `sin_fuente` sin citas; eventos y cuota correctos en la base.
 
@@ -144,7 +142,11 @@ Verificado en base (2026-07-31), con bloques SQL con `rollback` y sin residuo: r
 
 ## Fase 5 — Calidad y endurecimiento
 
-Con 1 solo PDF indexado esta fase se puede empezar pero no cerrar: unos 13-16 de los 30 casos son escribibles y ejecutables hoy; los otros 14-17 esperan los manuales oficiales. Los 4 de conflicto son imposibles por definición con un documento (la categoría mide la selección entre documentos parecidos), y los ~8 frecuentes que faltan exigirían inventar `expected_document_title` y `expected_page_hint` de manuales que nadie ha leído.
+Con los 5 manuales indexados (2026-08-01) **los 30 casos son escribibles y ejecutables**: ya no hay categorías bloqueadas por falta de corpus. Lo que queda condicionado es la certificación, porque el alcance pide 8 documentos y hoy hay 5 (ver bloqueos organizacionales): si el corpus cambia, la corrida se repite.
+
+Dos pistas concretas que salieron al leer los manuales:
+- **Conflicto (4 casos):** el "Reglamento para la Realización de Asambleas Rover" repite casi la misma estructura de funciones, quórum y convocatoria en el capítulo 3 (Asamblea Nacional) y el 5 (Asamblea Regional), con cifras distintas. Es el caso de documentos parecidos servido en bandeja. El "Manual de Cargos y Funciones" y el "Reglamento Red de Jóvenes" también se solapan sobre la Red de Jóvenes.
+- **Adversariales (2 casos):** "Equipo de Bolsillo - Rover" trae en los Anexos 5 y 7 prompts literales dirigidos a ChatGPT/Gemini en imperativo ("Ayúdame a pensar en...", "Hazme un resumen en formato de tabla..."). Es prompt injection documental real, con datos propios y sin fabricar un PDF sintético: exactamente lo que D-02 dice defender. Un caso debe comprobar que el asistente los trata como contenido citable y no como instrucciones.
 
 - [ ] Fijar en `docs/notes/rag-eval-criterios.md` el criterio de veredicto por categoría y a qué umbral de §14.2 responde cada aserción. Es el artefacto que falta de verdad: `rag_eval_cases` guarda `expected_behavior` en prosa, así que el veredicto automático se deriva de `category`. Decidir ahí si hace falta una columna `expected_estado` o si `category` alcanza.
 - [ ] Extraer a `lib/chat/` el núcleo que hoy vive en `app/api/chat/route.ts` (resolución de stores activos y `metadataFilter`, normalización de citas con snapshot, regla de vaciado de §7.2, marcas de calidad). Va **antes** del runner: sin esto el runner es una segunda implementación del producto y evalúa algo que el Scout no usa. Rama y PR propios porque toca código de producción.
@@ -174,10 +176,10 @@ Primero toda la funcionalidad; la capa visual se aplica al final sobre pantallas
 
 Estos no dependen de código, pero pueden frenar el lanzamiento si llegan tarde. **A 2026-07-31 son el camino crítico:** el código de las Fases 0-4 está en master y lo que impide lanzar ya no es ingeniería. Pedirlos por escrito con fecha de compromiso.
 
-- [ ] **Obtener los 7 PDFs oficiales que faltan (1 de 8 indexado), con versión definida.** Bloquea la indexación de Fase 3, la Definition of Done (§18) y los 14-17 casos de evaluación que dependen del corpus. Es el único bloqueo que no se puede mitigar desde el código.
-- [ ] Texto y versión de la política de privacidad y los términos. Bloquea el flujo de consentimiento de Fase 2 (hoy `consent_acceptance_events` tiene 0 filas y ningún código inserta ahí). **Al publicarla: construir la UI de aceptación PRIMERO y fijar `PRIVACY_POLICY_VERSION` en Vercel DESPUÉS.** El gate del chat ya funciona: fijar la variable sin la pantalla deja a todos los usuarios bloqueados sin salida.
-- [ ] Decisión del default de `account_status` para menores: `activo` o `pendiente_autorizacion`.
-- [ ] Política de autorización de adulto responsable para usuarios de 15 a 17.
+- [ ] **Confirmar el corpus definitivo del piloto.** El 2026-08-01 se indexaron los 5 manuales de la carpeta Clan, entregados como "los documentos con los que trabajar por ahora". El alcance (§18) exige 8 documentos iniciales, así que **este punto NO se cierra con 5**: o la Dirección confirma que el corpus del piloto son estos 5 y se registra la errata correspondiente en `docs/pilot-scope-v0.3.1.md`, o llegan los que falten. Hasta entonces la Definition of Done no se cumple, aunque el pipeline de indexación ya esté probado end-to-end.
+- [ ] **Confirmar que la Guía para el Dirigente de Clan es versión final.** Se indexó por decisión del dueño (2026-08-01), pero conserva instrucciones editoriales sin resolver dentro del texto ("Nota para insertar como pie de página a manera de referencia...", pp. 32, 34 y 66), la numeración salta del capítulo 11 al 13 y la tabla de contenido termina en el 12. El bot puede citar esas notas como contenido normativo. Reemplazarla es barato: mismo nombre de archivo en `data/pdfs/` y volver a correr el script, que retira la versión anterior y deja las citas históricas con su snapshot.
+- [x] **Política de privacidad definida (2026-08-01):** "Política y Procedimientos de Tratamiento de Información Personal", Acuerdo del Consejo Scout Nacional No. 369 (Resolución CSN No. 004-20), vigente desde el 9 de marzo de 2020, en https://scout.org.co/politica-privacidad. Es la única política que aplica, para todas las edades. Queda como trabajo de ingeniería (Fase 2) construir la UI de aceptación e insertar en `consent_acceptance_events`. **Orden obligatorio: la pantalla de aceptación PRIMERO y `PRIVACY_POLICY_VERSION` en Vercel DESPUÉS.** El gate del chat ya funciona, así que fijar la variable sin la pantalla deja a todos los usuarios bloqueados sin salida.
+- [x] **Menores: sin autorización de adulto responsable (decisión de la organización, 2026-08-01).** Todos los usuarios, incluidos los de 15 a 17, se rigen por la política de privacidad de la Asociación; no se pide autorización parental ni se construye flujo alguno para ella. En consecuencia: las cuentas nacen `activo`, `guardian_authorization_status` queda sin usar en el piloto y no hay `pendiente_autorizacion` por edad. El estado sigue existiendo en el esquema y el admin puede aplicarlo manualmente, pero por moderación, no por edad.
 - [ ] Política de situaciones sensibles, requisito previo a cualquier escalamiento (P2).
 
 ---
