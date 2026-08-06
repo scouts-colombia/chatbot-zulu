@@ -104,6 +104,7 @@ const EMAIL_A = `rls-test-a-${RUN_ID}@example.com`;
 const EMAIL_B = `rls-test-b-${RUN_ID}@example.com`;
 const cleanupErrors = [];
 let idA, idB;
+let seededAllowedEmail = false;
 let seededAuditId, seededEventId;
 
 // REST con la secret key (service role): siembra y limpieza de datos de prueba.
@@ -127,6 +128,20 @@ async function svcRest(method, path, body) {
 }
 
 try {
+  // A prueba el camino invitado y B el no invitado. La fila temporal se crea
+  // antes que auth.users para que handle_new_user decida el estado inicial.
+  const seedAllowed = await svcRest("POST", "allowed_emails", {
+    email: EMAIL_A,
+    nota: "verificación RLS",
+  });
+  seededAllowedEmail =
+    seedAllowed.status === 201 && seedAllowed.json?.[0]?.email === EMAIL_A;
+  if (!seededAllowedEmail) {
+    throw new Error(
+      `No se pudo sembrar allowed_emails: HTTP ${seedAllowed.status} ${JSON.stringify(seedAllowed.json)}`
+    );
+  }
+
   console.log("Creando usuarios de prueba...");
   idA = await adminCreateUser(EMAIL_A, PASSWORD);
   idB = await adminCreateUser(EMAIL_B, PASSWORD);
@@ -136,15 +151,25 @@ try {
   const asA = rest(tokenA);
   const asB = rest(tokenB);
 
-  // El trigger handle_new_user debió crear los profiles.
+  // El trigger handle_new_user crea ambos profiles y distingue invitación.
   const profA = await asA("GET", "profiles?select=id,role,account_status");
   check(
-    "trigger crea profile (rol scout, activo)",
+    "correo invitado nace scout activo",
     profA.status === 200 &&
       profA.json?.length === 1 &&
       profA.json[0].role === "scout" &&
       profA.json[0].account_status === "activo",
     JSON.stringify(profA.json?.[0] ?? profA.json)
+  );
+
+  const profB = await asB("GET", "profiles?select=id,role,account_status");
+  check(
+    "correo no invitado nace pendiente_autorizacion",
+    profB.status === 200 &&
+      profB.json?.length === 1 &&
+      profB.json[0].role === "scout" &&
+      profB.json[0].account_status === "pendiente_autorizacion",
+    JSON.stringify(profB.json?.[0] ?? profB.json)
   );
 
   // A solo ve SU profile (no el de B).
@@ -368,6 +393,12 @@ try {
     events.status !== 200 || events.json?.length === 0,
     `status=${events.status} filas=${events.json?.length ?? "n/a"}`
   );
+  const allowedEmails = await asA("GET", "allowed_emails?select=email");
+  check(
+    "A no lee allowed_emails (con fila sembrada)",
+    allowedEmails.status !== 200 || allowedEmails.json?.length === 0,
+    `status=${allowedEmails.status} filas=${allowedEmails.json?.length ?? "n/a"}`
+  );
 
   // knowledge_documents: lectura permitida, escritura no.
   const docsRead = await asA("GET", "knowledge_documents?select=id");
@@ -384,6 +415,15 @@ try {
   );
 } finally {
   console.log("Eliminando datos y usuarios de prueba...");
+  if (seededAllowedEmail) {
+    const del = await svcRest(
+      "DELETE",
+      `allowed_emails?email=eq.${encodeURIComponent(EMAIL_A)}`
+    );
+    if (del.status >= 300) {
+      cleanupErrors.push(`allowed email: HTTP ${del.status}`);
+    }
+  }
   // Las filas sembradas van primero: admin_audit_events no tiene cascade
   // y bloquearía la eliminación del usuario.
   if (seededAuditId) {
