@@ -32,7 +32,7 @@ Regla de trabajo: las fases van en orden (la regla original de paralelismo entre
 
 **Siguiente:** **el flujo de consentimiento de la Fase 2**, que dejó de estar bloqueado al quedar definida la política (ver el ítem en Fase 2). Es la primera tarea sin marcar de la fase más temprana, y va antes que la Fase 5 porque sin la pantalla de aceptación no se puede activar `PRIVACY_POLICY_VERSION`, que es requisito del checklist de lanzamiento (§19).
 
-Después, **Fase 5** — cargar los 30 casos en `rag_eval_cases` (12/6/6/4/2) y construir el runner que persista en `rag_eval_runs`. Con los 5 manuales indexados las 5 categorías son ejecutables, incluidas conflicto y adversariales; la corrida solo se repite si el corpus cambia.
+Después, **Fase 5** — cargar los 30 casos en `rag_eval_cases` (12/6/6/4/2) y construir el runner que persista en `rag_eval_runs`. Con los 6 documentos activos —los 5 manuales base más PARCE v0.5— las 5 categorías son ejecutables, incluidas conflicto y adversariales; la corrida solo se repite si el corpus cambia.
 
 **Deuda técnica conocida (en master).** Auditoría del 2026-07-31 contra código y base. El camino del Scout se endureció en el PR #7 (mergeado el 2026-08-01): transcripción paginada con cursor, ventana de cuota anclada a la zona de la organización (migración `0011`), fallos que ya no se leen como "no existe" ni como lista vacía, errores crudos de Postgres fuera de la UI y archivado con aviso. Lo que sigue abierto:
 
@@ -63,7 +63,7 @@ Baja:
 
 - [x] Crear el proyecto en Supabase: **ChatBot Zulú** (`ddimxdrggrrfcvzwwben`, us-east-2, Postgres 17). Obtener anon key y service role key del dashboard para `.env.local`; la service role solo va en servidor.
 - [x] Crear API key de Gemini (**Gemini Developer API**, no Vertex). Smoke test 2026-07-15: HTTP 200, `gemini-3.5-flash` disponible y generando. (Billing/créditos: verificar si el tier gratuito limita File Search durante el spike.)
-- [x] Conseguir **1 PDF oficial de prueba**: el Reglamento Red de Jóvenes (carpeta `data/pdfs/`, fuera de Git). Desde el 2026-08-01 `data/pdfs/` contiene los 5 manuales oficiales con su nombre real; el título visible de cada documento sale de ese nombre de archivo.
+- [x] Conseguir **1 PDF oficial de prueba**: el Reglamento Red de Jóvenes (carpeta `data/pdfs/`, fuera de Git). Desde el 2026-08-01 `data/pdfs/` contiene los 5 manuales oficiales con su nombre real y desde el 2026-08-06 contiene además PARCE v0.5: son 6 documentos locales en total. El título visible de cada documento sale del nombre de archivo.
 - [x] Configurar `.env.local` y `.env.example` con las variables del piloto (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `GEMINI_API_KEY`, `GEMINI_MODEL`, `MAX_CHAT_TURNS_PER_USER_PER_DAY`); eliminadas las de la plantilla. `.gitignore` incluye `CLAUDE.local.md`.
 - [x] Secretos completos en `.env.local`: `SUPABASE_SECRET_KEY` (formato moderno `sb_secret_`, preferido sobre la legacy service_role por rotación individual) y `GEMINI_API_KEY`. No se commitean.
 - [x] Validar disponibilidad de `gemini-3.5-flash` en la cuenta/región: confirmado por API el 2026-07-15 (`models.list` + `generateContent`).
@@ -121,7 +121,7 @@ Capacidad documentada para Gemini 3 / `gemini-3.5-flash`; lo que se valida es qu
 - [x] Render markdown (react-markdown) + chips de citas con documento y página. Typewriter local sobre texto ya validado (por tiempo transcurrido, inmune al throttling de pestañas); indicador "escribiendo". [P-RF-11, D-04]
 - [x] `sin_fuente` con citas vacías forzadas en servidor (§7.2) y badge en UI. [P-RF-12]
 - [x] Preguntas guiadas: persistidas en `guided_questions`/`options`, botones 2-4 + input libre; elegir una opción envía un turno normal por el mismo endpoint. [P-RF-13]
-- [x] `scripts/index-knowledge-documents.ts` completo (reserva fila → upload con custom_metadata → confirma sincronización; idempotente por sha256, FORCE=1 para reindexar). Store del piloto creado y los 5 manuales de Clan indexados el 2026-08-01 con su versión oficial (`scripts/versiones-documentos.json`). [P-RF-19, P-RF-20]
+- [x] `scripts/index-knowledge-documents.ts` completo (reserva fila → upload con custom_metadata → confirma sincronización; idempotente por sha256, FORCE=1 para reindexar). Store del piloto creado; los 5 manuales de Clan se indexaron el 2026-08-01 y PARCE v0.5 el 2026-08-06, para un total de 6 documentos activos con versión registrada en `scripts/versiones-documentos.json`. [P-RF-19, P-RF-20]
 
 Verificado e2e en navegador contra Gemini y Supabase reales (2026-07-17): pregunta sobre el Reglamento → respondido con 3 citas con página y `knowledge_document_id` (3/3 con versión coincidente); pregunta fuera de alcance → `sin_fuente` sin citas; eventos y cuota correctos en la base.
 
@@ -143,7 +143,7 @@ Verificado en base (2026-07-31), con bloques SQL con `rollback` y sin residuo: r
 
 ## Fase 5 — Calidad y endurecimiento
 
-Con los 5 manuales indexados (2026-08-01) **los 30 casos son escribibles y ejecutables**: ya no hay categorías bloqueadas por falta de corpus. Lo que queda condicionado es la certificación, porque el alcance pide 8 documentos y hoy hay 5 (ver bloqueos organizacionales): si el corpus cambia, la corrida se repite.
+Con los 6 documentos activos —los 5 manuales indexados el 2026-08-01 más PARCE v0.5, indexado el 2026-08-06— **los 30 casos son escribibles y ejecutables**: ya no hay categorías bloqueadas por falta de corpus. Lo que queda condicionado es la certificación, porque el alcance pide 8 documentos y hoy hay 6 (ver bloqueos organizacionales): si el corpus cambia, la corrida se repite.
 
 Dos pistas concretas que salieron al leer los manuales:
 - **Conflicto (4 casos):** el "Reglamento para la Realización de Asambleas Rover" repite casi la misma estructura de funciones, quórum y convocatoria en el capítulo 3 (Asamblea Nacional) y el 5 (Asamblea Regional), con cifras distintas. Es el caso de documentos parecidos servido en bandeja. El "Manual de Cargos y Funciones" y el "Reglamento Red de Jóvenes" también se solapan sobre la Red de Jóvenes.
