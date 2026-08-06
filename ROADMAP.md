@@ -6,9 +6,9 @@ Regla de trabajo: las fases van en orden (la regla original de paralelismo entre
 
 ---
 
-## Estado actual (2026-08-01) — handoff
+## Estado actual (2026-08-06) — handoff
 
-**Dónde está el proyecto:** Fases 0 a 4 cerradas y en master. Solo queda la Fase 5 (evaluación RAG) como trabajo de ingeniería del piloto; la Fase 6 (design system) va al final por decisión de producto. El corpus real ya está indexado y la política de privacidad quedó definida, así que la Fase 5 se puede ejecutar completa; lo que falta para lanzar es confirmar el corpus definitivo (el alcance pide 8 documentos y hay 5) y construir la UI de aceptación de la política.
+**Dónde está el proyecto:** Fases 0 a 4 cerradas y en master. Solo queda la Fase 5 (evaluación RAG) como trabajo de ingeniería del piloto; la Fase 6 (design system) va al final por decisión de producto. El corpus real ya está indexado y la política de privacidad quedó definida, así que la Fase 5 se puede ejecutar completa; lo que falta para lanzar es completar el corpus definitivo (el alcance pide 8 documentos y hay 6) y construir la UI de aceptación de la política.
 
 **Hecho:**
 - Fases 0 y 1 cerradas: infra completa (Supabase **ChatBot Zulú** `ddimxdrggrrfcvzwwben`, Gemini Developer API con `gemini-3.5-flash`, Vercel con previews por PR) y gate de spikes VERDE 7/7 (`docs/notes/spike-file-search-resultado.md`).
@@ -16,8 +16,9 @@ Regla de trabajo: las fases van en orden (la regla original de paralelismo entre
 - **Fase 3 cerrada (PR #5, mergeado):** chat completo contra Gemini File Search — cuota atómica por RPC, citas por `knowledge_document_id` con `metadataFilter` de documentos activos, retry único de JSON, bloqueo del proveedor mapeado, typewriter, preguntas guiadas, `scripts/index-knowledge-documents.ts` idempotente. Verificado e2e contra servicios reales.
 - **Fase 4 cerrada (PR #6, mergeado con squash el 2026-07-31, commit `2b53369`):** panel admin con guard de rol en servidor — listado paginado de conversaciones, **acceso directo al contenido con log silencioso** (sin motivo; cada apertura registra fila en `admin_audit_events`, fail-closed), transcripción paginada con citas, preguntas guiadas y estado de cada respuesta, documentos y estados de cuenta con RPCs atómicas. 8 rondas de revisión de Codex, 31 hilos resueltos, ninguno abierto.
 - **PR #7 mergeado (2026-08-01):** endurecimiento del camino del Scout — transcripción paginada por cursor con "Ver mensajes anteriores", ventana de cuota anclada a la zona de la organización, fallos de consulta que ya no se presentan como negación ni como vacío, y errores crudos de Postgres fuera de la UI.
-- Migraciones aplicadas al proyecto: `0001`–`0011`.
-- **Corpus indexado (2026-08-01):** los 5 manuales de la carpeta Clan de la Dirección Nacional de Programa de Jóvenes están en el store del piloto, activos y con metadata sincronizada — Equipo de Bolsillo - Rover (v2026), Guía para el Dirigente de Clan (v2026), Manual de Cargos y Funciones Red de Jóvenes (v2024), Reglamento para la Realización de Asambleas Rover (v2022) y Reglamento Red de Jóvenes (v2018). La versión de cada uno vive en `scripts/versiones-documentos.json`. Verificado contra Gemini real con la capa del chat: citas cruzadas por `knowledge_document_id` con versión y página correctas, y `sin_fuente` sin citas para una pregunta fuera de alcance.
+- Migraciones aplicadas al proyecto: `0001`–`0012`. `0012` crea la allowlist del piloto: las cuentas invitadas nacen `activo`, las demás `pendiente_autorizacion`; no modifica cuentas existentes. Verificada en Supabase el 2026-08-06 (tabla, RLS sin políticas, funciones, default y preservación de estados).
+- **Corpus indexado (2026-08-06):** hay 6 documentos activos y faltan 2 de los 8 del alcance. A los 5 manuales ya documentados se sumó PARCE — Proceso Autónomo del Rover en Competencias para su Evolución (v0.5), activo y con metadata sincronizada tanto en Supabase como en Gemini. La versión de cada documento vive en `scripts/versiones-documentos.json`. Verificado contra Gemini real con la capa del chat: citas cruzadas por `knowledge_document_id` con versión y página correctas, y `sin_fuente` sin citas para una pregunta fuera de alcance.
+- **Admin real promovido (2026-08-06):** `desarrollo.tecnologico@scout.org.co` tiene `role = admin` y `account_status = activo`. Falta recorrer el panel completo y comprobar los primeros `admin_audit_events`.
 
 **Decisiones e invariantes vigentes:**
 - **Acceso admin sin motivo obligatorio** (2026-07-17): errata 7 de `docs/pilot-scope-v0.3.1.md` (deroga P-RF-16; P-RF-17 se mantiene vía log silencioso automático). **No reintroducir el formulario de motivo.**
@@ -37,8 +38,8 @@ Después, **Fase 5** — cargar los 30 casos en `rag_eval_cases` (12/6/6/4/2) y 
 
 Media:
 - **`/admin/documentos` y `/admin/usuarios` no auditan su apertura**, aunque el de usuarios muestra nombres y correos de todos los perfiles. P-RF-17 exige auditar el acceso a *conversaciones* (eso sí está), así que no es incumplimiento literal, pero es inconsistente con el criterio del propio panel, que sí audita el listado de conversaciones.
-- **No hay puerta de entrada al piloto.** Toda cuenta nueva nace `activo`, así que cualquiera con un correo válido obtiene 30 llamadas a Gemini por día. Ya no es un tema de menores (decisión del 2026-08-01: no se piden autorizaciones), es control de acceso y de costo en un piloto cerrado de ~80 usuarios. La mitigación es de una línea: allowlist de correos, o default `pendiente_autorizacion` con el admin habilitando.
-- **El panel admin nunca se ha ejercitado con un admin real:** 0 perfiles con `role = admin` y `admin_audit_events` vacía. Todo lo verificado hasta hoy fue con usuarios sintéticos y `rollback`.
+- **La puerta de entrada por allowlist ya está aplicada**, pero falta cargar la lista real de invitados. No ejecutar `scripts/seed-allowlist.sql` con los correos de reemplazo; agregar un correo después del registro no activa retroactivamente la cuenta, que debe habilitarse desde `/admin/usuarios` para dejar auditoría.
+- **El panel admin todavía no se ha recorrido end-to-end con el admin real ya promovido.** Falta comprobar las primeras filas de `admin_audit_events`; las verificaciones anteriores del panel fueron con usuarios sintéticos y `rollback`.
 - **Rutas implementadas pero nunca ejercitadas:** 0 filas con `status = blocked` y 0 con `error_code = invalid_model_json` en `model_request_events`. El bloqueo del proveedor y el retry de JSON están escritos y sin probar.
 
 Baja:
@@ -48,13 +49,13 @@ Baja:
 - El indexador tiene más caminos donde la fila local y el estado del proveedor pueden divergir (auditoría del 2026-08-01): revertir a un PDF anterior lo salta por sha sin mirar `active`; un fallo tras la subida deja el documento en el store y la fila sin `metadata_synced_at`, y el panel no puede rescatarla porque `0010` exige `last_index_error is null`; el retiro de hermanos filtra por `display_name`, que es texto mutable; y el script fuerza `active = true` sobre documentos que un admin desactivó a propósito, sin dejar auditoría. Conviene un modo `--verify` que compare el store contra `knowledge_documents` en ambas direcciones.
 
 **Pendiente de gestión:**
-- Ejecutar `scripts/seed-admin.sql` cuando el admin real se registre (hoy la base tiene 0 admins activos) y recorrer el panel completo end-to-end.
-- Activar **protección de contraseñas filtradas** en Supabase Auth (Dashboard → Auth → Password security). Hoy está desactivada y el piloto tiene menores.
+- Recorrer el panel completo end-to-end con el admin real ya promovido y comprobar los primeros `admin_audit_events`.
+- Mantener desactivada la **protección de contraseñas filtradas** en Supabase Auth por decisión del usuario.
 - Confirmar el valor real de **Max rows** del proyecto (Dashboard → Settings → API). Todo el análisis de paginación asume el default de 1000; si estuviera más bajo, los truncamientos llegan antes.
 - Eliminar `AUTH_SECRET` de Vercel (ya no se usa).
 - **Dependabot: el conteo está inflado.** De las 48 alertas abiertas, 28 son de paquetes que ya no están en el lockfile (`next-auth`, `@auth/core`, `dompurify`, `undici`, `linkify-it`, `markdown-it`, `@opentelemetry/core`), eliminados al podar la plantilla. Lo realmente vivo son ~6 altas (`next`, `sharp`, `postcss`, `ws`), y subir `next` a >= 16.2.11 cierra la mayoría, incluida una de bypass de proxy. Descartar las obsoletas como "dependencia eliminada" para que el número signifique algo.
-- Los 4 avisos `rls_enabled_no_policy` de los advisors son intencionales (0001 §5.7: RLS sin políticas = solo servidor). No "arreglarlos".
-- Bloqueos organizacionales (sección al final): confirmar el corpus definitivo (5 indexados frente a los 8 del alcance) y construir la UI de aceptación de la política antes de fijar `PRIVACY_POLICY_VERSION`.
+- Los 5 avisos `rls_enabled_no_policy` de los advisors son intencionales (0001 §5.7 y `allowed_emails` en 0012: RLS sin políticas = solo servidor). No "arreglarlos".
+- Bloqueos organizacionales (sección al final): completar el corpus definitivo (6 indexados frente a los 8 del alcance) y construir la UI de aceptación de la política antes de fijar `PRIVACY_POLICY_VERSION`.
 
 ---
 

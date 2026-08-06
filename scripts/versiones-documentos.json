@@ -1,8 +1,10 @@
 {
   "_nota": "Versión oficial de cada manual, por nombre de archivo. Vive en el repo (y no en data/, que está fuera de Git) para que quede trazable qué versión se le asignó a cada documento y por qué. Los que no declaran versión en el PDF llevan el año de publicación, decidido con la Dirección Nacional de Programa de Jóvenes.",
+  "_nota_borradores": "Una versión por debajo de 1.0 marca un documento cuyo contenido es definitivo pero cuya diagramación no lo es. Se indexa igual porque la información ya sirve al Scout, y se reemplaza corriendo el script con el PDF final: mismo nombre de archivo, sha256 distinto, la fila nueva retira la anterior (paso 5 del script) y las citas históricas conservan su snapshot.",
   "Reglamento Red de Jóvenes.pdf": "2018",
   "Manual de Cargos y Funciones Red de Jóvenes.pdf": "2024",
   "Reglamento para la Realización de Asambleas Rover y Elección de Representantes Juveniles.pdf": "2022",
   "Equipo de Bolsillo - Rover.pdf": "2026",
-  "Guía para el Dirigente de Clan.pdf": "2026"
+  "Guía para el Dirigente de Clan.pdf": "2026",
+  "PARCE - Proceso Autónomo del Rover en Competencias para su Evolución.pdf": "0.5"
 }
