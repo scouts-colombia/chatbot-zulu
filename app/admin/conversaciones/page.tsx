@@ -1,3 +1,4 @@
+import { MessagesSquare } from "lucide-react";
 import { Suspense } from "react";
 import { requerirAdmin } from "@/lib/admin/guard";
 import { crearClienteAdmin } from "@/lib/supabase/admin";
@@ -9,7 +10,11 @@ export default function PaginaConversacionesAdmin({
 }) {
   return (
     <Suspense
-      fallback={<p className="text-muted-foreground text-sm">Cargando...</p>}
+      fallback={
+        <p className="text-sm text-scouts-purple/65">
+          Cargando conversaciones...
+        </p>
+      }
     >
       <ListaConversaciones searchParams={searchParams} />
     </Suspense>
@@ -71,7 +76,10 @@ async function ListaConversaciones({
   // creyendo que no hay nada que revisar.
   if (errorConversaciones) {
     return (
-      <p className="text-destructive text-sm" role="alert">
+      <p
+        className="rounded-2xl bg-scouts-red/8 p-4 text-scouts-red text-sm"
+        role="alert"
+      >
         No se pudieron cargar las conversaciones. Intenta de nuevo.
       </p>
     );
@@ -79,7 +87,7 @@ async function ListaConversaciones({
 
   if (!conversaciones || conversaciones.length === 0) {
     return (
-      <p className="text-muted-foreground text-sm">
+      <p className="rounded-2xl bg-scouts-purple/5 p-5 text-foreground/60 text-sm">
         {pagina > 1
           ? "No hay más conversaciones en esta página."
           : "No hay conversaciones todavía."}
@@ -99,7 +107,22 @@ async function ListaConversaciones({
       : pagina < totalPaginas;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
+      <header className="flex items-end justify-between gap-4">
+        <div>
+          <span className="brand-kicker">Supervisión</span>
+          <h2 className="mt-3 font-semibold text-2xl text-scouts-purple">
+            Conversaciones
+          </h2>
+          <p className="mt-1 text-foreground/55 text-sm">
+            Revisa el historial visible para los Scouts.
+          </p>
+        </div>
+        <MessagesSquare
+          aria-hidden="true"
+          className="hidden size-7 text-scouts-orange sm:block"
+        />
+      </header>
       <ul className="space-y-2">
         {conversaciones.map((conversacion) => {
           const dueno = conversacion.profiles as unknown as {
@@ -108,23 +131,23 @@ async function ListaConversaciones({
           } | null;
           return (
             <li
-              className="flex items-center gap-3 rounded-lg border px-3 py-2"
+              className="brand-list-item flex items-center gap-3 rounded-2xl px-3 py-3 sm:px-4"
               key={conversacion.id}
             >
               <div className="min-w-0 flex-1">
                 {/* <a>, no <Link>: ver la invariante en app/admin/layout.tsx. */}
                 <a
-                  className="block truncate text-sm hover:underline"
+                  className="focus-ring-card block truncate rounded-md font-medium text-sm text-scouts-purple hover:underline"
                   href={`/admin/conversaciones/${conversacion.id}`}
                 >
                   {conversacion.title}
                 </a>
-                <p className="truncate text-muted-foreground text-xs">
+                <p className="truncate text-foreground/50 text-xs">
                   {dueno?.nombre ?? dueno?.email ?? "—"}
                   {conversacion.archived && " · archivada"}
                 </p>
               </div>
-              <time className="shrink-0 text-muted-foreground text-xs">
+              <time className="shrink-0 text-foreground/45 text-xs">
                 {new Date(conversacion.updated_at as string).toLocaleDateString(
                   "es-CO"
                 )}
@@ -135,10 +158,10 @@ async function ListaConversaciones({
       </ul>
 
       {(hayAnterior || haySiguiente) && (
-        <nav className="flex items-center justify-between text-sm">
+        <nav className="flex items-center justify-between pt-2 text-sm">
           {hayAnterior ? (
             <a
-              className="hover:underline"
+              className="brand-page-link"
               href={`/admin/conversaciones?pagina=${pagina - 1}`}
             >
               ← Anterior
@@ -146,14 +169,14 @@ async function ListaConversaciones({
           ) : (
             <span />
           )}
-          <span className="text-muted-foreground text-xs">
+          <span className="text-foreground/50 text-xs">
             {totalPaginas === null
               ? `Página ${pagina} · total desconocido`
               : `Página ${pagina} de ${totalPaginas} · ${count} conversaciones`}
           </span>
           {haySiguiente ? (
             <a
-              className="hover:underline"
+              className="brand-page-link"
               href={`/admin/conversaciones?pagina=${pagina + 1}`}
             >
               Siguiente →
@@ -169,7 +192,10 @@ async function ListaConversaciones({
 
 function ErrorAuditoria() {
   return (
-    <p className="text-destructive text-sm" role="alert">
+    <p
+      className="rounded-2xl bg-scouts-red/8 p-4 text-scouts-red text-sm"
+      role="alert"
+    >
       No se pudo registrar la auditoría del listado, así que las conversaciones
       no se muestran. Intenta de nuevo.
     </p>

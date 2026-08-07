@@ -90,26 +90,24 @@ function ErrorChatPublico() {
 function MarcoChatPublico({ children }: { children: React.ReactNode }) {
   return (
     <div
-      className="auth-hero relative flex h-dvh min-h-[34rem] flex-col overflow-hidden text-white"
-      data-design-direction="ruta-liquid-glass"
+      className="pnpj-fondo relative flex h-dvh min-h-[34rem] flex-col overflow-hidden text-pnpj-tinta"
+      data-design-direction="ruta-editorial-glass"
       data-design-mode="operate"
     >
-      <div aria-hidden="true" className="brand-orb brand-orb-yellow" />
-      <div aria-hidden="true" className="brand-orb brand-orb-blue" />
-      <header className="relative z-10 flex min-h-16 items-center justify-between gap-3 border-white/15 border-b px-4 sm:px-6">
+      <header className="relative z-10 flex min-h-16 items-center justify-between gap-3 border-scouts-purple/10 border-b px-4 sm:px-6">
         <Link
-          className="focus-ring rounded-lg py-2 font-semibold text-xl tracking-[-0.03em] text-white"
+          className="focus-ring rounded-lg py-2 font-semibold text-xl tracking-[-0.03em] text-scouts-purple"
           href="/"
         >
           Zulú
-          <span className="ml-2 hidden font-normal text-sm text-white/72 sm:inline">
+          <span className="ml-2 hidden font-normal text-sm text-pnpj-tinta/65 sm:inline">
             Asistente Scout
           </span>
         </Link>
         <NavegacionCuentaPublica />
       </header>
       <main className="relative z-10 min-h-0 flex-1">{children}</main>
-      <p className="relative z-10 px-4 pb-3 text-center text-white/65 text-xs">
+      <p className="relative z-10 px-4 pb-3 text-center text-pnpj-tinta/60 text-xs">
         Una pregunta de prueba por dispositivo. Las respuestas citan documentos
         oficiales.
       </p>

@@ -1,7 +1,9 @@
+import { Archive } from "lucide-react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import { Conversacion } from "@/components/chat/conversacion";
+import { FondoMarca } from "@/components/marca/fondo-marca";
 import { cargarTramo } from "@/lib/chat/transcripcion";
 import { esIdTraspasoBorradorValido } from "@/lib/invitados/borrador";
 import { crearClienteServidor } from "@/lib/supabase/server";
@@ -18,9 +20,9 @@ export default function PaginaConversacion({
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-dvh items-center justify-center">
-          <p className="text-muted-foreground text-sm">Cargando...</p>
-        </div>
+        <FondoMarca className="flex items-center justify-center">
+          <p className="text-sm text-pnpj-tinta/60">Cargando conversación...</p>
+        </FondoMarca>
       }
     >
       <ContenidoConversacion params={params} searchParams={searchParams} />
@@ -95,47 +97,51 @@ async function ContenidoConversacion({
   }
 
   return (
-    <div className="mx-auto flex h-dvh w-full max-w-2xl flex-col">
-      <header className="flex items-center gap-3 border-b px-4 py-3">
-        <Link
-          className="text-muted-foreground text-sm hover:text-foreground"
-          href="/"
-        >
-          ← Conversaciones
-        </Link>
-        <h1 className="min-w-0 flex-1 truncate font-medium text-sm">
-          {conversacion.title}
-        </h1>
-        {conversacion.archived && (
-          <span className="rounded-full bg-muted px-2 py-0.5 text-muted-foreground text-xs">
-            Archivada
-          </span>
-        )}
-      </header>
-      <Conversacion
-        archivada={conversacion.archived}
-        borradorTransferenciaId={borradorTransferenciaId}
-        conversationId={conversacion.id}
-        cursorInicial={tramo.cursor}
-        hayMasAntiguos={tramo.hayMasAntiguos}
-        mensajesIniciales={tramo.mensajes}
-      />
-    </div>
+    <FondoMarca className="h-dvh overflow-hidden">
+      <div className="mx-auto flex h-dvh w-full max-w-4xl flex-col px-3 sm:px-6">
+        <header className="app-shell-header mt-3 flex min-h-16 items-center gap-3 rounded-2xl px-4 py-2.5 sm:mt-5">
+          <Link
+            className="focus-ring shrink-0 rounded-lg px-2 py-2 text-sm text-scouts-purple/75 hover:text-scouts-purple"
+            href="/"
+          >
+            ← Conversaciones
+          </Link>
+          <h1 className="min-w-0 flex-1 truncate font-medium text-sm text-pnpj-morado">
+            {conversacion.title}
+          </h1>
+          {conversacion.archived && (
+            <span className="flex items-center gap-1 rounded-full bg-scouts-yellow px-2.5 py-1 font-medium text-scouts-purple text-xs">
+              <Archive aria-hidden="true" className="size-3" />
+              Archivada
+            </span>
+          )}
+        </header>
+        <div className="min-h-0 flex-1">
+          <Conversacion
+            archivada={conversacion.archived}
+            borradorTransferenciaId={borradorTransferenciaId}
+            conversationId={conversacion.id}
+            cursorInicial={tramo.cursor}
+            hayMasAntiguos={tramo.hayMasAntiguos}
+            mensajesIniciales={tramo.mensajes}
+          />
+        </div>
+      </div>
+    </FondoMarca>
   );
 }
 
 function AvisoPantalla({ children }: { children: React.ReactNode }) {
   return (
-    <div className="mx-auto flex h-dvh w-full max-w-2xl flex-col items-center justify-center gap-4 px-4">
-      <p className="text-center text-destructive text-sm" role="alert">
-        {children}
-      </p>
-      <Link
-        className="text-muted-foreground text-sm hover:text-foreground"
-        href="/"
-      >
-        ← Conversaciones
-      </Link>
-    </div>
+    <FondoMarca className="flex items-center justify-center px-4">
+      <div className="auth-card-surface flex w-full max-w-lg flex-col items-center gap-4 rounded-3xl p-8">
+        <p className="text-center text-scouts-red text-sm" role="alert">
+          {children}
+        </p>
+        <Link className="brand-page-link" href="/">
+          ← Conversaciones
+        </Link>
+      </div>
+    </FondoMarca>
   );
 }

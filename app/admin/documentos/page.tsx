@@ -1,3 +1,4 @@
+import { FileText } from "lucide-react";
 import { Suspense } from "react";
 import { requerirAdmin } from "@/lib/admin/guard";
 import { crearClienteAdmin } from "@/lib/supabase/admin";
@@ -6,7 +7,9 @@ import { FormularioDocumento } from "./formulario-documento";
 export default function PaginaDocumentosAdmin() {
   return (
     <Suspense
-      fallback={<p className="text-muted-foreground text-sm">Cargando...</p>}
+      fallback={
+        <p className="text-sm text-scouts-purple/65">Cargando documentos...</p>
+      }
     >
       <ListaDocumentos />
     </Suspense>
@@ -29,7 +32,10 @@ async function ListaDocumentos() {
   // Search que nadie debería ejecutar por un error transitorio.
   if (errorDocumentos) {
     return (
-      <p className="text-destructive text-sm" role="alert">
+      <p
+        className="rounded-2xl bg-scouts-red/8 p-4 text-scouts-red text-sm"
+        role="alert"
+      >
         No se pudieron cargar los documentos. Intenta de nuevo.
       </p>
     );
@@ -37,15 +43,30 @@ async function ListaDocumentos() {
 
   if (!documentos || documentos.length === 0) {
     return (
-      <p className="text-muted-foreground text-sm">
+      <p className="rounded-2xl bg-scouts-purple/5 p-5 text-foreground/60 text-sm">
         No hay documentos indexados. Corre scripts/index-knowledge-documents.ts.
       </p>
     );
   }
 
   return (
-    <div className="space-y-4">
-      <p className="text-muted-foreground text-sm">
+    <div className="space-y-5">
+      <header className="flex items-end justify-between gap-4">
+        <div>
+          <span className="brand-kicker">Conocimiento</span>
+          <h2 className="mt-3 font-semibold text-2xl text-scouts-purple">
+            Documentos
+          </h2>
+          <p className="mt-1 text-foreground/55 text-sm">
+            Controla qué fuentes pueden fundamentar las respuestas.
+          </p>
+        </div>
+        <FileText
+          aria-hidden="true"
+          className="hidden size-7 text-scouts-blue sm:block"
+        />
+      </header>
+      <p className="rounded-2xl border border-scouts-blue/10 bg-scouts-blue/5 p-4 text-foreground/65 text-sm">
         Un documento desactivado deja de fundamentar respuestas de inmediato
         (queda fuera del filtro de recuperación). Las citas históricas conservan
         su snapshot.
@@ -53,12 +74,14 @@ async function ListaDocumentos() {
       <ul className="space-y-2">
         {documentos.map((documento) => (
           <li
-            className="flex items-center gap-3 rounded-lg border px-3 py-2"
+            className="brand-list-item flex flex-wrap items-center gap-3 rounded-2xl px-3 py-3 sm:flex-nowrap sm:px-4"
             key={documento.id}
           >
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm">{documento.display_name}</p>
-              <p className="text-muted-foreground text-xs">
+              <p className="truncate font-medium text-sm text-scouts-purple">
+                {documento.display_name}
+              </p>
+              <p className="text-foreground/50 text-xs">
                 v{documento.version}
                 {documento.indexed_at &&
                   ` · indexado ${new Date(documento.indexed_at as string).toLocaleDateString("es-CO")}`}
@@ -68,8 +91,8 @@ async function ListaDocumentos() {
             <span
               className={
                 documento.active
-                  ? "rounded-full bg-secondary px-2 py-0.5 text-secondary-foreground text-xs"
-                  : "rounded-full bg-muted px-2 py-0.5 text-muted-foreground text-xs"
+                  ? "rounded-full bg-scouts-yellow px-2.5 py-1 font-medium text-scouts-purple text-xs"
+                  : "rounded-full bg-scouts-purple/8 px-2.5 py-1 text-scouts-purple/65 text-xs"
               }
             >
               {documento.active ? "Activo" : "Inactivo"}

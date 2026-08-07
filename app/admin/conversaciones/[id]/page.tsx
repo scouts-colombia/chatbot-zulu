@@ -26,7 +26,11 @@ export default function PaginaConversacionAdmin({
 }) {
   return (
     <Suspense
-      fallback={<p className="text-muted-foreground text-sm">Cargando...</p>}
+      fallback={
+        <p className="text-sm text-scouts-purple/65">
+          Cargando transcripción...
+        </p>
+      }
     >
       <DetalleConversacion params={params} searchParams={searchParams} />
     </Suspense>
@@ -233,15 +237,22 @@ async function DetalleConversacion({
               }
               key={mensaje.id}
             >
-              <div className="max-w-[85%] rounded-2xl border bg-card px-4 py-2.5 text-sm">
-                <p className="mb-1 text-muted-foreground text-xs">
+              <div
+                className={[
+                  "max-w-[90%] rounded-2xl border px-4 py-3 text-sm shadow-sm sm:max-w-[82%]",
+                  mensaje.sender === "usuario"
+                    ? "rounded-br-sm border-scouts-yellow/80 bg-scouts-yellow text-scouts-purple"
+                    : "rounded-bl-sm border-scouts-purple/10 bg-white/80 text-foreground",
+                ].join(" ")}
+              >
+                <p className="mb-1 text-foreground/45 text-xs">
                   {mensaje.sender} ·{" "}
                   {new Date(mensaje.created_at as string).toLocaleString(
                     "es-CO"
                   )}
                 </p>
                 {etiquetaEstado && (
-                  <span className="mb-1 inline-block rounded-full bg-muted px-2 py-0.5 text-muted-foreground text-xs">
+                  <span className="mb-1 inline-block rounded-full bg-scouts-purple/8 px-2 py-0.5 text-scouts-purple/65 text-xs">
                     {etiquetaEstado}
                   </span>
                 )}
@@ -251,8 +262,8 @@ async function DetalleConversacion({
                   // revisar, p. ej. imágenes hacia terceros).
                   <p className="whitespace-pre-wrap">{mensaje.content}</p>
                 ) : (
-                  <div className="prose prose-sm dark:prose-invert max-w-none">
-                    {/* Sin <img>: un mensaje del asistente influido por el
+                  <div className="prose prose-sm max-w-none">
+                    {/* Sin imágenes: un mensaje del asistente influido por el
                     Scout podría incluir `![](url)` y filtrar la IP/actividad
                     del revisor al abrir la transcripción. */}
                     <Markdown
@@ -264,7 +275,7 @@ async function DetalleConversacion({
                   </div>
                 )}
                 {preguntaMensaje && (
-                  <div className="mt-2 rounded-lg bg-muted px-3 py-2 text-xs">
+                  <div className="mt-2 rounded-xl bg-scouts-blue/6 px-3 py-2 text-xs">
                     <p className="font-medium">{preguntaMensaje.text}</p>
                     <ul className="mt-1 list-inside list-disc text-muted-foreground">
                       {[...(preguntaMensaje.guided_question_options ?? [])]
@@ -279,7 +290,7 @@ async function DetalleConversacion({
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {citasMensaje.map((cita) => (
                       <span
-                        className="rounded-full bg-muted px-2 py-0.5 text-muted-foreground text-xs"
+                        className="rounded-full bg-scouts-purple/7 px-2 py-0.5 text-scouts-purple/65 text-xs"
                         key={cita.id}
                       >
                         {cita.document_title_snapshot}
@@ -326,21 +337,21 @@ function PaginacionMensajes({
     `/admin/conversaciones/${conversacionId}?pagina=${n}`;
 
   return (
-    <nav className="flex items-center justify-between text-sm">
+    <nav className="flex items-center justify-between rounded-2xl bg-scouts-purple/4 px-2 py-1 text-sm">
       {hayMasAntiguos ? (
-        <a className="hover:underline" href={url(pagina + 1)}>
+        <a className="brand-page-link" href={url(pagina + 1)}>
           ← Más antiguos
         </a>
       ) : (
         <span />
       )}
-      <span className="text-muted-foreground text-xs">
+      <span className="text-foreground/50 text-xs">
         {totalPaginas === null
           ? `Tramo ${pagina}`
           : `Tramo ${pagina} de ${totalPaginas} · ${total} mensajes`}
       </span>
       {hayMasRecientes ? (
-        <a className="hover:underline" href={url(pagina - 1)}>
+        <a className="brand-page-link" href={url(pagina - 1)}>
           Más recientes →
         </a>
       ) : (
@@ -355,10 +366,7 @@ function Volver() {
   // SPA dejaría esta transcripción en la caché de cliente y Atrás la revelaría
   // sin auditar la reapertura.
   return (
-    <a
-      className="block text-muted-foreground text-sm hover:text-foreground"
-      href="/admin/conversaciones"
-    >
+    <a className="brand-page-link w-fit" href="/admin/conversaciones">
       ← Volver
     </a>
   );
@@ -366,7 +374,10 @@ function Volver() {
 
 function Aviso({ children }: { children: React.ReactNode }) {
   return (
-    <p className="text-destructive text-sm" role="alert">
+    <p
+      className="rounded-2xl bg-scouts-red/8 p-4 text-scouts-red text-sm"
+      role="alert"
+    >
       {children}
     </p>
   );
@@ -382,13 +393,16 @@ function Encabezado({
   archivada: boolean;
 }) {
   return (
-    <div>
+    <header className="rounded-2xl border border-scouts-purple/10 bg-scouts-purple/4 p-4">
       <Volver />
-      <h2 className="mt-2 font-medium">{titulo}</h2>
-      <p className="text-muted-foreground text-sm">
+      <span className="brand-kicker mt-3">Transcripción auditada</span>
+      <h2 className="mt-3 font-semibold text-xl text-scouts-purple">
+        {titulo}
+      </h2>
+      <p className="mt-1 text-foreground/55 text-sm">
         {dueno?.nombre ?? "—"} · {dueno?.email ?? "—"}
         {archivada && " · archivada"}
       </p>
-    </div>
+    </header>
   );
 }
