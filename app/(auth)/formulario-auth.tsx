@@ -10,6 +10,7 @@ import type { EstadoFormulario } from "./acciones";
 type Props = {
   modo: "login" | "registro" | "finalizar";
   conversionInvitada?: boolean;
+  errorInicial?: string;
   accion: (
     estadoPrevio: EstadoFormulario,
     formData: FormData
@@ -19,9 +20,11 @@ type Props = {
 export function FormularioAuth({
   modo,
   accion,
+  errorInicial,
   conversionInvitada = false,
 }: Props) {
   const [estado, enviar, pendiente] = useActionState(accion, { error: null });
+  const errorVisible = estado.mensaje ? null : (estado.error ?? errorInicial);
   const esRegistro = modo === "registro";
   const esFinalizar = modo === "finalizar";
 
@@ -46,7 +49,7 @@ export function FormularioAuth({
             {esFinalizar
               ? "Crea una contraseña para terminar tu registro"
               : conversionInvitada
-                ? "Verifica tu correo sin perder la conversación"
+                ? "Crea tu contraseña y verifica el correo sin perder la conversación"
                 : esRegistro
                   ? "Crea tu cuenta para consultar los manuales oficiales"
                   : "Inicia sesión para consultar los manuales oficiales"}
@@ -81,7 +84,7 @@ export function FormularioAuth({
             </div>
           )}
 
-          {(!conversionInvitada || esFinalizar) && (
+          {(esRegistro || esFinalizar || !conversionInvitada) && (
             <div className="space-y-2">
               <Label htmlFor="password">Contraseña</Label>
               <Input
@@ -99,9 +102,9 @@ export function FormularioAuth({
             </div>
           )}
 
-          {estado.error && (
+          {errorVisible && (
             <p className="text-destructive text-sm" role="alert">
-              {estado.error}
+              {errorVisible}
             </p>
           )}
 
@@ -121,7 +124,7 @@ export function FormularioAuth({
               : esFinalizar
                 ? "Guardar contraseña"
                 : conversionInvitada
-                  ? "Enviar enlace de verificación"
+                  ? "Verificar y crear cuenta"
                   : esRegistro
                     ? "Crear cuenta"
                     : "Iniciar sesión"}

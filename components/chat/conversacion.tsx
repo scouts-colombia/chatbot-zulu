@@ -25,16 +25,19 @@ import type { MensajeUI } from "./tipos";
  * throttling de pestañas en segundo plano no arrastra la animación y al
  * recuperar el foco el texto se pone al día de inmediato.
  */
+const BORRADOR_INVITADO_KEY = "zulu:borrador-invitado";
 const CARACTERES_POR_SEGUNDO = 220;
 
 function TextoTypewriter({
   texto,
   animar,
   onTerminado,
+  superficieMarca,
 }: {
   texto: string;
   animar: boolean;
   onTerminado: () => void;
+  superficieMarca: boolean;
 }) {
   const [visible, setVisible] = useState(animar ? 0 : texto.length);
   const terminadoRef = useRef(false);
@@ -62,7 +65,13 @@ function TextoTypewriter({
   }, [animar, texto, onTerminado]);
 
   return (
-    <div className="prose prose-sm dark:prose-invert max-w-none">
+    <div
+      className={
+        superficieMarca
+          ? "prose prose-sm max-w-none"
+          : "prose prose-sm dark:prose-invert max-w-none"
+      }
+    >
       {/* Sin <img>: la respuesta del asistente puede incluir `![](url)` y
       cargar recursos de terceros al renderizar. */}
       <Markdown disallowedElements={["img"]} remarkPlugins={[remarkGfm]}>
@@ -125,6 +134,7 @@ function Burbuja({
         <TextoTypewriter
           animar={animar}
           onTerminado={onTerminado}
+          superficieMarca={superficieMarca}
           texto={mensaje.content}
         />
         {mostrarAdjuntos && mensaje.citas.length > 0 && (
@@ -206,6 +216,19 @@ export function Conversacion({
   const [masAntiguos, setMasAntiguos] = useState(hayMasAntiguos);
   const [cargandoAntiguos, setCargandoAntiguos] = useState(false);
   const [limiteInvitado, setLimiteInvitado] = useState(limiteConsumido);
+  useEffect(() => {
+    const guardado = sessionStorage.getItem(BORRADOR_INVITADO_KEY);
+    if (guardado) {
+      setBorrador((actual) => actual || guardado);
+    }
+  }, []);
+
+  const persistirBorrador = () => {
+    const limpio = borrador.trim();
+    if (limpio) {
+      sessionStorage.setItem(BORRADOR_INVITADO_KEY, limpio);
+    }
+  };
   const [mostrarRegistro, setMostrarRegistro] = useState(false);
   const [aceptaPolitica, setAceptaPolitica] = useState(false);
   const mensajesRef = useRef<HTMLDivElement>(null);
@@ -269,6 +292,7 @@ export function Conversacion({
     }
     if (esInvitado && limiteInvitado) {
       setBorrador(limpio);
+      sessionStorage.setItem(BORRADOR_INVITADO_KEY, limpio);
       setMostrarRegistro(true);
       return;
     }
@@ -312,6 +336,7 @@ export function Conversacion({
       const datos = await respuesta.json().catch(() => null);
 
       if (!respuesta.ok) {
+        sessionStorage.setItem(BORRADOR_INVITADO_KEY, limpio);
         revertir();
         if (datos?.codigo === "registro_requerido") {
           setMostrarRegistro(true);
@@ -335,6 +360,7 @@ export function Conversacion({
       }
       if (esInvitado) {
         setLimiteInvitado(true);
+        sessionStorage.removeItem(BORRADOR_INVITADO_KEY);
       }
 
       const mensajeAsistente: MensajeUI = {
@@ -390,11 +416,21 @@ export function Conversacion({
           </div>
         )}
         {mensajes.length === 0 && (
-          <div className="mx-auto flex max-w-xl flex-col items-center pt-10 text-center text-white">
+          <div
+            className={[
+              "mx-auto flex max-w-xl flex-col items-center pt-10 text-center",
+              esInvitado ? "text-white" : "text-foreground",
+            ].join(" ")}
+          >
             <h2 className="text-balance font-semibold text-2xl tracking-[-0.03em] sm:text-3xl">
               ¿Qué quieres descubrir hoy?
             </h2>
-            <p className="mt-3 max-w-md text-pretty text-sm text-white/78 sm:text-base">
+            <p
+              className={[
+                "mt-3 max-w-md text-pretty text-sm sm:text-base",
+                esInvitado ? "text-white/78" : "text-muted-foreground",
+              ].join(" ")}
+            >
               Pregunta sobre los manuales oficiales de Scouts Colombia. Zulú te
               responderá con las fuentes que respaldan la respuesta.
             </p>
@@ -511,14 +547,18 @@ export function Conversacion({
               asChild
               className="btn-press min-h-11 bg-scouts-purple text-white hover:bg-scouts-purple/90"
             >
-              <Link href="/registro">Crear cuenta</Link>
+              <Link href="/registro" onClick={persistirBorrador}>
+                Crear cuenta
+              </Link>
             </Button>
             <Button
               asChild
               className="btn-press min-h-11 border-scouts-purple/25 text-scouts-purple hover:bg-scouts-purple/8"
               variant="outline"
             >
-              <Link href="/login">Iniciar sesión</Link>
+              <Link href="/login" onClick={persistirBorrador}>
+                Iniciar sesión
+              </Link>
             </Button>
           </div>
         </DialogContent>

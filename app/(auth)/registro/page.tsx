@@ -5,7 +5,11 @@ import { FormularioAuth } from "../formulario-auth";
 
 export const metadata = { title: "Crear cuenta" };
 
-export default function PaginaRegistro() {
+export default function PaginaRegistro({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
   return (
     <Suspense
       fallback={
@@ -16,12 +20,17 @@ export default function PaginaRegistro() {
         </main>
       }
     >
-      <ContenidoRegistro />
+      <ContenidoRegistro searchParams={searchParams} />
     </Suspense>
   );
 }
 
-async function ContenidoRegistro() {
+async function ContenidoRegistro({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
+  const { error } = await searchParams;
   const supabase = await crearClienteServidor();
   const {
     data: { user },
@@ -39,6 +48,11 @@ async function ContenidoRegistro() {
     <FormularioAuth
       accion={registrarse}
       conversionInvitada={user?.is_anonymous === true}
+      errorInicial={
+        error === "enlace_invalido"
+          ? "El enlace de verificaci\u00f3n venci\u00f3 o ya fue usado. Solicita uno nuevo."
+          : undefined
+      }
       modo="registro"
     />
   );

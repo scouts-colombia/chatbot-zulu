@@ -1,5 +1,6 @@
 "use server";
 
+import { createClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
@@ -54,17 +55,34 @@ export async function iniciarSesion(
   } = await supabase.auth.getUser();
   const invitadoAnterior =
     usuarioAnterior?.is_anonymous === true ? usuarioAnterior.id : null;
-
-  const { data, error } = await supabase.auth.signInWithPassword({
+  const credenciales = {
     email: String(formData.get("email") ?? "").trim(),
     password: String(formData.get("password") ?? ""),
-  });
+  };
 
-  if (error) {
-    return { error: traducirError(error.code, error.message) };
-  }
+  if (invitadoAnterior) {
+    // Este cliente no escribe cookies. La sesión anónima sigue activa hasta
+    // que la transferencia termina, así un fallo transitorio es reintentable.
+    const verificador = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL as string,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string,
+      {
+        auth: {
+          autoRefreshToken: false,
+          detectSessionInUrl: false,
+          persistSession: false,
+        },
+      }
+    );
+    const { data, error } =
+      await verificador.auth.signInWithPassword(credenciales);
 
-  if (invitadoAnterior && data.user) {
+    if (error || !data.user || !data.session) {
+      return {
+        error: traducirError(error?.code, error?.message ?? "Sesión inválida"),
+      };
+    }
+
     const admin = crearClienteAdmin();
     const { error: errorTransferencia } = await admin.rpc(
       "transferir_conversaciones_invitadas",
@@ -80,9 +98,28 @@ export async function iniciarSesion(
       );
       return {
         error:
-          "Iniciaste sesión, pero no pudimos asociar tu conversación de prueba. Recarga e inténtalo de nuevo.",
+          "No pudimos asociar tu conversación de prueba. Tu sesión invitada sigue activa; inténtalo de nuevo.",
       };
     }
+
+    const { error: errorSesion } = await supabase.auth.setSession({
+      access_token: data.session.access_token,
+      refresh_token: data.session.refresh_token,
+    });
+    if (errorSesion) {
+      return {
+        error:
+          "La conversación quedó asociada, pero no pudimos iniciar la sesión. Inténtalo de nuevo.",
+      };
+    }
+
+    revalidatePath("/", "layout");
+    redirect("/");
+  }
+
+  const { error } = await supabase.auth.signInWithPassword(credenciales);
+  if (error) {
+    return { error: traducirError(error.code, error.message) };
   }
 
   revalidatePath("/", "layout");
@@ -102,6 +139,9 @@ export async function registrarse(
   if (!nombre) {
     return { error: "Escribe tu nombre." };
   }
+  if (password.length < 8) {
+    return { error: MENSAJES_ERROR.weak_password };
+  }
 
   const {
     data: { user: usuarioActual },
@@ -112,13 +152,14 @@ export async function registrarse(
     const { error } = await supabase.auth.updateUser(
       {
         email,
+        password,
         data: {
           nombre,
-          registro_pendiente_password: true,
+          registro_pendiente_password: false,
         },
       },
       {
-        emailRedirectTo: `${origen}/auth/callback?next=${encodeURIComponent("/registro")}`,
+        emailRedirectTo: `${origen}/auth/callback?next=${encodeURIComponent("/")}`,
       }
     );
 
@@ -129,12 +170,8 @@ export async function registrarse(
     return {
       error: null,
       mensaje:
-        "Te enviamos un enlace para verificar tu correo. Ábrelo en este dispositivo para conservar la conversación y crear tu contraseña.",
+        "Te enviamos un enlace para verificar tu correo. Ábrelo para activar la cuenta y conservar tu conversación.",
     };
-  }
-
-  if (password.length < 8) {
-    return { error: MENSAJES_ERROR.weak_password };
   }
 
   const origen = await obtenerOrigen();

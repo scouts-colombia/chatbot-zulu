@@ -46,6 +46,38 @@ function ahora() {
 
 type ClienteAdmin = ReturnType<typeof crearClienteAdmin>;
 
+async function obtenerIdentidadInvitada(request: Request) {
+  const secret = process.env.GUEST_LIMIT_SECRET ?? "";
+  const cookieStore = await cookies();
+  const cookieActual = cookieStore.get(COOKIE_DISPOSITIVO_INVITADO)?.value;
+  const deviceId = esIdDispositivoValido(cookieActual)
+    ? (cookieActual as string)
+    : crearIdDispositivo();
+
+  if (deviceId !== cookieActual) {
+    cookieStore.set(COOKIE_DISPOSITIVO_INVITADO, deviceId, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 365,
+    });
+  }
+
+  return construirIdentidadInvitada({ request, deviceId, secret });
+}
+
+async function liberarPreflight(
+  admin: ClienteAdmin,
+  preflightId: string | null
+) {
+  if (preflightId) {
+    await admin.rpc("liberar_preflight_turno_invitado", {
+      p_preflight_id: preflightId,
+    });
+  }
+}
+
 async function registrarEventos(
   admin: ClienteAdmin,
   base: {
@@ -120,19 +152,94 @@ export async function POST(request: Request) {
   }
 
   const supabase = await crearClienteServidor();
+  const admin = crearClienteAdmin();
   let {
     data: { user },
   } = await supabase.auth.getUser();
+  let identidadInvitada: IdentidadInvitada | null = null;
+  let preflightId: string | null = null;
 
   if (!user) {
-    const { data, error } = await supabase.auth.signInAnonymously();
-    if (error || !data.user) {
-      console.error("[chat] No se pudo iniciar la sesión invitada:", error);
+    if (cuerpo.conversationId) {
+      return NextResponse.json(
+        { codigo: "solicitud_invalida" },
+        { status: 400 }
+      );
+    }
+    // Rechazar antes de crear auth.users: ni la falta de consentimiento ni un
+    // limite agotado deben producir cuentas anonimas durables.
+    if (!cuerpo.aceptaPolitica) {
+      return NextResponse.json(
+        {
+          codigo: "consentimiento_requerido",
+          mensaje:
+            "Debes aceptar la pol\u00edtica de privacidad vigente antes de usar el chat.",
+        },
+        { status: 403 }
+      );
+    }
+
+    try {
+      identidadInvitada = await obtenerIdentidadInvitada(request);
+    } catch (error) {
+      console.error("[chat] Identidad invitada no disponible:", error);
       return NextResponse.json(
         {
           codigo: "invitado_no_disponible",
           mensaje:
-            "El turno de prueba no está disponible en este momento. Intenta de nuevo más tarde.",
+            "El turno de prueba no est\u00e1 disponible en este momento. Intenta de nuevo m\u00e1s tarde.",
+        },
+        { status: 503 }
+      );
+    }
+
+    const preflight = await admin.rpc("preparar_turno_invitado", {
+      p_device_hash: identidadInvitada.deviceHash,
+      p_environment_hash: identidadInvitada.environmentHash,
+      p_network_hash: identidadInvitada.networkHash,
+    });
+    if (preflight.error || !preflight.data) {
+      if (
+        /limite_invitado|limite_red_invitada/.test(
+          preflight.error?.message ?? ""
+        )
+      ) {
+        return NextResponse.json(
+          {
+            codigo: "registro_requerido",
+            mensaje:
+              "Ya usaste tu pregunta de prueba. Crea una cuenta o inicia sesi\u00f3n para continuar.",
+          },
+          { status: 429 }
+        );
+      }
+      console.error(
+        "[chat] No se pudo preparar el turno invitado:",
+        preflight.error
+      );
+      return NextResponse.json(
+        {
+          codigo: "invitado_no_disponible",
+          mensaje:
+            "El turno de prueba no est\u00e1 disponible en este momento. Intenta de nuevo m\u00e1s tarde.",
+        },
+        { status: 503 }
+      );
+    }
+    preflightId = preflight.data as string;
+
+    const { data, error } = await supabase.auth.signInAnonymously();
+    if (error || !data.user) {
+      await liberarPreflight(admin, preflightId);
+      console.error(
+        "[chat] No se pudo iniciar la sesi\u00f3n invitada:",
+        error
+      );
+      return NextResponse.json(
+        {
+          codigo: "invitado_no_disponible",
+          mensaje:
+            "El turno de prueba no est\u00e1 disponible en este momento. Intenta de nuevo m\u00e1s tarde.",
         },
         { status: 503 }
       );
@@ -141,7 +248,6 @@ export async function POST(request: Request) {
   }
 
   const esInvitado = user.is_anonymous === true;
-  const admin = crearClienteAdmin();
 
   // Estado de cuenta y consentimiento: lógica de API, no RLS (CLAUDE.md).
   const { data: perfil, error: errorPerfil } = await supabase
@@ -188,6 +294,58 @@ export async function POST(request: Request) {
   }
 
   // Conversación propia y activa (la RLS limita a lo propio).
+  if (esInvitado && !identidadInvitada) {
+    try {
+      identidadInvitada = await obtenerIdentidadInvitada(request);
+    } catch (error) {
+      console.error("[chat] Identidad invitada no disponible:", error);
+      return NextResponse.json(
+        {
+          codigo: "invitado_no_disponible",
+          mensaje:
+            "El turno de prueba no est\u00e1 disponible en este momento. Intenta de nuevo m\u00e1s tarde.",
+        },
+        { status: 503 }
+      );
+    }
+  }
+
+  if (esInvitado && !preflightId && identidadInvitada) {
+    const preflight = await admin.rpc("preparar_turno_invitado", {
+      p_device_hash: identidadInvitada.deviceHash,
+      p_environment_hash: identidadInvitada.environmentHash,
+      p_network_hash: identidadInvitada.networkHash,
+    });
+    if (preflight.error || !preflight.data) {
+      if (
+        /limite_invitado|limite_red_invitada/.test(
+          preflight.error?.message ?? ""
+        )
+      ) {
+        return NextResponse.json(
+          {
+            codigo: "registro_requerido",
+            mensaje:
+              "Ya usaste tu pregunta de prueba. Crea una cuenta o inicia sesi\u00f3n para continuar.",
+          },
+          { status: 429 }
+        );
+      }
+      console.error(
+        "[chat] No se pudo preparar el turno invitado:",
+        preflight.error
+      );
+      return NextResponse.json(
+        {
+          codigo: "invitado_no_disponible",
+          mensaje:
+            "El turno de prueba no est\u00e1 disponible en este momento. Intenta de nuevo m\u00e1s tarde.",
+        },
+        { status: 503 }
+      );
+    }
+    preflightId = preflight.data as string;
+  }
   let conversationId = cuerpo.conversationId;
   if (!conversationId && esInvitado) {
     const { data: existente, error: errorExistente } = await supabase
@@ -281,55 +439,34 @@ export async function POST(request: Request) {
   let errorTurno: { message: string } | null = null;
 
   if (esInvitado) {
-    const secret = process.env.GUEST_LIMIT_SECRET ?? "";
-    const cookieStore = await cookies();
-    const cookieActual = cookieStore.get(COOKIE_DISPOSITIVO_INVITADO)?.value;
-    const deviceId = esIdDispositivoValido(cookieActual)
-      ? (cookieActual as string)
-      : crearIdDispositivo();
-
-    if (deviceId !== cookieActual) {
-      cookieStore.set(COOKIE_DISPOSITIVO_INVITADO, deviceId, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        path: "/",
-        maxAge: 60 * 60 * 24 * 365,
-      });
-    }
-
-    let identidad: IdentidadInvitada;
-    try {
-      identidad = construirIdentidadInvitada({
-        request,
-        deviceId,
-        secret,
-      });
-    } catch (error) {
-      console.error("[chat] Identidad invitada no disponible:", error);
+    if (!identidadInvitada || !preflightId) {
       return NextResponse.json(
         {
           codigo: "invitado_no_disponible",
           mensaje:
-            "El turno de prueba no está disponible en este momento. Intenta de nuevo más tarde.",
+            "El turno de prueba no est\u00e1 disponible en este momento. Intenta de nuevo m\u00e1s tarde.",
         },
         { status: 503 }
       );
     }
 
-    const reserva = await admin.rpc("reservar_turno_invitado", {
+    const reserva = await admin.rpc("reservar_turno_invitado_v2", {
+      p_preflight_id: preflightId,
       p_user_id: user.id,
       p_conversation_id: conversationId,
       p_content: cuerpo.mensaje,
-      p_device_hash: identidad.deviceHash,
-      p_environment_hash: identidad.environmentHash,
-      p_network_hash: identidad.networkHash,
+      p_device_hash: identidadInvitada.deviceHash,
+      p_environment_hash: identidadInvitada.environmentHash,
+      p_network_hash: identidadInvitada.networkHash,
       p_policy_version: VERSION_POLITICA_PRIVACIDAD,
       p_policy_url: URL_POLITICA_PRIVACIDAD,
-      p_user_agent_hash: identidad.userAgentHash,
+      p_user_agent_hash: identidadInvitada.userAgentHash,
     });
     idTurno = reserva.data;
     errorTurno = reserva.error;
+    if (errorTurno || !idTurno) {
+      await liberarPreflight(admin, preflightId);
+    }
   } else {
     const turno = await supabase.rpc("insertar_turno_usuario", {
       p_conversation_id: conversationId,
