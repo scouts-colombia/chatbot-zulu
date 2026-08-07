@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { crearClienteServidor } from "@/lib/supabase/server";
 
 function destinoSeguro(value: string | null) {
-  if (!value || !value.startsWith("/") || value.startsWith("//")) {
+  if (!value?.startsWith("/") || value.startsWith("//")) {
     return "/";
   }
   return value;
