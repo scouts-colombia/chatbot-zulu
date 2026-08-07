@@ -158,10 +158,18 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser();
   let identidadInvitada: IdentidadInvitada | null = null;
   let preflightId: string | null = null;
+  const responderLiberandoPreflight = async (
+    cuerpoRespuesta: Record<string, unknown>,
+    init: ResponseInit
+  ) => {
+    await liberarPreflight(admin, preflightId);
+    preflightId = null;
+    return NextResponse.json(cuerpoRespuesta, init);
+  };
 
   if (!user) {
     if (cuerpo.conversationId) {
-      return NextResponse.json(
+      return responderLiberandoPreflight(
         { codigo: "solicitud_invalida" },
         { status: 400 }
       );
@@ -169,7 +177,7 @@ export async function POST(request: Request) {
     // Rechazar antes de crear auth.users: ni la falta de consentimiento ni un
     // limite agotado deben producir cuentas anonimas durables.
     if (!cuerpo.aceptaPolitica) {
-      return NextResponse.json(
+      return responderLiberandoPreflight(
         {
           codigo: "consentimiento_requerido",
           mensaje:
@@ -183,7 +191,7 @@ export async function POST(request: Request) {
       identidadInvitada = await obtenerIdentidadInvitada(request);
     } catch (error) {
       console.error("[chat] Identidad invitada no disponible:", error);
-      return NextResponse.json(
+      return responderLiberandoPreflight(
         {
           codigo: "invitado_no_disponible",
           mensaje:
@@ -204,7 +212,7 @@ export async function POST(request: Request) {
           preflight.error?.message ?? ""
         )
       ) {
-        return NextResponse.json(
+        return responderLiberandoPreflight(
           {
             codigo: "registro_requerido",
             mensaje:
@@ -217,7 +225,7 @@ export async function POST(request: Request) {
         "[chat] No se pudo preparar el turno invitado:",
         preflight.error
       );
-      return NextResponse.json(
+      return responderLiberandoPreflight(
         {
           codigo: "invitado_no_disponible",
           mensaje:
@@ -230,12 +238,11 @@ export async function POST(request: Request) {
 
     const { data, error } = await supabase.auth.signInAnonymously();
     if (error || !data.user) {
-      await liberarPreflight(admin, preflightId);
       console.error(
         "[chat] No se pudo iniciar la sesi\u00f3n invitada:",
         error
       );
-      return NextResponse.json(
+      return responderLiberandoPreflight(
         {
           codigo: "invitado_no_disponible",
           mensaje:
@@ -258,7 +265,7 @@ export async function POST(request: Request) {
 
   if (errorPerfil) {
     console.error("[chat] No se pudo verificar el perfil:", errorPerfil);
-    return NextResponse.json(
+    return responderLiberandoPreflight(
       {
         codigo: "perfil_no_disponible",
         mensaje: "No pudimos verificar tu acceso. Intenta de nuevo.",
@@ -268,7 +275,7 @@ export async function POST(request: Request) {
   }
 
   if (perfil?.account_status !== "activo") {
-    return NextResponse.json(
+    return responderLiberandoPreflight(
       {
         codigo: "cuenta_inactiva",
         mensaje: "Tu cuenta no está habilitada para usar el chat.",
@@ -283,7 +290,7 @@ export async function POST(request: Request) {
   const requiereConsentimiento =
     perfil.privacy_policy_version_accepted !== VERSION_POLITICA_PRIVACIDAD;
   if (requiereConsentimiento && !(esInvitado && cuerpo.aceptaPolitica)) {
-    return NextResponse.json(
+    return responderLiberandoPreflight(
       {
         codigo: "consentimiento_requerido",
         mensaje:
@@ -299,7 +306,7 @@ export async function POST(request: Request) {
       identidadInvitada = await obtenerIdentidadInvitada(request);
     } catch (error) {
       console.error("[chat] Identidad invitada no disponible:", error);
-      return NextResponse.json(
+      return responderLiberandoPreflight(
         {
           codigo: "invitado_no_disponible",
           mensaje:
@@ -322,7 +329,7 @@ export async function POST(request: Request) {
           preflight.error?.message ?? ""
         )
       ) {
-        return NextResponse.json(
+        return responderLiberandoPreflight(
           {
             codigo: "registro_requerido",
             mensaje:
@@ -335,7 +342,7 @@ export async function POST(request: Request) {
         "[chat] No se pudo preparar el turno invitado:",
         preflight.error
       );
-      return NextResponse.json(
+      return responderLiberandoPreflight(
         {
           codigo: "invitado_no_disponible",
           mensaje:
@@ -361,7 +368,7 @@ export async function POST(request: Request) {
         "[chat] No se pudo buscar la conversación invitada:",
         errorExistente
       );
-      return NextResponse.json(
+      return responderLiberandoPreflight(
         {
           codigo: "conversacion_no_disponible",
           mensaje: "No pudimos preparar tu conversación. Intenta de nuevo.",
@@ -383,7 +390,7 @@ export async function POST(request: Request) {
           "[chat] No se pudo crear la conversación invitada:",
           errorCreada
         );
-        return NextResponse.json(
+        return responderLiberandoPreflight(
           {
             codigo: "conversacion_no_disponible",
             mensaje: "No pudimos preparar tu conversación. Intenta de nuevo.",
@@ -396,7 +403,10 @@ export async function POST(request: Request) {
   }
 
   if (!conversationId) {
-    return NextResponse.json({ codigo: "solicitud_invalida" }, { status: 400 });
+    return responderLiberandoPreflight(
+      { codigo: "solicitud_invalida" },
+      { status: 400 }
+    );
   }
 
   const { data: conversacion, error: errorConversacion } = await supabase
@@ -410,7 +420,7 @@ export async function POST(request: Request) {
       "[chat] No se pudo verificar la conversación:",
       errorConversacion
     );
-    return NextResponse.json(
+    return responderLiberandoPreflight(
       {
         codigo: "conversacion_no_disponible",
         mensaje: "No pudimos abrir la conversación. Intenta de nuevo.",
@@ -419,13 +429,13 @@ export async function POST(request: Request) {
     );
   }
   if (!conversacion) {
-    return NextResponse.json(
+    return responderLiberandoPreflight(
       { codigo: "conversacion_no_encontrada" },
       { status: 404 }
     );
   }
   if (conversacion.archived) {
-    return NextResponse.json(
+    return responderLiberandoPreflight(
       { codigo: "conversacion_archivada" },
       { status: 409 }
     );
@@ -440,7 +450,7 @@ export async function POST(request: Request) {
 
   if (esInvitado) {
     if (!identidadInvitada || !preflightId) {
-      return NextResponse.json(
+      return responderLiberandoPreflight(
         {
           codigo: "invitado_no_disponible",
           mensaje:

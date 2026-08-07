@@ -25,8 +25,14 @@ import type { MensajeUI } from "./tipos";
  * throttling de pestañas en segundo plano no arrastra la animación y al
  * recuperar el foco el texto se pone al día de inmediato.
  */
-const BORRADOR_INVITADO_KEY = "zulu:borrador-invitado";
+const BORRADOR_INVITADO_PREFIJO = "zulu:borrador-invitado";
 const CARACTERES_POR_SEGUNDO = 220;
+
+function claveBorradorInvitado(conversationId: string | null) {
+  return conversationId
+    ? `${BORRADOR_INVITADO_PREFIJO}:${conversationId}`
+    : null;
+}
 
 function TextoTypewriter({
   texto,
@@ -217,16 +223,24 @@ export function Conversacion({
   const [cargandoAntiguos, setCargandoAntiguos] = useState(false);
   const [limiteInvitado, setLimiteInvitado] = useState(limiteConsumido);
   useEffect(() => {
-    const guardado = sessionStorage.getItem(BORRADOR_INVITADO_KEY);
+    // Elimina la clave global de versiones anteriores para que un borrador
+    // no pueda reaparecer al cambiar de identidad en una pestaña compartida.
+    sessionStorage.removeItem(BORRADOR_INVITADO_PREFIJO);
+    const clave = claveBorradorInvitado(conversationIdActual);
+    if (!clave) {
+      return;
+    }
+    const guardado = sessionStorage.getItem(clave);
     if (guardado) {
       setBorrador((actual) => actual || guardado);
     }
-  }, []);
+  }, [conversationIdActual]);
 
   const persistirBorrador = () => {
     const limpio = borrador.trim();
-    if (limpio) {
-      sessionStorage.setItem(BORRADOR_INVITADO_KEY, limpio);
+    const clave = claveBorradorInvitado(conversationIdActual);
+    if (esInvitado && limpio && clave) {
+      sessionStorage.setItem(clave, limpio);
     }
   };
   const [mostrarRegistro, setMostrarRegistro] = useState(false);
@@ -292,7 +306,7 @@ export function Conversacion({
     }
     if (esInvitado && limiteInvitado) {
       setBorrador(limpio);
-      sessionStorage.setItem(BORRADOR_INVITADO_KEY, limpio);
+      persistirBorrador();
       setMostrarRegistro(true);
       return;
     }
@@ -336,9 +350,12 @@ export function Conversacion({
       const datos = await respuesta.json().catch(() => null);
 
       if (!respuesta.ok) {
-        sessionStorage.setItem(BORRADOR_INVITADO_KEY, limpio);
         revertir();
         if (datos?.codigo === "registro_requerido") {
+          const clave = claveBorradorInvitado(conversationIdActual);
+          if (esInvitado && clave) {
+            sessionStorage.setItem(clave, limpio);
+          }
           setMostrarRegistro(true);
           return;
         }
@@ -355,12 +372,17 @@ export function Conversacion({
         return;
       }
 
+      const idConversacionRespuesta =
+        datos.conversationId ?? conversationIdActual;
       if (datos.conversationId) {
         setConversationIdActual(datos.conversationId);
       }
+      const clave = claveBorradorInvitado(idConversacionRespuesta);
+      if (clave) {
+        sessionStorage.removeItem(clave);
+      }
       if (esInvitado) {
         setLimiteInvitado(true);
-        sessionStorage.removeItem(BORRADOR_INVITADO_KEY);
       }
 
       const mensajeAsistente: MensajeUI = {
