@@ -48,7 +48,14 @@ async function ContenidoPrincipal({
 
   const {
     data: { user },
+    error: errorAutenticacion,
   } = await supabase.auth.getUser();
+
+  const sesionAusente = errorAutenticacion?.name === "AuthSessionMissingError";
+  if (errorAutenticacion && !sesionAusente) {
+    console.error("[home] No se pudo verificar la sesión:", errorAutenticacion);
+    return <ErrorAutenticacion />;
+  }
 
   if (!user || user.is_anonymous === true) {
     return <ChatPublico userId={user?.id ?? null} />;
@@ -226,6 +233,27 @@ async function ContenidoPrincipal({
   );
 }
 
+function ErrorAutenticacion() {
+  return (
+    <main className="flex min-h-dvh items-center justify-center bg-background px-4">
+      <section
+        className="w-full max-w-md rounded-3xl border bg-card p-8 text-center shadow-[var(--shadow-float)]"
+        role="alert"
+      >
+        <h1 className="font-semibold text-scouts-purple text-xl">
+          No pudimos verificar tu sesión
+        </h1>
+        <p className="mt-2 text-muted-foreground text-sm">
+          No entraremos al modo invitado mientras exista esta duda. Reintenta
+          para conservar tu cuenta y tus conversaciones.
+        </p>
+        <Button asChild className="mt-5 min-h-11 bg-scouts-purple text-white">
+          <a href="/">Reintentar</a>
+        </Button>
+      </section>
+    </main>
+  );
+}
 /**
  * Si no viene `count` no se finge un total: se ofrece "Siguiente" mientras la
  * página venga llena, en vez de ocultar la navegación y dar a entender que no
