@@ -30,8 +30,9 @@ export function normalizarCitas(response: GenerateContentResponse): {
 } {
   const groundingMetadata = response.candidates?.[0]?.groundingMetadata;
   const chunks = groundingMetadata?.groundingChunks ?? [];
+  const supports = groundingMetadata?.groundingSupports;
   const indicesRespaldados = new Set(
-    (groundingMetadata?.groundingSupports ?? [])
+    (supports ?? [])
       .flatMap((support) => support.groundingChunkIndices ?? [])
       .filter(
         (index) =>
@@ -39,13 +40,13 @@ export function normalizarCitas(response: GenerateContentResponse): {
       )
   );
 
-  // File Search puede omitir groundingSupports. En ese caso, o si los
-  // indices recibidos no son utilizables, conservamos el comportamiento
-  // anterior para no convertir una respuesta respaldada en una sin citas.
+  // File Search puede omitir groundingSupports. Solo en ese caso conservamos
+  // el comportamiento anterior. Si Gemini envia el campo pero no asocia
+  // chunks validos, respetamos que la respuesta no tiene citas respaldadas.
   const chunksRespaldados =
-    indicesRespaldados.size > 0
-      ? chunks.filter((_, index) => indicesRespaldados.has(index))
-      : chunks;
+    supports === undefined
+      ? chunks
+      : chunks.filter((_, index) => indicesRespaldados.has(index));
 
   const citas: CitaNormalizada[] = [];
   const citasVistas = new Set<string>();
@@ -64,19 +65,13 @@ export function normalizarCitas(response: GenerateContentResponse): {
       faltaKnowledgeDocumentId = true;
     }
 
-    const documento = knowledgeDocumentId
-      ? `id:${knowledgeDocumentId}`
-      : [
-          "proveedor",
-          contexto.fileSearchStore ?? "",
-          contexto.documentName ?? "",
-          contexto.title ?? "",
-        ].join(":");
-    const claveCita = `${documento}\u0000${contexto.pageNumber ?? "sin-pagina"}`;
-    if (citasVistas.has(claveCita)) {
-      continue;
+    if (knowledgeDocumentId) {
+      const claveCita = `${knowledgeDocumentId}\u0000${contexto.pageNumber ?? "sin-pagina"}`;
+      if (citasVistas.has(claveCita)) {
+        continue;
+      }
+      citasVistas.add(claveCita);
     }
-    citasVistas.add(claveCita);
 
     citas.push({
       knowledgeDocumentId,

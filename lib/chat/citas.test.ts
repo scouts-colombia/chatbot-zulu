@@ -91,7 +91,7 @@ test("usa todos los chunks cuando Gemini omite groundingSupports", () => {
   assert.equal(resultado.citas.length, 2);
 });
 
-test("usa todos los chunks cuando los soportes no traen indices validos", () => {
+test("no cita chunks cuando groundingSupports esta presente sin indices validos", () => {
   const resultado = normalizarCitas(
     respuestaConGrounding(
       [
@@ -102,7 +102,25 @@ test("usa todos los chunks cuando los soportes no traen indices validos", () => 
     )
   );
 
-  assert.equal(resultado.citas.length, 2);
+  assert.equal(resultado.citas.length, 0);
+  assert.equal(resultado.faltaKnowledgeDocumentId, false);
+});
+
+test("no deduplica por titulo cuando falta knowledge_document_id", () => {
+  const resultado = normalizarCitas(
+    respuestaConGrounding(
+      [
+        { titulo: "Titulo compartido", pagina: 2, texto: "Documento uno" },
+        { titulo: "Titulo compartido", pagina: 2, texto: "Documento dos" },
+      ],
+      [[0, 1]]
+    )
+  );
+
+  assert.deepEqual(
+    resultado.citas.map((cita) => cita.fragment),
+    ["Documento uno", "Documento dos"]
+  );
   assert.equal(resultado.faltaKnowledgeDocumentId, true);
 });
 
