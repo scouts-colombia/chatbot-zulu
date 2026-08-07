@@ -11,6 +11,7 @@ import {
   llamarModelo,
   type TurnoHistorial,
 } from "@/lib/chat/gemini";
+import { construirFilasEventos } from "@/lib/chat/telemetria";
 import { crearClienteAdmin } from "@/lib/supabase/admin";
 import { crearClienteServidor } from "@/lib/supabase/server";
 
@@ -44,38 +45,7 @@ async function registrarEventos(
   intentos: IntentoModelo[],
   opciones?: { safetyBlockSource?: string; calidad?: string[] }
 ) {
-  const filas = intentos.map((intento) => {
-    const esUltimo = intento.attemptIndex === intentos.length;
-    const marcasCalidad =
-      esUltimo && intento.status === "ok" && opciones?.calidad?.length
-        ? opciones.calidad.join(",")
-        : undefined;
-    return {
-      user_id: base.userId,
-      conversation_id: base.conversationId,
-      user_message_id: base.userMessageId,
-      assistant_message_id: base.assistantMessageId ?? null,
-      attempt_index: intento.attemptIndex,
-      model_id: base.modelId,
-      provider: "gemini",
-      status: intento.status,
-      latency_ms: intento.latencyMs,
-      input_tokens: intento.inputTokens ?? null,
-      output_tokens: intento.outputTokens ?? null,
-      total_tokens: intento.totalTokens ?? null,
-      grounding_disponible: intento.groundingDisponible,
-      finish_reason: intento.finishReason ?? null,
-      // 'proveedor' cuando el bloqueo llegó sin JSON; 'modelo' cuando vino
-      // dentro de un JSON válido (§15.1).
-      safety_block_source:
-        intento.status === "blocked"
-          ? (opciones?.safetyBlockSource ?? "proveedor")
-          : esUltimo && intento.status === "ok"
-            ? (opciones?.safetyBlockSource ?? null)
-            : null,
-      error_code: intento.errorCode ?? marcasCalidad ?? null,
-    };
-  });
+  const filas = construirFilasEventos(base, intentos, opciones);
 
   const { error } = await admin.from("model_request_events").insert(filas);
   if (error) {
@@ -118,8 +88,8 @@ function metadataDe(
     requestId,
     modelId,
     latencyMs: intentos.reduce((suma, i) => suma + i.latencyMs, 0),
-    inputTokens: ultimo?.inputTokens,
-    outputTokens: ultimo?.outputTokens,
+    inputTokens: ultimo?.promptTokens,
+    outputTokens: ultimo?.candidatesTokens,
     totalTokens: ultimo?.totalTokens,
     groundingDisponible: ultimo?.groundingDisponible ?? false,
     finishReason: ultimo?.finishReason,
