@@ -9,7 +9,7 @@
     "start": "next start",
     "check": "ultracite check",
     "fix": "ultracite fix",
-    "test": "tsx --test lib/chat/contrato.test.ts lib/chat/gemini.test.ts lib/chat/telemetria.test.ts",
+    "test": "tsx --test lib/chat/citas.test.ts lib/chat/contrato.test.ts lib/chat/gemini.test.ts lib/chat/telemetria.test.ts",
     "typecheck": "tsc --noEmit",
     "verify:rls": "node scripts/verify-rls.mjs",
     "spike:file-search": "tsx scripts/spike-file-search.ts"
