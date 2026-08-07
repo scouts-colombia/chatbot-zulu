@@ -5,9 +5,11 @@
   "scripts": {
     "dev": "next dev --turbo",
     "build": "next build",
+    "compare:thinking": "tsx scripts/compare-thinking-levels.ts",
     "start": "next start",
     "check": "ultracite check",
     "fix": "ultracite fix",
+    "test": "tsx --test lib/chat/contrato.test.ts lib/chat/gemini.test.ts lib/chat/telemetria.test.ts",
     "typecheck": "tsc --noEmit",
     "verify:rls": "node scripts/verify-rls.mjs",
     "spike:file-search": "tsx scripts/spike-file-search.ts"
