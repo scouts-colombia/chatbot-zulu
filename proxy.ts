@@ -1,7 +1,13 @@
 import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 
-const RUTAS_PUBLICAS = ["/login", "/registro"];
+const RUTAS_SIN_SESION = new Set([
+  "/",
+  "/login",
+  "/registro",
+  "/auth/callback",
+  "/api/chat",
+]);
 
 /**
  * Refresca la sesión de Supabase en cada request y protege las rutas:
@@ -60,15 +66,26 @@ export async function proxy(request: NextRequest) {
   };
 
   const { pathname } = request.nextUrl;
-  const esRutaPublica = RUTAS_PUBLICAS.some((ruta) =>
-    pathname.startsWith(ruta)
-  );
+  const esRutaSinSesion = RUTAS_SIN_SESION.has(pathname);
+  const esRutaAuth = pathname === "/login" || pathname === "/registro";
+  const esInvitado = user?.is_anonymous === true;
 
-  if (!(user || esRutaPublica)) {
+  if (!(user || esRutaSinSesion)) {
     return redirigirA("/login");
   }
 
-  if (user && esRutaPublica) {
+  if (esInvitado && !esRutaSinSesion) {
+    return redirigirA("/");
+  }
+
+  const registroIncompleto =
+    user?.user_metadata?.registro_pendiente_password === true;
+  if (
+    user &&
+    !esInvitado &&
+    esRutaAuth &&
+    !(pathname === "/registro" && registroIncompleto)
+  ) {
     return redirigirA("/");
   }
 

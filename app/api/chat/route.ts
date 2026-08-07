@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { normalizarCitas } from "@/lib/chat/citas";
@@ -12,14 +13,26 @@ import {
   type TurnoHistorial,
 } from "@/lib/chat/gemini";
 import { construirFilasEventos } from "@/lib/chat/telemetria";
+import {
+  COOKIE_DISPOSITIVO_INVITADO,
+  construirIdentidadInvitada,
+  crearIdDispositivo,
+  esIdDispositivoValido,
+  type IdentidadInvitada,
+} from "@/lib/invitados/identidad";
+import {
+  URL_POLITICA_PRIVACIDAD,
+  VERSION_POLITICA_PRIVACIDAD,
+} from "@/lib/privacidad";
 import { crearClienteAdmin } from "@/lib/supabase/admin";
 import { crearClienteServidor } from "@/lib/supabase/server";
 
 export const maxDuration = 60;
 
 const CuerpoSchema = z.object({
-  conversationId: z.string().uuid(),
+  conversationId: z.string().uuid().optional(),
   mensaje: z.string().trim().min(1).max(2000),
+  aceptaPolitica: z.boolean().optional(),
 });
 
 const MENSAJE_BLOQUEADO =
@@ -99,21 +112,54 @@ function metadataDe(
 }
 
 export async function POST(request: Request) {
+  let cuerpo: z.infer<typeof CuerpoSchema>;
+  try {
+    cuerpo = CuerpoSchema.parse(await request.json());
+  } catch {
+    return NextResponse.json({ codigo: "solicitud_invalida" }, { status: 400 });
+  }
+
   const supabase = await crearClienteServidor();
-  const {
+  let {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return NextResponse.json({ codigo: "no_autenticado" }, { status: 401 });
+    const { data, error } = await supabase.auth.signInAnonymously();
+    if (error || !data.user) {
+      console.error("[chat] No se pudo iniciar la sesión invitada:", error);
+      return NextResponse.json(
+        {
+          codigo: "invitado_no_disponible",
+          mensaje:
+            "El turno de prueba no está disponible en este momento. Intenta de nuevo más tarde.",
+        },
+        { status: 503 }
+      );
+    }
+    user = data.user;
   }
 
+  const esInvitado = user.is_anonymous === true;
+  const admin = crearClienteAdmin();
+
   // Estado de cuenta y consentimiento: lógica de API, no RLS (CLAUDE.md).
-  const { data: perfil } = await supabase
+  const { data: perfil, error: errorPerfil } = await supabase
     .from("profiles")
     .select("account_status, privacy_policy_version_accepted")
     .eq("id", user.id)
-    .single();
+    .maybeSingle();
+
+  if (errorPerfil) {
+    console.error("[chat] No se pudo verificar el perfil:", errorPerfil);
+    return NextResponse.json(
+      {
+        codigo: "perfil_no_disponible",
+        mensaje: "No pudimos verificar tu acceso. Intenta de nuevo.",
+      },
+      { status: 503 }
+    );
+  }
 
   if (perfil?.account_status !== "activo") {
     return NextResponse.json(
@@ -128,11 +174,9 @@ export async function POST(request: Request) {
   // Gate de consentimiento (P-RF-04). Se activa fijando PRIVACY_POLICY_VERSION
   // cuando la organización publique el texto de la política; hasta entonces no
   // hay versión que aceptar.
-  const versionPolitica = process.env.PRIVACY_POLICY_VERSION;
-  if (
-    versionPolitica &&
-    perfil.privacy_policy_version_accepted !== versionPolitica
-  ) {
+  const requiereConsentimiento =
+    perfil.privacy_policy_version_accepted !== VERSION_POLITICA_PRIVACIDAD;
+  if (requiereConsentimiento && !(esInvitado && cuerpo.aceptaPolitica)) {
     return NextResponse.json(
       {
         codigo: "consentimiento_requerido",
@@ -143,20 +187,79 @@ export async function POST(request: Request) {
     );
   }
 
-  let cuerpo: z.infer<typeof CuerpoSchema>;
-  try {
-    cuerpo = CuerpoSchema.parse(await request.json());
-  } catch {
+  // Conversación propia y activa (la RLS limita a lo propio).
+  let conversationId = cuerpo.conversationId;
+  if (!conversationId && esInvitado) {
+    const { data: existente, error: errorExistente } = await supabase
+      .from("conversations")
+      .select("id")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (errorExistente) {
+      console.error(
+        "[chat] No se pudo buscar la conversación invitada:",
+        errorExistente
+      );
+      return NextResponse.json(
+        {
+          codigo: "conversacion_no_disponible",
+          mensaje: "No pudimos preparar tu conversación. Intenta de nuevo.",
+        },
+        { status: 503 }
+      );
+    }
+
+    if (existente) {
+      conversationId = existente.id as string;
+    } else {
+      const { data: creada, error: errorCreada } = await admin
+        .from("conversations")
+        .insert({ user_id: user.id })
+        .select("id")
+        .single();
+      if (errorCreada || !creada) {
+        console.error(
+          "[chat] No se pudo crear la conversación invitada:",
+          errorCreada
+        );
+        return NextResponse.json(
+          {
+            codigo: "conversacion_no_disponible",
+            mensaje: "No pudimos preparar tu conversación. Intenta de nuevo.",
+          },
+          { status: 503 }
+        );
+      }
+      conversationId = creada.id as string;
+    }
+  }
+
+  if (!conversationId) {
     return NextResponse.json({ codigo: "solicitud_invalida" }, { status: 400 });
   }
 
-  // Conversación propia y activa (la RLS limita a lo propio).
-  const { data: conversacion } = await supabase
+  const { data: conversacion, error: errorConversacion } = await supabase
     .from("conversations")
     .select("id, archived, title")
-    .eq("id", cuerpo.conversationId)
-    .single();
+    .eq("id", conversationId)
+    .maybeSingle();
 
+  if (errorConversacion) {
+    console.error(
+      "[chat] No se pudo verificar la conversación:",
+      errorConversacion
+    );
+    return NextResponse.json(
+      {
+        codigo: "conversacion_no_disponible",
+        mensaje: "No pudimos abrir la conversación. Intenta de nuevo.",
+      },
+      { status: 503 }
+    );
+  }
   if (!conversacion) {
     return NextResponse.json(
       { codigo: "conversacion_no_encontrada" },
@@ -174,15 +277,82 @@ export async function POST(request: Request) {
   // serializa por usuario con advisory lock, así N requests concurrentes no
   // pueden superar el límite. Corre con el JWT del usuario (security invoker):
   // la RLS y los privilegios de columna siguen aplicando por dentro.
-  const { data: idTurno, error: errorTurno } = await supabase.rpc(
-    "insertar_turno_usuario",
-    {
-      p_conversation_id: cuerpo.conversationId,
-      p_content: cuerpo.mensaje,
+  let idTurno: unknown;
+  let errorTurno: { message: string } | null = null;
+
+  if (esInvitado) {
+    const secret = process.env.GUEST_LIMIT_SECRET ?? "";
+    const cookieStore = await cookies();
+    const cookieActual = cookieStore.get(COOKIE_DISPOSITIVO_INVITADO)?.value;
+    const deviceId = esIdDispositivoValido(cookieActual)
+      ? (cookieActual as string)
+      : crearIdDispositivo();
+
+    if (deviceId !== cookieActual) {
+      cookieStore.set(COOKIE_DISPOSITIVO_INVITADO, deviceId, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+        maxAge: 60 * 60 * 24 * 365,
+      });
     }
-  );
+
+    let identidad: IdentidadInvitada;
+    try {
+      identidad = construirIdentidadInvitada({
+        request,
+        deviceId,
+        secret,
+      });
+    } catch (error) {
+      console.error("[chat] Identidad invitada no disponible:", error);
+      return NextResponse.json(
+        {
+          codigo: "invitado_no_disponible",
+          mensaje:
+            "El turno de prueba no está disponible en este momento. Intenta de nuevo más tarde.",
+        },
+        { status: 503 }
+      );
+    }
+
+    const reserva = await admin.rpc("reservar_turno_invitado", {
+      p_user_id: user.id,
+      p_conversation_id: conversationId,
+      p_content: cuerpo.mensaje,
+      p_device_hash: identidad.deviceHash,
+      p_environment_hash: identidad.environmentHash,
+      p_network_hash: identidad.networkHash,
+      p_policy_version: VERSION_POLITICA_PRIVACIDAD,
+      p_policy_url: URL_POLITICA_PRIVACIDAD,
+      p_user_agent_hash: identidad.userAgentHash,
+    });
+    idTurno = reserva.data;
+    errorTurno = reserva.error;
+  } else {
+    const turno = await supabase.rpc("insertar_turno_usuario", {
+      p_conversation_id: conversationId,
+      p_content: cuerpo.mensaje,
+    });
+    idTurno = turno.data;
+    errorTurno = turno.error;
+  }
 
   if (errorTurno || !idTurno) {
+    if (
+      esInvitado &&
+      /limite_invitado|limite_red_invitada/.test(errorTurno?.message ?? "")
+    ) {
+      return NextResponse.json(
+        {
+          codigo: "registro_requerido",
+          mensaje:
+            "Ya usaste tu pregunta de prueba. Crea una cuenta o inicia sesión para continuar.",
+        },
+        { status: 429 }
+      );
+    }
     const limite = errorTurno?.message.match(/limite_diario:(\d+)/);
     if (limite) {
       return NextResponse.json(
@@ -196,7 +366,12 @@ export async function POST(request: Request) {
     // El detalle crudo de Postgres (funciones, columnas, constraints, timeouts
     // del rol) no va a la pantalla de un Scout: se registra en servidor.
     if (errorTurno) {
-      console.error("[chat] insertar_turno_usuario", errorTurno);
+      console.error(
+        esInvitado
+          ? "[chat] reservar_turno_invitado"
+          : "[chat] insertar_turno_usuario",
+        errorTurno
+      );
     }
     return NextResponse.json(
       {
@@ -210,27 +385,26 @@ export async function POST(request: Request) {
 
   const mensajeUsuario = { id: idTurno as string };
 
-  const admin = crearClienteAdmin();
-
   // Primer mensaje: el título pasa a ser la pregunta. Todo turno aceptado
   // toca updated_at para que la lista ordene por actividad real (el trigger
   // set_updated_at pone el valor).
   if (conversacion.title === "Nueva conversación") {
-    await supabase
+    const clienteEscritura = esInvitado ? admin : supabase;
+    await clienteEscritura
       .from("conversations")
       .update({ title: cuerpo.mensaje.slice(0, 80) })
-      .eq("id", cuerpo.conversationId);
+      .eq("id", conversationId);
   } else {
     await admin
       .from("conversations")
       .update({ updated_at: ahora() })
-      .eq("id", cuerpo.conversationId);
+      .eq("id", conversationId);
   }
   const modelId = process.env.GEMINI_MODEL ?? "gemini-3.5-flash";
   const requestId = crypto.randomUUID();
   const baseEventos = {
     userId: user.id,
-    conversationId: cuerpo.conversationId,
+    conversationId,
     userMessageId: mensajeUsuario.id as string,
     modelId,
   };
@@ -263,7 +437,7 @@ export async function POST(request: Request) {
     };
     const asistenteId = await guardarMensajeAsistente(
       admin,
-      cuerpo.conversationId,
+      conversationId,
       respuesta.respuesta,
       { estado: "error", respuesta: respuesta.respuesta }
     );
@@ -280,14 +454,18 @@ export async function POST(request: Request) {
         },
       ]
     );
-    return NextResponse.json({ ...respuesta, mensajeId: asistenteId });
+    return NextResponse.json({
+      ...respuesta,
+      mensajeId: asistenteId,
+      conversationId,
+    });
   }
 
   // Historial: últimos mensajes de la conversación (§10), sin el recién creado.
   const { data: previos } = await supabase
     .from("messages")
     .select("id, sender, content")
-    .eq("conversation_id", cuerpo.conversationId)
+    .eq("conversation_id", conversationId)
     .order("created_at", { ascending: false })
     .limit(11);
 
@@ -318,7 +496,7 @@ export async function POST(request: Request) {
     };
     const asistenteId = await guardarMensajeAsistente(
       admin,
-      cuerpo.conversationId,
+      conversationId,
       MENSAJE_BLOQUEADO,
       respuestaJson
     );
@@ -334,14 +512,18 @@ export async function POST(request: Request) {
       citas: [],
       metadata: metadataDe(resultado.intentos, modelId, requestId, "proveedor"),
     };
-    return NextResponse.json({ ...respuesta, mensajeId: asistenteId });
+    return NextResponse.json({
+      ...respuesta,
+      mensajeId: asistenteId,
+      conversationId,
+    });
   }
 
   if (resultado.tipo === "json_invalido") {
     const respuestaJson = { estado: "error", respuesta: MENSAJE_ERROR };
     const asistenteId = await guardarMensajeAsistente(
       admin,
-      cuerpo.conversationId,
+      conversationId,
       MENSAJE_ERROR,
       respuestaJson
     );
@@ -356,7 +538,11 @@ export async function POST(request: Request) {
       citas: [],
       metadata: metadataDe(resultado.intentos, modelId, requestId),
     };
-    return NextResponse.json({ ...respuesta, mensajeId: asistenteId });
+    return NextResponse.json({
+      ...respuesta,
+      mensajeId: asistenteId,
+      conversationId,
+    });
   }
 
   // JSON válido: normalizar citas del grounding (D-07) y persistir.
@@ -372,7 +558,7 @@ export async function POST(request: Request) {
     };
     const asistenteId = await guardarMensajeAsistente(
       admin,
-      cuerpo.conversationId,
+      conversationId,
       MENSAJE_BLOQUEADO,
       respuestaJson
     );
@@ -388,7 +574,11 @@ export async function POST(request: Request) {
       citas: [],
       metadata: metadataDe(resultado.intentos, modelId, requestId, "modelo"),
     };
-    return NextResponse.json({ ...respuesta, mensajeId: asistenteId });
+    return NextResponse.json({
+      ...respuesta,
+      mensajeId: asistenteId,
+      conversationId,
+    });
   }
 
   const { citas: citasCrudas, faltaKnowledgeDocumentId } = normalizarCitas(
@@ -454,7 +644,7 @@ export async function POST(request: Request) {
 
   const asistenteId = await guardarMensajeAsistente(
     admin,
-    cuerpo.conversationId,
+    conversationId,
     modelo.respuesta,
     // La respuesta normalizada NO duplica el arreglo de citas (D-12).
     modelo as unknown as Record<string, unknown>
@@ -522,5 +712,9 @@ export async function POST(request: Request) {
     metadata: metadataDe(resultado.intentos, modelId, requestId),
   };
 
-  return NextResponse.json({ ...respuesta, mensajeId: asistenteId });
+  return NextResponse.json({
+    ...respuesta,
+    mensajeId: asistenteId,
+    conversationId,
+  });
 }

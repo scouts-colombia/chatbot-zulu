@@ -1,9 +1,13 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { Suspense } from "react";
+import { ChatPublico } from "@/components/chat/chat-publico";
 import { Button } from "@/components/ui/button";
+import {
+  URL_POLITICA_PRIVACIDAD,
+  VERSION_POLITICA_PRIVACIDAD,
+} from "@/lib/privacidad";
 import { crearClienteServidor } from "@/lib/supabase/server";
-import { cerrarSesion } from "./(auth)/acciones";
+import { aceptarPoliticaPrivacidad, cerrarSesion } from "./(auth)/acciones";
 import { archivarConversacion, crearConversacion } from "./chat/acciones";
 
 const MENSAJES_ESTADO: Record<string, string> = {
@@ -46,19 +50,24 @@ async function ContenidoPrincipal({
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) {
-    redirect("/login");
+  if (!user || user.is_anonymous === true) {
+    return <ChatPublico userId={user?.id ?? null} />;
   }
 
   const { data: perfil } = await supabase
     .from("profiles")
-    .select("nombre, email, role, account_status")
+    .select(
+      "nombre, email, role, account_status, privacy_policy_version_accepted"
+    )
     .eq("id", user.id)
     .single();
 
   const mensajeEstado = perfil
     ? MENSAJES_ESTADO[perfil.account_status]
     : "No pudimos cargar tu perfil. Cierra sesión e inténtalo de nuevo; si persiste, contacta a la organización.";
+  const requiereConsentimiento =
+    !mensajeEstado &&
+    perfil?.privacy_policy_version_accepted !== VERSION_POLITICA_PRIVACIDAD;
 
   // Paginada: PostgREST corta en `db-max-rows` sin error, y un tope fijo sin
   // navegación dejaría las conversaciones antiguas inalcanzables, que el Scout
@@ -69,7 +78,7 @@ async function ContenidoPrincipal({
     data: conversaciones,
     count: totalConversaciones,
     error: errorConversaciones,
-  } = mensajeEstado
+  } = mensajeEstado || requiereConsentimiento
     ? { data: [], count: 0, error: null }
     : await supabase
         .from("conversations")
@@ -110,6 +119,45 @@ async function ContenidoPrincipal({
           <p className="mx-auto max-w-md text-center text-muted-foreground">
             {mensajeEstado}
           </p>
+        ) : requiereConsentimiento ? (
+          <section className="auth-card-surface mx-auto max-w-lg rounded-2xl p-6">
+            <h2 className="font-semibold text-scouts-purple text-xl">
+              Antes de continuar
+            </h2>
+            <p className="mt-2 text-foreground/70 text-sm">
+              Lee la política de privacidad vigente de Scouts Colombia. Tu
+              aceptación se conserva como un evento histórico y será necesaria
+              de nuevo si la versión cambia.
+            </p>
+            {aviso === "consentimiento" && (
+              <p className="mt-3 text-destructive text-sm" role="alert">
+                No pudimos registrar tu aceptación. Intenta de nuevo.
+              </p>
+            )}
+            <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+              <Button
+                asChild
+                className="min-h-11 border-scouts-purple/25 text-scouts-purple"
+                variant="outline"
+              >
+                <a
+                  href={URL_POLITICA_PRIVACIDAD}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  Leer política
+                </a>
+              </Button>
+              <form action={aceptarPoliticaPrivacidad} className="flex-1">
+                <Button
+                  className="btn-press min-h-11 w-full bg-scouts-purple text-white hover:bg-scouts-purple/90"
+                  type="submit"
+                >
+                  Acepto y quiero continuar
+                </Button>
+              </form>
+            </div>
+          </section>
         ) : (
           <div className="space-y-6">
             <form action={crearConversacion}>

@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { futuraStd } from "./futura";
 
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Chat Scout",
+  title: "Zulú",
   description:
     "Asistente para consultar los manuales oficiales de la organización Scout, con citas verificables.",
 };
@@ -15,20 +16,14 @@ export const viewport = {
   maximumScale: 1,
 };
 
-const geist = Geist({
-  subsets: ["latin"],
-  display: "swap",
-  variable: "--font-geist",
-});
-
 const geistMono = Geist_Mono({
   subsets: ["latin"],
   display: "swap",
   variable: "--font-geist-mono",
 });
 
-const LIGHT_THEME_COLOR = "hsl(0 0% 100%)";
-const DARK_THEME_COLOR = "hsl(240deg 10% 3.92%)";
+const LIGHT_THEME_COLOR = "#4d006e";
+const DARK_THEME_COLOR = "#2c1039";
 const THEME_COLOR_SCRIPT = `\
 (function() {
   var html = document.documentElement;
@@ -54,7 +49,7 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      className={`${geist.variable} ${geistMono.variable}`}
+      className={`${futuraStd.variable} ${geistMono.variable}`}
       lang="es"
       suppressHydrationWarning
     >
