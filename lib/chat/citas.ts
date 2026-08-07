@@ -28,13 +28,31 @@ export function normalizarCitas(response: GenerateContentResponse): {
   citas: CitaNormalizada[];
   faltaKnowledgeDocumentId: boolean;
 } {
-  const chunks =
-    response.candidates?.[0]?.groundingMetadata?.groundingChunks ?? [];
+  const groundingMetadata = response.candidates?.[0]?.groundingMetadata;
+  const chunks = groundingMetadata?.groundingChunks ?? [];
+  const supports = groundingMetadata?.groundingSupports;
+  const indicesRespaldados = new Set(
+    (supports ?? [])
+      .flatMap((support) => support.groundingChunkIndices ?? [])
+      .filter(
+        (index) =>
+          Number.isInteger(index) && index >= 0 && index < chunks.length
+      )
+  );
+
+  // File Search puede omitir groundingSupports. Solo en ese caso conservamos
+  // el comportamiento anterior. Si Gemini envia el campo pero no asocia
+  // chunks validos, respetamos que la respuesta no tiene citas respaldadas.
+  const chunksRespaldados =
+    supports === undefined
+      ? chunks
+      : chunks.filter((_, index) => indicesRespaldados.has(index));
 
   const citas: CitaNormalizada[] = [];
+  const citasVistas = new Set<string>();
   let faltaKnowledgeDocumentId = false;
 
-  for (const chunk of chunks) {
+  for (const chunk of chunksRespaldados) {
     const contexto = chunk.retrievedContext as ContextoRecuperado | undefined;
     if (!contexto) {
       continue;
@@ -45,6 +63,14 @@ export function normalizarCitas(response: GenerateContentResponse): {
       // No inferir por título (D-07): se registra evento de calidad y la
       // cita queda sin id.
       faltaKnowledgeDocumentId = true;
+    }
+
+    if (knowledgeDocumentId) {
+      const claveCita = `${knowledgeDocumentId}\u0000${contexto.pageNumber ?? "sin-pagina"}`;
+      if (citasVistas.has(claveCita)) {
+        continue;
+      }
+      citasVistas.add(claveCita);
     }
 
     citas.push({
