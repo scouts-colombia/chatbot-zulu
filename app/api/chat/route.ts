@@ -599,10 +599,14 @@ export async function POST(request: Request) {
     // así que además del nombre del store se construye un metadataFilter por
     // knowledge_document_id: un documento desactivado no debe fundamentar
     // respuestas aunque siga dentro del store.
-    const { data: documentos } = await admin
+    const { data: documentos, error: errorDocumentos } = await admin
       .from("knowledge_documents")
       .select("id, file_search_store_name")
       .eq("active", true);
+
+    if (errorDocumentos) {
+      throw new Error("consulta_documentos_activos_fallida");
+    }
 
     const storeNames = [
       ...new Set(
@@ -648,12 +652,16 @@ export async function POST(request: Request) {
     }
 
     // Historial: últimos mensajes de la conversación (§10), sin el recién creado.
-    const { data: previos } = await supabase
+    const { data: previos, error: errorHistorial } = await supabase
       .from("messages")
       .select("id, sender, content")
       .eq("conversation_id", conversationId)
       .order("created_at", { ascending: false })
       .limit(11);
+
+    if (errorHistorial) {
+      throw new Error("consulta_historial_fallida");
+    }
 
     // Cada turno del historial va acotado: el límite duro vive en la base
     // (constraint de 0007 para sender='usuario'), y este slice defiende el

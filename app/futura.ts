@@ -8,7 +8,7 @@ export const futuraStd = localFont({
     { path: "./fonts/futura-600.woff2", weight: "600", style: "normal" },
     { path: "./fonts/futura-700.woff2", weight: "700", style: "normal" },
   ],
-  variable: "--font-sans",
+  variable: "--font-futura",
   display: "swap",
   adjustFontFallback: "Arial",
 });
