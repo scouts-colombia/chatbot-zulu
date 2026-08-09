@@ -52,7 +52,20 @@ export async function iniciarSesion(
   const supabase = await crearClienteServidor();
   const {
     data: { user: usuarioAnterior },
+    error: errorUsuarioAnterior,
   } = await supabase.auth.getUser();
+  const sesionAusente =
+    errorUsuarioAnterior?.name === "AuthSessionMissingError";
+  if (errorUsuarioAnterior && !sesionAusente) {
+    console.error(
+      "[auth] No se pudo verificar la sesión antes de iniciar sesión:",
+      errorUsuarioAnterior
+    );
+    return {
+      error:
+        "No pudimos verificar tu sesión actual. Inténtalo de nuevo para conservar tu conversación.",
+    };
+  }
   const invitadoAnterior =
     usuarioAnterior?.is_anonymous === true ? usuarioAnterior.id : null;
   const credenciales = {

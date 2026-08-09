@@ -236,8 +236,8 @@ export function Conversacion({
     }
   }, [conversationIdActual]);
 
-  const persistirBorrador = () => {
-    const limpio = borrador.trim();
+  const persistirBorrador = (texto = borrador) => {
+    const limpio = texto.trim();
     const clave = claveBorradorInvitado(conversationIdActual);
     if (esInvitado && limpio && clave) {
       sessionStorage.setItem(clave, limpio);
@@ -306,7 +306,7 @@ export function Conversacion({
     }
     if (esInvitado && limiteInvitado) {
       setBorrador(limpio);
-      persistirBorrador();
+      persistirBorrador(limpio);
       setMostrarRegistro(true);
       return;
     }
@@ -569,7 +569,7 @@ export function Conversacion({
               asChild
               className="btn-press min-h-11 bg-scouts-purple text-white hover:bg-scouts-purple/90"
             >
-              <Link href="/registro" onClick={persistirBorrador}>
+              <Link href="/registro" onClick={() => persistirBorrador()}>
                 Crear cuenta
               </Link>
             </Button>
@@ -578,7 +578,7 @@ export function Conversacion({
               className="btn-press min-h-11 border-scouts-purple/25 text-scouts-purple hover:bg-scouts-purple/8"
               variant="outline"
             >
-              <Link href="/login" onClick={persistirBorrador}>
+              <Link href="/login" onClick={() => persistirBorrador()}>
                 Iniciar sesión
               </Link>
             </Button>
