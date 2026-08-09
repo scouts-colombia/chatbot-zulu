@@ -42,9 +42,12 @@ export default function LayoutAdmin({
           </h1>
           <nav
             aria-label="Secciones administrativas"
-            className="grid w-full grid-cols-3 gap-2 text-sm sm:flex sm:w-auto"
+            className="grid w-full grid-cols-2 gap-2 text-sm sm:flex sm:w-auto"
           >
-            <a className="admin-nav-link" href="/admin/conversaciones">
+            <a
+              className="admin-nav-link col-span-2 sm:col-span-1"
+              href="/admin/conversaciones"
+            >
               <MessagesSquare aria-hidden="true" className="size-4" />
               Conversaciones
             </a>
