@@ -109,6 +109,12 @@ export async function iniciarSesion(
         "[auth] No se pudo transferir la conversación invitada:",
         errorTransferencia
       );
+      if (errorTransferencia.message.includes("turno_invitado_en_curso")) {
+        return {
+          error:
+            "Tu respuesta de prueba todavía se está preparando. Espera un momento e inicia sesión de nuevo para conservarla.",
+        };
+      }
       return {
         error:
           "No pudimos asociar tu conversación de prueba. Tu sesión invitada sigue activa; inténtalo de nuevo.",

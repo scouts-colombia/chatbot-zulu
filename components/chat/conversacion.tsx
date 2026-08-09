@@ -336,6 +336,15 @@ export function Conversacion({
       setMensajes((previos) => previos.filter((m) => m.id !== idLocal));
       setBorrador(limpio);
     };
+    const exigirRegistroTrasEnvio = (mensaje: string) => {
+      guardarBorradorInvitado({
+        almacen: sessionStorage,
+        conversationId: conversationIdActual,
+        texto: limpio,
+      });
+      setMotivoRegistro(mensaje);
+      setMostrarRegistro(true);
+    };
 
     try {
       const respuesta = await fetch("/api/chat", {
@@ -357,18 +366,16 @@ export function Conversacion({
       if (!respuesta.ok) {
         revertir();
         if (datos?.codigo === "registro_requerido") {
-          if (esInvitado) {
-            guardarBorradorInvitado({
-              almacen: sessionStorage,
-              conversationId: conversationIdActual,
-              texto: limpio,
-            });
-          }
-          setMotivoRegistro(
+          exigirRegistroTrasEnvio(
             datos.mensaje ??
               "Crea una cuenta o inicia sesión para continuar usando el chat."
           );
-          setMostrarRegistro(true);
+          return;
+        }
+        if (esInvitado && !datos) {
+          exigirRegistroTrasEnvio(
+            "No pudimos confirmar la respuesta de prueba. Crea una cuenta o inicia sesión para continuar sin perder tu pregunta."
+          );
           return;
         }
         setAviso(
@@ -380,6 +387,12 @@ export function Conversacion({
 
       if (!datos) {
         revertir();
+        if (esInvitado) {
+          exigirRegistroTrasEnvio(
+            "No pudimos confirmar la respuesta de prueba. Crea una cuenta o inicia sesión para continuar sin perder tu pregunta."
+          );
+          return;
+        }
         setAviso("No se pudo leer la respuesta. Inténtalo de nuevo.");
         return;
       }
@@ -416,6 +429,12 @@ export function Conversacion({
       setAnimandoId(mensajeAsistente.id);
     } catch {
       revertir();
+      if (esInvitado) {
+        exigirRegistroTrasEnvio(
+          "Se perdió la conexión mientras procesábamos tu pregunta de prueba. Crea una cuenta o inicia sesión para continuar sin perderla."
+        );
+        return;
+      }
       setAviso("No hay conexión con el servidor. Inténtalo de nuevo.");
     } finally {
       setEnviando(false);

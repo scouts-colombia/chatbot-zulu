@@ -570,337 +570,377 @@ export async function POST(request: Request) {
 
   const mensajeUsuario = { id: idTurno as string };
 
-  // Primer mensaje: el título pasa a ser la pregunta. Todo turno aceptado
-  // toca updated_at para que la lista ordene por actividad real (el trigger
-  // set_updated_at pone el valor).
-  if (conversacion.title === "Nueva conversación") {
-    const clienteEscritura = esInvitado ? admin : supabase;
-    await clienteEscritura
-      .from("conversations")
-      .update({ title: cuerpo.mensaje.slice(0, 80) })
-      .eq("id", conversationId);
-  } else {
-    await admin
-      .from("conversations")
-      .update({ updated_at: ahora() })
-      .eq("id", conversationId);
-  }
-  const modelId = process.env.GEMINI_MODEL ?? "gemini-3.5-flash";
-  const requestId = crypto.randomUUID();
-  const baseEventos = {
-    userId: user.id,
-    conversationId,
-    userMessageId: mensajeUsuario.id as string,
-    modelId,
-  };
-
-  // Store(s) y documentos ACTIVOS. File Search recupera a nivel de store,
-  // así que además del nombre del store se construye un metadataFilter por
-  // knowledge_document_id: un documento desactivado no debe fundamentar
-  // respuestas aunque siga dentro del store.
-  const { data: documentos } = await admin
-    .from("knowledge_documents")
-    .select("id, file_search_store_name")
-    .eq("active", true);
-
-  const storeNames = [
-    ...new Set(
-      (documentos ?? []).map((d) => d.file_search_store_name as string)
-    ),
-  ];
-  const metadataFilter = (documentos ?? [])
-    .map((d) => `knowledge_document_id = "${d.id as string}"`)
-    .join(" OR ");
-
-  if (storeNames.length === 0) {
-    const respuesta: RespuestaAsistente = {
-      estado: "error",
-      respuesta:
-        "El chat aún no tiene documentos configurados. Contacta a la organización.",
-      citas: [],
-      metadata: metadataDe([], modelId, requestId, "servidor"),
+  try {
+    // Primer mensaje: el título pasa a ser la pregunta. Todo turno aceptado
+    // toca updated_at para que la lista ordene por actividad real (el trigger
+    // set_updated_at pone el valor).
+    if (conversacion.title === "Nueva conversación") {
+      const clienteEscritura = esInvitado ? admin : supabase;
+      await clienteEscritura
+        .from("conversations")
+        .update({ title: cuerpo.mensaje.slice(0, 80) })
+        .eq("id", conversationId);
+    } else {
+      await admin
+        .from("conversations")
+        .update({ updated_at: ahora() })
+        .eq("id", conversationId);
+    }
+    const modelId = process.env.GEMINI_MODEL ?? "gemini-3.5-flash";
+    const requestId = crypto.randomUUID();
+    const baseEventos = {
+      userId: user.id,
+      conversationId,
+      userMessageId: mensajeUsuario.id as string,
+      modelId,
     };
-    const asistenteId = await guardarMensajeAsistente(
-      admin,
-      conversationId,
-      respuesta.respuesta,
-      { estado: "error", respuesta: respuesta.respuesta }
-    );
-    await registrarEventos(
-      admin,
-      { ...baseEventos, assistantMessageId: asistenteId },
-      [
-        {
-          attemptIndex: 1,
-          latencyMs: 0,
-          status: "error",
-          errorCode: "sin_documentos_activos",
-          groundingDisponible: false,
-        },
-      ]
-    );
-    return NextResponse.json({
-      ...respuesta,
-      mensajeId: asistenteId,
-      conversationId,
-    });
-  }
 
-  // Historial: últimos mensajes de la conversación (§10), sin el recién creado.
-  const { data: previos } = await supabase
-    .from("messages")
-    .select("id, sender, content")
-    .eq("conversation_id", conversationId)
-    .order("created_at", { ascending: false })
-    .limit(11);
-
-  // Cada turno del historial va acotado: el límite duro vive en la base
-  // (constraint de 0007 para sender='usuario'), y este slice defiende el
-  // prompt ante filas legadas o respuestas largas del asistente.
-  const historial: TurnoHistorial[] = (previos ?? [])
-    .filter((m) => m.id !== mensajeUsuario.id && m.sender !== "sistema")
-    .slice(0, 8)
-    .reverse()
-    .map((m) => ({
-      role: m.sender === "usuario" ? ("user" as const) : ("model" as const),
-      texto: m.content.slice(0, 4000),
-    }));
-
-  const resultado = await llamarModelo({
-    historial,
-    pregunta: cuerpo.mensaje,
-    storeNames,
-    metadataFilter,
-  });
-
-  if (resultado.tipo === "bloqueado") {
-    // Bloqueo del proveedor: estado seguro de producto, no error (D-08).
-    const respuestaJson = {
-      estado: "bloqueado_por_seguridad",
-      respuesta: MENSAJE_BLOQUEADO,
-    };
-    const asistenteId = await guardarMensajeAsistente(
-      admin,
-      conversationId,
-      MENSAJE_BLOQUEADO,
-      respuestaJson
-    );
-    await registrarEventos(
-      admin,
-      { ...baseEventos, assistantMessageId: asistenteId },
-      resultado.intentos,
-      { safetyBlockSource: "proveedor" }
-    );
-    const respuesta: RespuestaAsistente = {
-      estado: "bloqueado_por_seguridad",
-      respuesta: MENSAJE_BLOQUEADO,
-      citas: [],
-      metadata: metadataDe(resultado.intentos, modelId, requestId, "proveedor"),
-    };
-    return NextResponse.json({
-      ...respuesta,
-      mensajeId: asistenteId,
-      conversationId,
-    });
-  }
-
-  if (resultado.tipo === "json_invalido") {
-    const mensajeError = esInvitado ? MENSAJE_ERROR_INVITADO : MENSAJE_ERROR;
-    const respuestaJson = { estado: "error", respuesta: mensajeError };
-    const asistenteId = await guardarMensajeAsistente(
-      admin,
-      conversationId,
-      mensajeError,
-      respuestaJson
-    );
-    await registrarEventos(
-      admin,
-      { ...baseEventos, assistantMessageId: asistenteId },
-      resultado.intentos
-    );
-    const respuesta: RespuestaAsistente = {
-      estado: "error",
-      respuesta: mensajeError,
-      citas: [],
-      metadata: metadataDe(resultado.intentos, modelId, requestId),
-    };
-    return NextResponse.json({
-      ...respuesta,
-      mensajeId: asistenteId,
-      conversationId,
-    });
-  }
-
-  // JSON válido: normalizar citas del grounding (D-07) y persistir.
-  const modelo = resultado.respuesta;
-
-  // Bloqueo emitido por el MODELO en JSON válido (§15.1): mismo mensaje
-  // seguro y breve que el bloqueo del proveedor. No se persiste ni se
-  // muestra el texto del modelo (minimización de datos con menores).
-  if (modelo.estado === "bloqueado_por_seguridad") {
-    const respuestaJson = {
-      estado: "bloqueado_por_seguridad",
-      respuesta: MENSAJE_BLOQUEADO,
-    };
-    const asistenteId = await guardarMensajeAsistente(
-      admin,
-      conversationId,
-      MENSAJE_BLOQUEADO,
-      respuestaJson
-    );
-    await registrarEventos(
-      admin,
-      { ...baseEventos, assistantMessageId: asistenteId },
-      resultado.intentos,
-      { safetyBlockSource: "modelo" }
-    );
-    const respuesta: RespuestaAsistente = {
-      estado: "bloqueado_por_seguridad",
-      respuesta: MENSAJE_BLOQUEADO,
-      citas: [],
-      metadata: metadataDe(resultado.intentos, modelId, requestId, "modelo"),
-    };
-    return NextResponse.json({
-      ...respuesta,
-      mensajeId: asistenteId,
-      conversationId,
-    });
-  }
-
-  const { citas: citasCrudas, faltaKnowledgeDocumentId } = normalizarCitas(
-    resultado.response
-  );
-
-  // sin_fuente exige citas vacías (§7.2); las citas solo acompañan respuestas
-  // con fundamento.
-  let citas: CitaNormalizada[] =
-    modelo.estado === "respondido" ? citasCrudas : [];
-
-  // El snapshot de versión confiable es el de knowledge_documents (§7.1
-  // regla 3); el custom_metadata del proveedor queda solo como fallback.
-  const idsDocumentos = [
-    ...new Set(
-      citas
-        .map((cita) => cita.knowledgeDocumentId)
-        .filter((id): id is string => Boolean(id))
-    ),
-  ];
-  // El título NO se sobrescribe con `display_name`: §7.1 regla 4 pide guardar
-  // `retrievedContext.title` como título visible citado, o sea el nombre del
-  // artefacto que el grounding devolvió de verdad. Pisarlo con la etiqueta
-  // (mutable) de la base ocultaría un desajuste entre el store y la tabla, así
-  // que cuando difieren se emite una marca de calidad y se reindexa el
-  // documento, que es lo que corrige el origen.
-  let tituloDesalineado = false;
-  if (idsDocumentos.length > 0) {
+    // Store(s) y documentos ACTIVOS. File Search recupera a nivel de store,
+    // así que además del nombre del store se construye un metadataFilter por
+    // knowledge_document_id: un documento desactivado no debe fundamentar
+    // respuestas aunque siga dentro del store.
     const { data: documentos } = await admin
       .from("knowledge_documents")
-      .select("id, version, display_name")
-      .in("id", idsDocumentos);
-    const docPorId = new Map(
-      (documentos ?? []).map((doc) => [doc.id as string, doc])
-    );
-    citas = citas.map((cita) => {
-      const doc = cita.knowledgeDocumentId
-        ? docPorId.get(cita.knowledgeDocumentId)
-        : undefined;
-      if (!doc) {
-        return cita;
-      }
-      if (doc.display_name !== cita.documentTitleSnapshot) {
-        tituloDesalineado = true;
-      }
-      return { ...cita, documentVersionSnapshot: doc.version as string };
-    });
-  }
+      .select("id, file_search_store_name")
+      .eq("active", true);
 
-  const marcasCalidad: string[] = [];
-  if (modelo.estado === "respondido" && citas.length === 0) {
-    marcasCalidad.push("respondido_sin_citas");
-  }
-  if (faltaKnowledgeDocumentId && modelo.estado === "respondido") {
-    marcasCalidad.push("missing_knowledge_document_id");
-  }
-  // El documento del store y su fila local llevan títulos distintos: el store
-  // quedó desactualizado (su displayName no se puede editar en sitio) y hay que
-  // reindexar ese documento. Se registra en vez de taparlo pisando el snapshot.
-  if (tituloDesalineado) {
-    marcasCalidad.push("titulo_desalineado");
-  }
+    const storeNames = [
+      ...new Set(
+        (documentos ?? []).map((d) => d.file_search_store_name as string)
+      ),
+    ];
+    const metadataFilter = (documentos ?? [])
+      .map((d) => `knowledge_document_id = "${d.id as string}"`)
+      .join(" OR ");
 
-  const asistenteId = await guardarMensajeAsistente(
-    admin,
-    conversationId,
-    modelo.respuesta,
-    // La respuesta normalizada NO duplica el arreglo de citas (D-12).
-    modelo as unknown as Record<string, unknown>
-  );
-
-  if (citas.length > 0) {
-    const { error: errorCitas } = await admin.from("citations").insert(
-      citas.map((cita) => ({
-        message_id: asistenteId,
-        knowledge_document_id: cita.knowledgeDocumentId ?? null,
-        document_title_snapshot: cita.documentTitleSnapshot,
-        document_version_snapshot: cita.documentVersionSnapshot ?? null,
-        page_number: cita.pageNumber ?? null,
-        fragment: cita.fragment ?? null,
-        file_search_store_name: cita.fileSearchStoreName ?? null,
-        file_search_document_name: cita.fileSearchDocumentName ?? null,
-        media_id: cita.mediaId ?? null,
-      }))
-    );
-    if (errorCitas) {
-      // La tabla citations es la única fuente de verdad (D-12): si no se
-      // persistieron, no se devuelven citas que desaparecerían al recargar.
-      console.error("No se pudieron guardar las citas:", errorCitas.message);
-      citas = [];
-      marcasCalidad.push("citas_no_persistidas");
+    if (storeNames.length === 0) {
+      const respuesta: RespuestaAsistente = {
+        estado: "error",
+        respuesta:
+          "El chat aún no tiene documentos configurados. Contacta a la organización.",
+        citas: [],
+        metadata: metadataDe([], modelId, requestId, "servidor"),
+      };
+      const asistenteId = await guardarMensajeAsistente(
+        admin,
+        conversationId,
+        respuesta.respuesta,
+        { estado: "error", respuesta: respuesta.respuesta }
+      );
+      await registrarEventos(
+        admin,
+        { ...baseEventos, assistantMessageId: asistenteId },
+        [
+          {
+            attemptIndex: 1,
+            latencyMs: 0,
+            status: "error",
+            errorCode: "sin_documentos_activos",
+            groundingDisponible: false,
+          },
+        ]
+      );
+      return NextResponse.json({
+        ...respuesta,
+        mensajeId: asistenteId,
+        conversationId,
+      });
     }
-  }
 
-  if (modelo.preguntaGuiada) {
-    const { data: pregunta } = await admin
-      .from("guided_questions")
-      .insert({
-        message_id: asistenteId,
-        type: modelo.preguntaGuiada.tipo,
-        text: modelo.preguntaGuiada.texto,
-        allows_free_input: true,
-      })
-      .select("id")
-      .single();
-    if (pregunta) {
-      await admin.from("guided_question_options").insert(
-        modelo.preguntaGuiada.opciones.map((label, indice) => ({
-          guided_question_id: pregunta.id,
-          order_index: indice,
-          label,
+    // Historial: últimos mensajes de la conversación (§10), sin el recién creado.
+    const { data: previos } = await supabase
+      .from("messages")
+      .select("id, sender, content")
+      .eq("conversation_id", conversationId)
+      .order("created_at", { ascending: false })
+      .limit(11);
+
+    // Cada turno del historial va acotado: el límite duro vive en la base
+    // (constraint de 0007 para sender='usuario'), y este slice defiende el
+    // prompt ante filas legadas o respuestas largas del asistente.
+    const historial: TurnoHistorial[] = (previos ?? [])
+      .filter((m) => m.id !== mensajeUsuario.id && m.sender !== "sistema")
+      .slice(0, 8)
+      .reverse()
+      .map((m) => ({
+        role: m.sender === "usuario" ? ("user" as const) : ("model" as const),
+        texto: m.content.slice(0, 4000),
+      }));
+
+    const resultado = await llamarModelo({
+      historial,
+      pregunta: cuerpo.mensaje,
+      storeNames,
+      metadataFilter,
+    });
+
+    if (resultado.tipo === "bloqueado") {
+      // Bloqueo del proveedor: estado seguro de producto, no error (D-08).
+      const respuestaJson = {
+        estado: "bloqueado_por_seguridad",
+        respuesta: MENSAJE_BLOQUEADO,
+      };
+      const asistenteId = await guardarMensajeAsistente(
+        admin,
+        conversationId,
+        MENSAJE_BLOQUEADO,
+        respuestaJson
+      );
+      await registrarEventos(
+        admin,
+        { ...baseEventos, assistantMessageId: asistenteId },
+        resultado.intentos,
+        { safetyBlockSource: "proveedor" }
+      );
+      const respuesta: RespuestaAsistente = {
+        estado: "bloqueado_por_seguridad",
+        respuesta: MENSAJE_BLOQUEADO,
+        citas: [],
+        metadata: metadataDe(
+          resultado.intentos,
+          modelId,
+          requestId,
+          "proveedor"
+        ),
+      };
+      return NextResponse.json({
+        ...respuesta,
+        mensajeId: asistenteId,
+        conversationId,
+      });
+    }
+
+    if (resultado.tipo === "json_invalido") {
+      const mensajeError = esInvitado ? MENSAJE_ERROR_INVITADO : MENSAJE_ERROR;
+      const respuestaJson = { estado: "error", respuesta: mensajeError };
+      const asistenteId = await guardarMensajeAsistente(
+        admin,
+        conversationId,
+        mensajeError,
+        respuestaJson
+      );
+      await registrarEventos(
+        admin,
+        { ...baseEventos, assistantMessageId: asistenteId },
+        resultado.intentos
+      );
+      const respuesta: RespuestaAsistente = {
+        estado: "error",
+        respuesta: mensajeError,
+        citas: [],
+        metadata: metadataDe(resultado.intentos, modelId, requestId),
+      };
+      return NextResponse.json({
+        ...respuesta,
+        mensajeId: asistenteId,
+        conversationId,
+      });
+    }
+
+    // JSON válido: normalizar citas del grounding (D-07) y persistir.
+    const modelo = resultado.respuesta;
+
+    // Bloqueo emitido por el MODELO en JSON válido (§15.1): mismo mensaje
+    // seguro y breve que el bloqueo del proveedor. No se persiste ni se
+    // muestra el texto del modelo (minimización de datos con menores).
+    if (modelo.estado === "bloqueado_por_seguridad") {
+      const respuestaJson = {
+        estado: "bloqueado_por_seguridad",
+        respuesta: MENSAJE_BLOQUEADO,
+      };
+      const asistenteId = await guardarMensajeAsistente(
+        admin,
+        conversationId,
+        MENSAJE_BLOQUEADO,
+        respuestaJson
+      );
+      await registrarEventos(
+        admin,
+        { ...baseEventos, assistantMessageId: asistenteId },
+        resultado.intentos,
+        { safetyBlockSource: "modelo" }
+      );
+      const respuesta: RespuestaAsistente = {
+        estado: "bloqueado_por_seguridad",
+        respuesta: MENSAJE_BLOQUEADO,
+        citas: [],
+        metadata: metadataDe(resultado.intentos, modelId, requestId, "modelo"),
+      };
+      return NextResponse.json({
+        ...respuesta,
+        mensajeId: asistenteId,
+        conversationId,
+      });
+    }
+
+    const { citas: citasCrudas, faltaKnowledgeDocumentId } = normalizarCitas(
+      resultado.response
+    );
+
+    // sin_fuente exige citas vacías (§7.2); las citas solo acompañan respuestas
+    // con fundamento.
+    let citas: CitaNormalizada[] =
+      modelo.estado === "respondido" ? citasCrudas : [];
+
+    // El snapshot de versión confiable es el de knowledge_documents (§7.1
+    // regla 3); el custom_metadata del proveedor queda solo como fallback.
+    const idsDocumentos = [
+      ...new Set(
+        citas
+          .map((cita) => cita.knowledgeDocumentId)
+          .filter((id): id is string => Boolean(id))
+      ),
+    ];
+    // El título NO se sobrescribe con `display_name`: §7.1 regla 4 pide guardar
+    // `retrievedContext.title` como título visible citado, o sea el nombre del
+    // artefacto que el grounding devolvió de verdad. Pisarlo con la etiqueta
+    // (mutable) de la base ocultaría un desajuste entre el store y la tabla, así
+    // que cuando difieren se emite una marca de calidad y se reindexa el
+    // documento, que es lo que corrige el origen.
+    let tituloDesalineado = false;
+    if (idsDocumentos.length > 0) {
+      const { data: documentos } = await admin
+        .from("knowledge_documents")
+        .select("id, version, display_name")
+        .in("id", idsDocumentos);
+      const docPorId = new Map(
+        (documentos ?? []).map((doc) => [doc.id as string, doc])
+      );
+      citas = citas.map((cita) => {
+        const doc = cita.knowledgeDocumentId
+          ? docPorId.get(cita.knowledgeDocumentId)
+          : undefined;
+        if (!doc) {
+          return cita;
+        }
+        if (doc.display_name !== cita.documentTitleSnapshot) {
+          tituloDesalineado = true;
+        }
+        return { ...cita, documentVersionSnapshot: doc.version as string };
+      });
+    }
+
+    const marcasCalidad: string[] = [];
+    if (modelo.estado === "respondido" && citas.length === 0) {
+      marcasCalidad.push("respondido_sin_citas");
+    }
+    if (faltaKnowledgeDocumentId && modelo.estado === "respondido") {
+      marcasCalidad.push("missing_knowledge_document_id");
+    }
+    // El documento del store y su fila local llevan títulos distintos: el store
+    // quedó desactualizado (su displayName no se puede editar en sitio) y hay que
+    // reindexar ese documento. Se registra en vez de taparlo pisando el snapshot.
+    if (tituloDesalineado) {
+      marcasCalidad.push("titulo_desalineado");
+    }
+
+    const asistenteId = await guardarMensajeAsistente(
+      admin,
+      conversationId,
+      modelo.respuesta,
+      // La respuesta normalizada NO duplica el arreglo de citas (D-12).
+      modelo as unknown as Record<string, unknown>
+    );
+
+    if (citas.length > 0) {
+      const { error: errorCitas } = await admin.from("citations").insert(
+        citas.map((cita) => ({
+          message_id: asistenteId,
+          knowledge_document_id: cita.knowledgeDocumentId ?? null,
+          document_title_snapshot: cita.documentTitleSnapshot,
+          document_version_snapshot: cita.documentVersionSnapshot ?? null,
+          page_number: cita.pageNumber ?? null,
+          fragment: cita.fragment ?? null,
+          file_search_store_name: cita.fileSearchStoreName ?? null,
+          file_search_document_name: cita.fileSearchDocumentName ?? null,
+          media_id: cita.mediaId ?? null,
         }))
       );
+      if (errorCitas) {
+        // La tabla citations es la única fuente de verdad (D-12): si no se
+        // persistieron, no se devuelven citas que desaparecerían al recargar.
+        console.error("No se pudieron guardar las citas:", errorCitas.message);
+        citas = [];
+        marcasCalidad.push("citas_no_persistidas");
+      }
+    }
+
+    if (modelo.preguntaGuiada) {
+      const { data: pregunta } = await admin
+        .from("guided_questions")
+        .insert({
+          message_id: asistenteId,
+          type: modelo.preguntaGuiada.tipo,
+          text: modelo.preguntaGuiada.texto,
+          allows_free_input: true,
+        })
+        .select("id")
+        .single();
+      if (pregunta) {
+        await admin.from("guided_question_options").insert(
+          modelo.preguntaGuiada.opciones.map((label, indice) => ({
+            guided_question_id: pregunta.id,
+            order_index: indice,
+            label,
+          }))
+        );
+      }
+    }
+
+    await registrarEventos(
+      admin,
+      { ...baseEventos, assistantMessageId: asistenteId },
+      resultado.intentos,
+      { calidad: marcasCalidad }
+    );
+
+    const respuesta: RespuestaAsistente = {
+      estado: modelo.estado,
+      respuesta: modelo.respuesta,
+      citas,
+      preguntaGuiada: modelo.preguntaGuiada,
+      sugerencias: modelo.sugerencias,
+      advertencias: modelo.advertencias,
+      metadata: metadataDe(resultado.intentos, modelId, requestId),
+    };
+
+    return NextResponse.json({
+      ...respuesta,
+      mensajeId: asistenteId,
+      conversationId,
+    });
+  } catch (error) {
+    console.error("[chat] Fallo posterior a registrar la pregunta:", error);
+    if (esInvitado) {
+      return NextResponse.json(
+        {
+          codigo: "registro_requerido",
+          mensaje:
+            "Tu pregunta de prueba quedó registrada, pero no pudimos completar la respuesta. Crea una cuenta o inicia sesión para continuar.",
+        },
+        { status: 503 }
+      );
+    }
+    throw error;
+  } finally {
+    if (esInvitado) {
+      try {
+        const finalizacion = await admin.rpc("finalizar_turno_invitado", {
+          p_user_message_id: mensajeUsuario.id,
+          p_anonymous_user_id: user.id,
+        });
+        if (finalizacion.error || finalizacion.data !== true) {
+          console.error(
+            "[chat] No se pudo finalizar el turno invitado:",
+            finalizacion.error
+          );
+        }
+      } catch (error) {
+        console.error(
+          "[chat] Falló la finalización del turno invitado:",
+          error
+        );
+      }
     }
   }
-
-  await registrarEventos(
-    admin,
-    { ...baseEventos, assistantMessageId: asistenteId },
-    resultado.intentos,
-    { calidad: marcasCalidad }
-  );
-
-  const respuesta: RespuestaAsistente = {
-    estado: modelo.estado,
-    respuesta: modelo.respuesta,
-    citas,
-    preguntaGuiada: modelo.preguntaGuiada,
-    sugerencias: modelo.sugerencias,
-    advertencias: modelo.advertencias,
-    metadata: metadataDe(resultado.intentos, modelId, requestId),
-  };
-
-  return NextResponse.json({
-    ...respuesta,
-    mensajeId: asistenteId,
-    conversationId,
-  });
 }
