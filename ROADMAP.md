@@ -170,8 +170,8 @@ Notas de la auditoría útiles para las pruebas de citas: `retrievedContext` no 
 
 Producto adelantó esta fase después de estabilizar el turno público. La referencia visual es Ruta DNPJ, en especial `/diseno/componentes`: fondo crema, colores vivos, Futura, bordes y superficies liquid glass. El modo oscuro se elimina por completo.
 
-- [ ] Retomar la rama **`feat/design-system`** (PR #4, cerrado sin merge; NO borrar la rama): tokens de marca de `ruta` (scouts-*, secciones, PNPJ, radius), tipografías locales Futura/JollyGood (`app/fuentes.ts` + `app/fonts/`), superficies `auth-hero`/`auth-card-surface` (glass) y `components/ui/card`. Todo quedó construido y verificado (preview desplegado en el PR #4); al retomar: rebase sobre master o re-aplicación por partes (los archivos de tokens/fuentes son aditivos; solo las pantallas tocadas necesitan ajuste manual).
-- [ ] Aplicar el design system al chat y pantallas nuevas de las Fases 3-4.
+- [x] Reaplicar por partes el trabajo de **`feat/design-system`** (PR #4 cerrado sin merge; la rama se conserva): tokens de marca de Ruta, Futura local, radios, bordes y superficies liquid glass quedaron incorporados en `agent/zulu-ui-aplicacion`.
+- [x] Aplicar el design system al chat público y privado, autenticación, estados de carga/error y todas las pantallas administrativas de las Fases 3-4.
 - [x] **Modo oscuro eliminado (decisión 2026-08-09):** se quitaron `next-themes`, el proveedor/script de tema, las variantes `dark:` y la adaptación automática al sistema. Zulú usa exclusivamente el sistema visual claro de Ruta con fondo crema.
 
 ---

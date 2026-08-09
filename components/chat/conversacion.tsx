@@ -618,7 +618,7 @@ export function Conversacion({
       <div
         className={
           sinMensajes
-            ? "shrink-0 space-y-4 overflow-y-auto px-4 pt-[clamp(6rem,24vh,12rem)] sm:px-6"
+            ? "min-h-0 flex-1 space-y-4 overflow-y-auto px-4 pt-[clamp(2rem,10vh,6rem)] sm:px-6"
             : "min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-6 sm:px-6"
         }
         ref={mensajesRef}
@@ -675,7 +675,7 @@ export function Conversacion({
         <form
           className={
             sinMensajes
-              ? "mx-auto w-full max-w-3xl px-4 pt-6 sm:px-6"
+              ? "mx-auto w-full max-w-3xl shrink-0 px-4 pt-4 sm:px-6"
               : "mx-auto w-full max-w-3xl px-4 pb-4 sm:px-6 sm:pb-6"
           }
           onSubmit={(evento) => {

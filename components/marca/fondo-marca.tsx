@@ -9,13 +9,12 @@ export function FondoMarca({
 }) {
   return (
     <div
-      className={cn(
-        "pnpj-fondo relative min-h-dvh overflow-hidden text-pnpj-tinta",
-        className
-      )}
+      className="pnpj-fondo relative min-h-dvh overflow-hidden text-pnpj-tinta"
       data-design-direction="ruta-editorial-glass"
     >
-      <div className="relative z-10 min-h-dvh">{children}</div>
+      <div className={cn("relative z-10 min-h-dvh w-full", className)}>
+        {children}
+      </div>
     </div>
   );
 }
