@@ -16,6 +16,12 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { ETIQUETAS_ESTADO } from "@/lib/chat/contrato";
+import {
+  eliminarClaveGlobalAnterior,
+  guardarBorradorInvitado,
+  limpiarBorradorInvitado,
+  restaurarBorradorInvitado,
+} from "@/lib/invitados/borrador";
 import { URL_POLITICA_PRIVACIDAD } from "@/lib/privacidad";
 import type { MensajeUI } from "./tipos";
 
@@ -25,14 +31,7 @@ import type { MensajeUI } from "./tipos";
  * throttling de pestañas en segundo plano no arrastra la animación y al
  * recuperar el foco el texto se pone al día de inmediato.
  */
-const BORRADOR_INVITADO_PREFIJO = "zulu:borrador-invitado";
 const CARACTERES_POR_SEGUNDO = 220;
-
-function claveBorradorInvitado(conversationId: string | null) {
-  return conversationId
-    ? `${BORRADOR_INVITADO_PREFIJO}:${conversationId}`
-    : null;
-}
 
 function TextoTypewriter({
   texto,
@@ -225,12 +224,11 @@ export function Conversacion({
   useEffect(() => {
     // Elimina la clave global de versiones anteriores para que un borrador
     // no pueda reaparecer al cambiar de identidad en una pestaña compartida.
-    sessionStorage.removeItem(BORRADOR_INVITADO_PREFIJO);
-    const clave = claveBorradorInvitado(conversationIdActual);
-    if (!clave) {
-      return;
-    }
-    const guardado = sessionStorage.getItem(clave);
+    eliminarClaveGlobalAnterior(sessionStorage);
+    const guardado = restaurarBorradorInvitado({
+      almacen: sessionStorage,
+      conversationId: conversationIdActual,
+    });
     if (guardado) {
       setBorrador((actual) => actual || guardado);
     }
@@ -238,12 +236,16 @@ export function Conversacion({
 
   const persistirBorrador = (texto = borrador) => {
     const limpio = texto.trim();
-    const clave = claveBorradorInvitado(conversationIdActual);
-    if (esInvitado && limpio && clave) {
-      sessionStorage.setItem(clave, limpio);
+    if (esInvitado && limpio) {
+      guardarBorradorInvitado({
+        almacen: sessionStorage,
+        conversationId: conversationIdActual,
+        texto: limpio,
+      });
     }
   };
   const [mostrarRegistro, setMostrarRegistro] = useState(false);
+  const [motivoRegistro, setMotivoRegistro] = useState<string | null>(null);
   const [aceptaPolitica, setAceptaPolitica] = useState(false);
   const mensajesRef = useRef<HTMLDivElement>(null);
   // Cursor del mensaje más antiguo cargado. Un contador se desfasaría en cuanto
@@ -307,6 +309,9 @@ export function Conversacion({
     if (esInvitado && limiteInvitado) {
       setBorrador(limpio);
       persistirBorrador(limpio);
+      setMotivoRegistro(
+        "Ya usaste tu pregunta de prueba. Crea una cuenta o inicia sesión para continuar."
+      );
       setMostrarRegistro(true);
       return;
     }
@@ -352,10 +357,17 @@ export function Conversacion({
       if (!respuesta.ok) {
         revertir();
         if (datos?.codigo === "registro_requerido") {
-          const clave = claveBorradorInvitado(conversationIdActual);
-          if (esInvitado && clave) {
-            sessionStorage.setItem(clave, limpio);
+          if (esInvitado) {
+            guardarBorradorInvitado({
+              almacen: sessionStorage,
+              conversationId: conversationIdActual,
+              texto: limpio,
+            });
           }
+          setMotivoRegistro(
+            datos.mensaje ??
+              "Crea una cuenta o inicia sesión para continuar usando el chat."
+          );
           setMostrarRegistro(true);
           return;
         }
@@ -377,10 +389,7 @@ export function Conversacion({
       if (datos.conversationId) {
         setConversationIdActual(datos.conversationId);
       }
-      const clave = claveBorradorInvitado(idConversacionRespuesta);
-      if (clave) {
-        sessionStorage.removeItem(clave);
-      }
+      limpiarBorradorInvitado(sessionStorage, idConversacionRespuesta);
       if (esInvitado) {
         setLimiteInvitado(true);
       }
@@ -557,11 +566,12 @@ export function Conversacion({
         <DialogContent className="auth-card-surface max-w-md border-white/70">
           <DialogHeader>
             <DialogTitle className="text-scouts-purple text-xl">
-              Tu pregunta de prueba ya fue usada
+              Continúa con una cuenta
             </DialogTitle>
             <DialogDescription className="text-foreground/70">
-              Tu conversación y el texto que acabas de escribir seguirán aquí.
-              Crea una cuenta para continuar o inicia sesión si ya tienes una.
+              {motivoRegistro ??
+                "Tu pregunta de prueba ya fue usada. Crea una cuenta o inicia sesión para continuar."}{" "}
+              El texto que acabas de escribir seguirá aquí.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-3 pt-2 sm:grid-cols-2">
