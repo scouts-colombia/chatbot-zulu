@@ -158,7 +158,19 @@ export async function registrarse(
 
   const {
     data: { user: usuarioActual },
+    error: errorUsuarioActual,
   } = await supabase.auth.getUser();
+  const sesionAusente = errorUsuarioActual?.name === "AuthSessionMissingError";
+  if (errorUsuarioActual && !sesionAusente) {
+    console.error(
+      "[auth] No se pudo verificar la sesión antes del registro:",
+      errorUsuarioActual
+    );
+    return {
+      error:
+        "No pudimos verificar tu sesión actual. Inténtalo de nuevo para conservar tu conversación.",
+    };
+  }
 
   if (usuarioActual?.is_anonymous === true) {
     const origen = await obtenerOrigen();
@@ -217,7 +229,15 @@ export async function aceptarPoliticaPrivacidad() {
   const supabase = await crearClienteServidor();
   const {
     data: { user },
+    error: errorUsuario,
   } = await supabase.auth.getUser();
+  if (errorUsuario && errorUsuario.name !== "AuthSessionMissingError") {
+    console.error(
+      "[auth] No se pudo verificar la sesión para aceptar la política:",
+      errorUsuario
+    );
+    redirect("/?aviso=consentimiento");
+  }
   if (!user || user.is_anonymous === true) {
     redirect("/");
   }
@@ -272,7 +292,17 @@ export async function finalizarRegistro(
   const supabase = await crearClienteServidor();
   const {
     data: { user },
+    error: errorUsuario,
   } = await supabase.auth.getUser();
+  if (errorUsuario && errorUsuario.name !== "AuthSessionMissingError") {
+    console.error(
+      "[auth] No se pudo verificar la sesión para finalizar el registro:",
+      errorUsuario
+    );
+    return {
+      error: "No pudimos verificar tu sesión. Inténtalo de nuevo.",
+    };
+  }
   if (
     !user ||
     user.is_anonymous === true ||

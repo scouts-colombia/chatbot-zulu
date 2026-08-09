@@ -34,7 +34,22 @@ async function ContenidoRegistro({
   const supabase = await crearClienteServidor();
   const {
     data: { user },
+    error: errorAutenticacion,
   } = await supabase.auth.getUser();
+  const sesionAusente = errorAutenticacion?.name === "AuthSessionMissingError";
+  if (errorAutenticacion && !sesionAusente) {
+    console.error(
+      "[registro] No se pudo verificar la sesión:",
+      errorAutenticacion
+    );
+    return (
+      <FormularioAuth
+        accion={registrarse}
+        errorInicial="No pudimos verificar tu sesión. Recarga la página e inténtalo de nuevo."
+        modo="registro"
+      />
+    );
+  }
 
   if (
     user &&

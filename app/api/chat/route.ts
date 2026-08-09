@@ -157,15 +157,57 @@ export async function POST(request: Request) {
   const admin = crearClienteAdmin();
   let {
     data: { user },
+    error: errorAutenticacion,
   } = await supabase.auth.getUser();
+  const sesionAusente = errorAutenticacion?.name === "AuthSessionMissingError";
+  if (errorAutenticacion && !sesionAusente) {
+    console.error("[chat] No se pudo verificar la sesión:", errorAutenticacion);
+    return NextResponse.json(
+      {
+        codigo: "autenticacion_no_disponible",
+        mensaje: "No pudimos verificar tu sesión. Intenta de nuevo.",
+      },
+      { status: 503 }
+    );
+  }
+
   let identidadInvitada: IdentidadInvitada | null = null;
   let preflightId: string | null = null;
+  let usuarioAnonimoCreadoId: string | null = null;
+  const limpiarPreparacionInvitada = async () => {
+    let puedeLiberarPreflight = true;
+    if (usuarioAnonimoCreadoId) {
+      const id = usuarioAnonimoCreadoId;
+      const { error } = await admin.auth.admin.deleteUser(id);
+      if (error) {
+        puedeLiberarPreflight = false;
+        console.error(
+          "[chat] No se pudo eliminar la identidad invitada incompleta:",
+          error
+        );
+      } else {
+        usuarioAnonimoCreadoId = null;
+        const { error: errorCierre } = await supabase.auth.signOut({
+          scope: "local",
+        });
+        if (errorCierre) {
+          console.error(
+            "[chat] No se pudo limpiar la sesión invitada local:",
+            errorCierre
+          );
+        }
+      }
+    }
+    if (puedeLiberarPreflight) {
+      await liberarPreflight(admin, preflightId);
+      preflightId = null;
+    }
+  };
   const responderLiberandoPreflight = async (
     cuerpoRespuesta: Record<string, unknown>,
     init: ResponseInit
   ) => {
-    await liberarPreflight(admin, preflightId);
-    preflightId = null;
+    await limpiarPreparacionInvitada();
     return NextResponse.json(cuerpoRespuesta, init);
   };
 
@@ -254,6 +296,7 @@ export async function POST(request: Request) {
       );
     }
     user = data.user;
+    usuarioAnonimoCreadoId = data.user.id;
   }
 
   const esInvitado = user.is_anonymous === true;
@@ -477,7 +520,10 @@ export async function POST(request: Request) {
     idTurno = reserva.data;
     errorTurno = reserva.error;
     if (errorTurno || !idTurno) {
-      await liberarPreflight(admin, preflightId);
+      await limpiarPreparacionInvitada();
+    } else {
+      usuarioAnonimoCreadoId = null;
+      preflightId = null;
     }
   } else {
     const turno = await supabase.rpc("insertar_turno_usuario", {
