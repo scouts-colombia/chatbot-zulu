@@ -359,7 +359,6 @@ export function Conversacion({
 
     let solicitudPrincipalIniciada = false;
     try {
-      let preflightId: string | undefined;
       if (esInvitado && !sesionInvitadaLista) {
         const preparacion = await fetch("/api/chat/invitado", {
           method: "POST",
@@ -379,10 +378,6 @@ export function Conversacion({
           );
           return;
         }
-        preflightId =
-          typeof datosPreparacion.preflightId === "string"
-            ? datosPreparacion.preflightId
-            : undefined;
         setSesionInvitadaLista(true);
       }
 
@@ -392,7 +387,6 @@ export function Conversacion({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           conversationId: conversationIdActual ?? undefined,
-          preflightId,
           mensaje: limpio,
           aceptaPolitica:
             esInvitado && requiereConsentimiento ? aceptaPolitica : undefined,

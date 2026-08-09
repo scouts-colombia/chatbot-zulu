@@ -15,9 +15,12 @@ import {
 import { construirFilasEventos } from "@/lib/chat/telemetria";
 import {
   COOKIE_DISPOSITIVO_INVITADO,
+  COOKIE_PREFLIGHT_INVITADO,
   construirIdentidadInvitada,
   crearIdDispositivo,
+  DURACION_PREFLIGHT_INVITADO_SEGUNDOS,
   esIdDispositivoValido,
+  esIdPreflightValido,
   type IdentidadInvitada,
 } from "@/lib/invitados/identidad";
 import { respuestaRegistroPorLimite } from "@/lib/invitados/limites";
@@ -33,7 +36,6 @@ export const maxDuration = 60;
 
 const CuerpoSchema = z.object({
   conversationId: z.string().uuid().optional(),
-  preflightId: z.string().uuid().optional(),
   mensaje: z.string().trim().min(1).max(2000),
   aceptaPolitica: z.boolean().optional(),
 });
@@ -76,11 +78,17 @@ async function liberarPreflight(
   admin: ClienteAdmin,
   preflightId: string | null
 ) {
-  if (preflightId) {
-    await admin.rpc("liberar_preflight_turno_invitado", {
-      p_preflight_id: preflightId,
-    });
+  if (!preflightId) {
+    return true;
   }
+  const { error } = await admin.rpc("liberar_preflight_turno_invitado", {
+    p_preflight_id: preflightId,
+  });
+  if (error) {
+    console.error("[chat] No se pudo liberar el preflight invitado:", error);
+    return false;
+  }
+  return true;
 }
 
 async function registrarEventos(
@@ -174,6 +182,7 @@ export async function POST(request: Request) {
 
   const supabase = await crearClienteServidor();
   const admin = crearClienteAdmin();
+  const cookieStore = await cookies();
   const {
     data: { user },
     error: errorAutenticacion,
@@ -190,11 +199,15 @@ export async function POST(request: Request) {
     );
   }
 
+  const preflightCookie = cookieStore.get(COOKIE_PREFLIGHT_INVITADO)?.value;
   let identidadInvitada: IdentidadInvitada | null = null;
   let preflightId: string | null = null;
   const limpiarPreparacionInvitada = async () => {
-    await liberarPreflight(admin, preflightId);
-    preflightId = null;
+    const liberado = await liberarPreflight(admin, preflightId);
+    if (liberado) {
+      preflightId = null;
+      cookieStore.delete(COOKIE_PREFLIGHT_INVITADO);
+    }
   };
   const responderLiberandoPreflight = async (
     cuerpoRespuesta: Record<string, unknown>,
@@ -215,8 +228,8 @@ export async function POST(request: Request) {
   }
 
   const esInvitado = user.is_anonymous === true;
-  if (esInvitado && cuerpo.preflightId) {
-    preflightId = cuerpo.preflightId;
+  if (esInvitado && esIdPreflightValido(preflightCookie)) {
+    preflightId = preflightCookie as string;
   }
 
   // Estado de cuenta y consentimiento: lógica de API, no RLS (CLAUDE.md).
@@ -311,6 +324,13 @@ export async function POST(request: Request) {
       );
     }
     preflightId = preflight.data as string;
+    cookieStore.set(COOKIE_PREFLIGHT_INVITADO, preflightId, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: DURACION_PREFLIGHT_INVITADO_SEGUNDOS,
+    });
   }
   let conversationId = cuerpo.conversationId;
   if (!conversationId && esInvitado) {
@@ -437,6 +457,7 @@ export async function POST(request: Request) {
       await limpiarPreparacionInvitada();
     } else {
       preflightId = null;
+      cookieStore.delete(COOKIE_PREFLIGHT_INVITADO);
     }
   } else {
     const turno = await supabase.rpc("insertar_turno_usuario", {

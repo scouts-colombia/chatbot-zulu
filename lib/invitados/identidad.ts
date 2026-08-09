@@ -1,6 +1,8 @@
 import { createHmac, randomUUID } from "node:crypto";
 
 export const COOKIE_DISPOSITIVO_INVITADO = "zulu_guest_device";
+export const COOKIE_PREFLIGHT_INVITADO = "zulu_guest_preflight";
+export const DURACION_PREFLIGHT_INVITADO_SEGUNDOS = 10 * 60;
 
 const HEX_64 = /^[0-9a-f]{64}$/;
 const UUID =
@@ -14,6 +16,10 @@ export type IdentidadInvitada = {
 };
 
 export function esIdDispositivoValido(value: string | undefined) {
+  return Boolean(value && UUID.test(value));
+}
+
+export function esIdPreflightValido(value: string | undefined) {
   return Boolean(value && UUID.test(value));
 }
 

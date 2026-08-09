@@ -3,9 +3,12 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import {
   COOKIE_DISPOSITIVO_INVITADO,
+  COOKIE_PREFLIGHT_INVITADO,
   construirIdentidadInvitada,
   crearIdDispositivo,
+  DURACION_PREFLIGHT_INVITADO_SEGUNDOS,
   esIdDispositivoValido,
+  esIdPreflightValido,
   type IdentidadInvitada,
 } from "@/lib/invitados/identidad";
 import { respuestaRegistroPorLimite } from "@/lib/invitados/limites";
@@ -53,6 +56,7 @@ export async function POST(request: Request) {
 
   const supabase = await crearClienteServidor();
   const admin = crearClienteAdmin();
+  const cookieStore = await cookies();
   const {
     data: { user },
     error: errorAutenticacion,
@@ -75,7 +79,7 @@ export async function POST(request: Request) {
 
   if (user) {
     if (user.is_anonymous === true) {
-      return NextResponse.json({ preflightId: null });
+      return NextResponse.json({ sesionPreparada: true });
     }
     return NextResponse.json(
       {
@@ -83,6 +87,18 @@ export async function POST(request: Request) {
         mensaje: "Tu cuenta ya está activa. Recarga la página para continuar.",
       },
       { status: 409 }
+    );
+  }
+
+  const preflightPendiente = cookieStore.get(COOKIE_PREFLIGHT_INVITADO)?.value;
+  if (esIdPreflightValido(preflightPendiente)) {
+    return NextResponse.json(
+      {
+        codigo: "sesion_invitada_pendiente",
+        mensaje:
+          "No pudimos completar tu sesión de prueba. Espera unos minutos e intenta de nuevo.",
+      },
+      { status: 503 }
     );
   }
 
@@ -130,12 +146,22 @@ export async function POST(request: Request) {
   }
 
   const preflightId = preflight.data as string;
+  cookieStore.set(COOKIE_PREFLIGHT_INVITADO, preflightId, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: DURACION_PREFLIGHT_INVITADO_SEGUNDOS,
+  });
+
   const { data, error } = await supabase.auth.signInAnonymously();
   if (error || !data.user || !data.session) {
+    let puedeLiberarPreflight = !data.user;
     if (data.user) {
       const { error: errorBorrado } = await admin.auth.admin.deleteUser(
         data.user.id
       );
+      puedeLiberarPreflight = !errorBorrado;
       if (errorBorrado) {
         console.error(
           "[chat/invitado] No se pudo eliminar la identidad incompleta:",
@@ -143,9 +169,19 @@ export async function POST(request: Request) {
         );
       }
     }
-    await admin.rpc("liberar_preflight_turno_invitado", {
-      p_preflight_id: preflightId,
-    });
+    if (puedeLiberarPreflight) {
+      const liberacion = await admin.rpc("liberar_preflight_turno_invitado", {
+        p_preflight_id: preflightId,
+      });
+      if (liberacion.error) {
+        console.error(
+          "[chat/invitado] No se pudo liberar el preflight:",
+          liberacion.error
+        );
+      } else {
+        cookieStore.delete(COOKIE_PREFLIGHT_INVITADO);
+      }
+    }
     console.error("[chat/invitado] No se pudo iniciar la sesión:", error);
     return NextResponse.json(
       {
@@ -157,5 +193,5 @@ export async function POST(request: Request) {
     );
   }
 
-  return NextResponse.json({ preflightId });
+  return NextResponse.json({ sesionPreparada: true });
 }

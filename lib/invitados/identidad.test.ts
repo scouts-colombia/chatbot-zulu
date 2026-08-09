@@ -6,6 +6,7 @@ import {
   crearIdDispositivo,
   esHashInvitado,
   esIdDispositivoValido,
+  esIdPreflightValido,
   obtenerIpCliente,
 } from "./identidad";
 
@@ -121,4 +122,9 @@ test("rechaza secretos cortos e identificadores de dispositivo invalidos", () =>
 
 test("genera identificadores de dispositivo validos", () => {
   assert.equal(esIdDispositivoValido(crearIdDispositivo()), true);
+});
+test("valida identificadores de preflight antes de confiar en la cookie", () => {
+  assert.equal(esIdPreflightValido(DEVICE_ID), true);
+  assert.equal(esIdPreflightValido("no-es-un-uuid"), false);
+  assert.equal(esIdPreflightValido(undefined), false);
 });
