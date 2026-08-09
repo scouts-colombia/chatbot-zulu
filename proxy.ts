@@ -7,6 +7,7 @@ const RUTAS_SIN_SESION = new Set([
   "/registro",
   "/auth/callback",
   "/api/chat",
+  "/api/chat/invitado",
 ]);
 
 /**
