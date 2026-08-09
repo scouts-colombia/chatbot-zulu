@@ -675,7 +675,7 @@ export function Conversacion({
         <form
           className={
             sinMensajes
-              ? "mx-auto w-full max-w-3xl shrink-0 px-4 pt-4 sm:px-6"
+              ? "mx-auto w-full max-w-3xl shrink-0 px-4 pt-4 [@media(max-height:30rem)]:pt-1 sm:px-6"
               : "mx-auto w-full max-w-3xl px-4 pb-4 sm:px-6 sm:pb-6"
           }
           onSubmit={(evento) => {
@@ -712,7 +712,7 @@ export function Conversacion({
             </Button>
           </div>
           {esInvitado && requiereConsentimiento && !limiteInvitado && (
-            <label className="mt-3 flex cursor-pointer items-start gap-2.5 text-pnpj-tinta/75 text-xs leading-5">
+            <label className="mt-3 flex cursor-pointer items-start gap-2.5 text-pnpj-tinta/75 text-xs leading-5 [@media(max-height:30rem)]:mt-2 [@media(max-height:30rem)]:leading-[1.125rem]">
               <span className="relative mt-0.5 flex size-5 shrink-0 items-center justify-center">
                 <input
                   aria-label={`Acepto la política de privacidad, versión ${versionPoliticaActual ?? "vigente"}`}
