@@ -33,6 +33,7 @@ export const maxDuration = 60;
 
 const CuerpoSchema = z.object({
   conversationId: z.string().uuid().optional(),
+  preflightId: z.string().uuid().optional(),
   mensaje: z.string().trim().min(1).max(2000),
   aceptaPolitica: z.boolean().optional(),
 });
@@ -126,6 +127,22 @@ async function guardarMensajeAsistente(
   return data.id as string;
 }
 
+async function descartarRespuestaIncompleta(
+  admin: ClienteAdmin,
+  assistantMessageId: string
+) {
+  const { error } = await admin
+    .from("messages")
+    .delete()
+    .eq("id", assistantMessageId);
+  if (error) {
+    console.error(
+      "[chat] No se pudo descartar la respuesta incompleta:",
+      error
+    );
+  }
+}
+
 function metadataDe(
   intentos: IntentoModelo[],
   modelId: string,
@@ -157,7 +174,7 @@ export async function POST(request: Request) {
 
   const supabase = await crearClienteServidor();
   const admin = crearClienteAdmin();
-  let {
+  const {
     data: { user },
     error: errorAutenticacion,
   } = await supabase.auth.getUser();
@@ -175,35 +192,9 @@ export async function POST(request: Request) {
 
   let identidadInvitada: IdentidadInvitada | null = null;
   let preflightId: string | null = null;
-  let usuarioAnonimoCreadoId: string | null = null;
   const limpiarPreparacionInvitada = async () => {
-    let puedeLiberarPreflight = true;
-    if (usuarioAnonimoCreadoId) {
-      const id = usuarioAnonimoCreadoId;
-      const { error } = await admin.auth.admin.deleteUser(id);
-      if (error) {
-        puedeLiberarPreflight = false;
-        console.error(
-          "[chat] No se pudo eliminar la identidad invitada incompleta:",
-          error
-        );
-      } else {
-        usuarioAnonimoCreadoId = null;
-        const { error: errorCierre } = await supabase.auth.signOut({
-          scope: "local",
-        });
-        if (errorCierre) {
-          console.error(
-            "[chat] No se pudo limpiar la sesión invitada local:",
-            errorCierre
-          );
-        }
-      }
-    }
-    if (puedeLiberarPreflight) {
-      await liberarPreflight(admin, preflightId);
-      preflightId = null;
-    }
+    await liberarPreflight(admin, preflightId);
+    preflightId = null;
   };
   const responderLiberandoPreflight = async (
     cuerpoRespuesta: Record<string, unknown>,
@@ -214,90 +205,19 @@ export async function POST(request: Request) {
   };
 
   if (!user) {
-    if (cuerpo.conversationId) {
-      return responderLiberandoPreflight(
-        { codigo: "solicitud_invalida" },
-        { status: 400 }
-      );
-    }
-    // Rechazar antes de crear auth.users: ni la falta de consentimiento ni un
-    // limite agotado deben producir cuentas anonimas durables.
-    if (!cuerpo.aceptaPolitica) {
-      return responderLiberandoPreflight(
-        {
-          codigo: "consentimiento_requerido",
-          mensaje:
-            "Debes aceptar la pol\u00edtica de privacidad vigente antes de usar el chat.",
-        },
-        { status: 403 }
-      );
-    }
-
-    try {
-      identidadInvitada = await obtenerIdentidadInvitada(request);
-    } catch (error) {
-      console.error("[chat] Identidad invitada no disponible:", error);
-      return responderLiberandoPreflight(
-        {
-          codigo: "invitado_no_disponible",
-          mensaje:
-            "El turno de prueba no est\u00e1 disponible en este momento. Intenta de nuevo m\u00e1s tarde.",
-        },
-        { status: 503 }
-      );
-    }
-
-    const preflight = await admin.rpc("preparar_turno_invitado", {
-      p_device_hash: identidadInvitada.deviceHash,
-      p_environment_hash: identidadInvitada.environmentHash,
-      p_network_hash: identidadInvitada.networkHash,
-    });
-    if (preflight.error || !preflight.data) {
-      if (
-        /limite_invitado|limite_red_invitada/.test(
-          preflight.error?.message ?? ""
-        )
-      ) {
-        return responderLiberandoPreflight(
-          respuestaRegistroPorLimite(preflight.error?.message ?? ""),
-          { status: 429 }
-        );
-      }
-      console.error(
-        "[chat] No se pudo preparar el turno invitado:",
-        preflight.error
-      );
-      return responderLiberandoPreflight(
-        {
-          codigo: "invitado_no_disponible",
-          mensaje:
-            "El turno de prueba no est\u00e1 disponible en este momento. Intenta de nuevo m\u00e1s tarde.",
-        },
-        { status: 503 }
-      );
-    }
-    preflightId = preflight.data as string;
-
-    const { data, error } = await supabase.auth.signInAnonymously();
-    if (error || !data.user) {
-      console.error(
-        "[chat] No se pudo iniciar la sesi\u00f3n invitada:",
-        error
-      );
-      return responderLiberandoPreflight(
-        {
-          codigo: "invitado_no_disponible",
-          mensaje:
-            "El turno de prueba no est\u00e1 disponible en este momento. Intenta de nuevo m\u00e1s tarde.",
-        },
-        { status: 503 }
-      );
-    }
-    user = data.user;
-    usuarioAnonimoCreadoId = data.user.id;
+    return NextResponse.json(
+      {
+        codigo: "sesion_invitada_requerida",
+        mensaje: "Prepara tu sesión de prueba e intenta de nuevo.",
+      },
+      { status: 401 }
+    );
   }
 
   const esInvitado = user.is_anonymous === true;
+  if (esInvitado && cuerpo.preflightId) {
+    preflightId = cuerpo.preflightId;
+  }
 
   // Estado de cuenta y consentimiento: lógica de API, no RLS (CLAUDE.md).
   const { data: perfil, error: errorPerfil } = await supabase
@@ -516,7 +436,6 @@ export async function POST(request: Request) {
     if (errorTurno || !idTurno) {
       await limpiarPreparacionInvitada();
     } else {
-      usuarioAnonimoCreadoId = null;
       preflightId = null;
     }
   } else {
@@ -874,7 +793,7 @@ export async function POST(request: Request) {
     }
 
     if (modelo.preguntaGuiada) {
-      const { data: pregunta } = await admin
+      const { data: pregunta, error: errorPregunta } = await admin
         .from("guided_questions")
         .insert({
           message_id: asistenteId,
@@ -884,14 +803,31 @@ export async function POST(request: Request) {
         })
         .select("id")
         .single();
-      if (pregunta) {
-        await admin.from("guided_question_options").insert(
+      if (errorPregunta || !pregunta) {
+        console.error(
+          "[chat] No se pudo guardar la pregunta guiada:",
+          errorPregunta
+        );
+        await descartarRespuestaIncompleta(admin, asistenteId);
+        throw new Error("persistencia_pregunta_guiada_fallida");
+      }
+
+      const { error: errorOpciones } = await admin
+        .from("guided_question_options")
+        .insert(
           modelo.preguntaGuiada.opciones.map((label, indice) => ({
             guided_question_id: pregunta.id,
             order_index: indice,
             label,
           }))
         );
+      if (errorOpciones) {
+        console.error(
+          "[chat] No se pudieron guardar las opciones guiadas:",
+          errorOpciones
+        );
+        await descartarRespuestaIncompleta(admin, asistenteId);
+        throw new Error("persistencia_opciones_guiadas_fallida");
       }
     }
 

@@ -136,6 +136,9 @@ async function ContenidoPrincipal({
               aceptación se conserva como un evento histórico y será necesaria
               de nuevo si la versión cambia.
             </p>
+            <p className="mt-2 text-foreground/60 text-xs">
+              Versión que registrarás: {VERSION_POLITICA_PRIVACIDAD}
+            </p>
             {aviso === "consentimiento" && (
               <p className="mt-3 text-destructive text-sm" role="alert">
                 No pudimos registrar tu aceptación. Intenta de nuevo.

@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
 import { cargarTramo } from "@/lib/chat/transcripcion";
 import { VERSION_POLITICA_PRIVACIDAD } from "@/lib/privacidad";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { Conversacion } from "./conversacion";
+import { NavegacionCuentaPublica } from "./navegacion-cuenta-publica";
 import type { MensajeUI } from "./tipos";
 
 export async function ChatPublico({ userId }: { userId: string | null }) {
@@ -66,6 +66,8 @@ export async function ChatPublico({ userId }: { userId: string | null }) {
         )}
         mensajesIniciales={mensajes}
         requiereConsentimiento={!consentimientoAceptado}
+        sesionInvitadaEstablecida={Boolean(userId)}
+        versionPolitica={VERSION_POLITICA_PRIVACIDAD}
       />
     </MarcoChatPublico>
   );
@@ -104,21 +106,7 @@ function MarcoChatPublico({ children }: { children: React.ReactNode }) {
             Asistente Scout
           </span>
         </Link>
-        <nav aria-label="Cuenta" className="flex items-center gap-2">
-          <Button
-            asChild
-            className="btn-press min-h-11 border-white/35 bg-white/10 px-4 text-white backdrop-blur-md hover:bg-white/18"
-            variant="outline"
-          >
-            <Link href="/login">Iniciar sesión</Link>
-          </Button>
-          <Button
-            asChild
-            className="btn-press min-h-11 bg-scouts-yellow px-4 text-scouts-purple shadow-lg hover:bg-scouts-yellow/90"
-          >
-            <Link href="/registro">Crear cuenta</Link>
-          </Button>
-        </nav>
+        <NavegacionCuentaPublica />
       </header>
       <main className="relative z-10 min-h-0 flex-1">{children}</main>
       <p className="relative z-10 px-4 pb-3 text-center text-white/65 text-xs">

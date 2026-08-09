@@ -22,6 +22,7 @@ import {
   limpiarBorradorInvitado,
   restaurarBorradorInvitado,
 } from "@/lib/invitados/borrador";
+import { marcarTurnoInvitadoEnCurso } from "@/lib/invitados/turno-en-curso";
 import { URL_POLITICA_PRIVACIDAD } from "@/lib/privacidad";
 import type { MensajeUI } from "./tipos";
 
@@ -200,6 +201,8 @@ export function Conversacion({
   esInvitado = false,
   limiteConsumido = false,
   requiereConsentimiento = false,
+  sesionInvitadaEstablecida = false,
+  versionPolitica,
 }: {
   conversationId?: string | null;
   mensajesIniciales: MensajeUI[];
@@ -209,6 +212,8 @@ export function Conversacion({
   esInvitado?: boolean;
   limiteConsumido?: boolean;
   requiereConsentimiento?: boolean;
+  sesionInvitadaEstablecida?: boolean;
+  versionPolitica?: string;
 }) {
   const [conversationIdActual, setConversationIdActual] = useState(
     conversationId ?? null
@@ -221,6 +226,9 @@ export function Conversacion({
   const [masAntiguos, setMasAntiguos] = useState(hayMasAntiguos);
   const [cargandoAntiguos, setCargandoAntiguos] = useState(false);
   const [limiteInvitado, setLimiteInvitado] = useState(limiteConsumido);
+  const [sesionInvitadaLista, setSesionInvitadaLista] = useState(
+    sesionInvitadaEstablecida
+  );
   useEffect(() => {
     // Elimina la clave global de versiones anteriores para que un borrador
     // no pueda reaparecer al cambiar de identidad en una pestaña compartida.
@@ -323,6 +331,9 @@ export function Conversacion({
     }
     setAviso(null);
     setEnviando(true);
+    if (esInvitado) {
+      marcarTurnoInvitadoEnCurso(true);
+    }
     setBorrador("");
     const idLocal = `local-${Date.now()}`;
     setMensajes((previos) => [
@@ -346,12 +357,42 @@ export function Conversacion({
       setMostrarRegistro(true);
     };
 
+    let solicitudPrincipalIniciada = false;
     try {
+      let preflightId: string | undefined;
+      if (esInvitado && !sesionInvitadaLista) {
+        const preparacion = await fetch("/api/chat/invitado", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ aceptaPolitica }),
+        });
+        const datosPreparacion = await preparacion.json().catch(() => null);
+        if (!preparacion.ok || !datosPreparacion) {
+          revertir();
+          if (datosPreparacion?.codigo === "registro_requerido") {
+            exigirRegistroTrasEnvio(datosPreparacion.mensaje);
+            return;
+          }
+          setAviso(
+            datosPreparacion?.mensaje ??
+              "No pudimos preparar tu sesión de prueba. Inténtalo de nuevo."
+          );
+          return;
+        }
+        preflightId =
+          typeof datosPreparacion.preflightId === "string"
+            ? datosPreparacion.preflightId
+            : undefined;
+        setSesionInvitadaLista(true);
+      }
+
+      solicitudPrincipalIniciada = true;
       const respuesta = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           conversationId: conversationIdActual ?? undefined,
+          preflightId,
           mensaje: limpio,
           aceptaPolitica:
             esInvitado && requiereConsentimiento ? aceptaPolitica : undefined,
@@ -369,6 +410,13 @@ export function Conversacion({
           exigirRegistroTrasEnvio(
             datos.mensaje ??
               "Crea una cuenta o inicia sesión para continuar usando el chat."
+          );
+          return;
+        }
+        if (esInvitado && datos?.codigo === "sesion_invitada_requerida") {
+          setSesionInvitadaLista(false);
+          setAviso(
+            "No pudimos establecer tu sesión de prueba. Inténtalo de nuevo."
           );
           return;
         }
@@ -429,7 +477,7 @@ export function Conversacion({
       setAnimandoId(mensajeAsistente.id);
     } catch {
       revertir();
-      if (esInvitado) {
+      if (esInvitado && solicitudPrincipalIniciada) {
         exigirRegistroTrasEnvio(
           "Se perdió la conexión mientras procesábamos tu pregunta de prueba. Crea una cuenta o inicia sesión para continuar sin perderla."
         );
@@ -437,6 +485,9 @@ export function Conversacion({
       }
       setAviso("No hay conexión con el servidor. Inténtalo de nuevo.");
     } finally {
+      if (esInvitado) {
+        marcarTurnoInvitadoEnCurso(false);
+      }
       setEnviando(false);
     }
   }
@@ -550,6 +601,7 @@ export function Conversacion({
             <label className="mt-3 flex cursor-pointer items-start gap-2.5 text-white/86 text-xs leading-5">
               <span className="relative mt-0.5 flex size-5 shrink-0 items-center justify-center">
                 <input
+                  aria-label={`Acepto la política de privacidad, versión ${versionPolitica ?? "vigente"}`}
                   checked={aceptaPolitica}
                   className="peer absolute inset-0 cursor-pointer opacity-0"
                   onChange={(evento) =>
@@ -574,7 +626,8 @@ export function Conversacion({
                 >
                   política de privacidad
                 </a>
-                . Mi primera pregunta quedará asociada si creo una cuenta.
+                {versionPolitica ? ` (versión ${versionPolitica})` : ""}. Mi
+                primera pregunta quedará asociada si creo una cuenta.
               </span>
             </label>
           )}
