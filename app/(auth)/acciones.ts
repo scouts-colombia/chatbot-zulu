@@ -126,6 +126,17 @@ export async function iniciarSesion(
       };
     }
 
+    // La reserva conserva sus HMAC/UUID sin FK al perfil para mantener el
+    // límite antiabuso; la conversación ya pertenece a la cuenta permanente.
+    const { error: errorEliminarInvitado } =
+      await admin.auth.admin.deleteUser(invitadoAnterior);
+    if (errorEliminarInvitado) {
+      console.error(
+        "[auth] No se pudo eliminar la identidad invitada transferida:",
+        errorEliminarInvitado
+      );
+    }
+
     revalidatePath("/", "layout");
     redirect("/");
   }

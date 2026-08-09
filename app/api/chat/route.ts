@@ -20,6 +20,8 @@ import {
   esIdDispositivoValido,
   type IdentidadInvitada,
 } from "@/lib/invitados/identidad";
+import { respuestaRegistroPorLimite } from "@/lib/invitados/limites";
+
 import {
   URL_POLITICA_PRIVACIDAD,
   VERSION_POLITICA_PRIVACIDAD,
@@ -257,11 +259,7 @@ export async function POST(request: Request) {
         )
       ) {
         return responderLiberandoPreflight(
-          {
-            codigo: "registro_requerido",
-            mensaje:
-              "Ya usaste tu pregunta de prueba. Crea una cuenta o inicia sesi\u00f3n para continuar.",
-          },
+          respuestaRegistroPorLimite(preflight.error?.message ?? ""),
           { status: 429 }
         );
       }
@@ -375,11 +373,7 @@ export async function POST(request: Request) {
         )
       ) {
         return responderLiberandoPreflight(
-          {
-            codigo: "registro_requerido",
-            mensaje:
-              "Ya usaste tu pregunta de prueba. Crea una cuenta o inicia sesi\u00f3n para continuar.",
-          },
+          respuestaRegistroPorLimite(preflight.error?.message ?? ""),
           { status: 429 }
         );
       }
@@ -540,11 +534,7 @@ export async function POST(request: Request) {
       /limite_invitado|limite_red_invitada/.test(errorTurno?.message ?? "")
     ) {
       return NextResponse.json(
-        {
-          codigo: "registro_requerido",
-          mensaje:
-            "Ya usaste tu pregunta de prueba. Crea una cuenta o inicia sesión para continuar.",
-        },
+        respuestaRegistroPorLimite(errorTurno?.message ?? ""),
         { status: 429 }
       );
     }
