@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { construirHashesSolicitud } from "@/lib/invitados/identidad";
+import { limpiarIdentidadesInvitadasPendientes } from "@/lib/invitados/limpieza";
 import {
   URL_POLITICA_PRIVACIDAD,
   VERSION_POLITICA_PRIVACIDAD,
@@ -132,16 +133,12 @@ export async function iniciarSesion(
       };
     }
 
-    // La reserva conserva sus HMAC/UUID sin FK al perfil para mantener el
-    // límite antiabuso; la conversación ya pertenece a la cuenta permanente.
-    const { error: errorEliminarInvitado } =
-      await admin.auth.admin.deleteUser(invitadoAnterior);
-    if (errorEliminarInvitado) {
-      console.error(
-        "[auth] No se pudo eliminar la identidad invitada transferida:",
-        errorEliminarInvitado
-      );
-    }
+    // La transferencia ya dejó una intención durable en PostgreSQL. Este
+    // intento prioriza la identidad actual; si Auth falla, otro login retomará
+    // la fila después del cooldown sin bloquear la cuenta permanente.
+    await limpiarIdentidadesInvitadasPendientes(admin, {
+      preferida: invitadoAnterior,
+    });
 
     revalidatePath("/", "layout");
     redirect("/");
@@ -152,6 +149,7 @@ export async function iniciarSesion(
     return { error: traducirError(error.code, error.message) };
   }
 
+  await limpiarIdentidadesInvitadasPendientes(crearClienteAdmin());
   revalidatePath("/", "layout");
   redirect("/");
 }
