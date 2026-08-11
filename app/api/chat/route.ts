@@ -334,18 +334,14 @@ export async function POST(request: Request) {
   }
   let conversationId = cuerpo.conversationId;
   if (!conversationId && esInvitado) {
-    const { data: existente, error: errorExistente } = await supabase
-      .from("conversations")
-      .select("id")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: true })
-      .limit(1)
-      .maybeSingle();
-
-    if (errorExistente) {
+    const { data: preparada, error: errorPreparada } = await admin.rpc(
+      "obtener_o_crear_conversacion_invitada",
+      { p_user_id: user.id }
+    );
+    if (errorPreparada || !preparada) {
       console.error(
-        "[chat] No se pudo buscar la conversación invitada:",
-        errorExistente
+        "[chat] No se pudo preparar la conversación invitada:",
+        errorPreparada
       );
       return responderLiberandoPreflight(
         {
@@ -355,32 +351,8 @@ export async function POST(request: Request) {
         { status: 503 }
       );
     }
-
-    if (existente) {
-      conversationId = existente.id as string;
-    } else {
-      const { data: creada, error: errorCreada } = await admin
-        .from("conversations")
-        .insert({ user_id: user.id })
-        .select("id")
-        .single();
-      if (errorCreada || !creada) {
-        console.error(
-          "[chat] No se pudo crear la conversación invitada:",
-          errorCreada
-        );
-        return responderLiberandoPreflight(
-          {
-            codigo: "conversacion_no_disponible",
-            mensaje: "No pudimos preparar tu conversación. Intenta de nuevo.",
-          },
-          { status: 503 }
-        );
-      }
-      conversationId = creada.id as string;
-    }
+    conversationId = preparada as string;
   }
-
   if (!conversationId) {
     return responderLiberandoPreflight(
       { codigo: "solicitud_invalida" },
