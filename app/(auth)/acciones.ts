@@ -116,6 +116,16 @@ export async function iniciarSesion(
             "Tu respuesta de prueba todavía se está preparando. Espera un momento e inicia sesión de nuevo para conservarla.",
         };
       }
+      if (
+        errorTransferencia.message.includes(
+          "transferencia_invitada_destino_distinto"
+        )
+      ) {
+        return {
+          error:
+            "Tu conversación de prueba ya fue asociada a otra cuenta. Inicia sesión con la cuenta que usaste primero.",
+        };
+      }
       return {
         error:
           "No pudimos asociar tu conversación de prueba. Tu sesión invitada sigue activa; inténtalo de nuevo.",

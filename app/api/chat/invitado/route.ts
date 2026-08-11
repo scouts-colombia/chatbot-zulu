@@ -12,6 +12,7 @@ import {
   type IdentidadInvitada,
 } from "@/lib/invitados/identidad";
 import { respuestaRegistroPorLimite } from "@/lib/invitados/limites";
+import { limpiarIdentidadesInvitadasPendientes } from "@/lib/invitados/limpieza";
 import { crearClienteAdmin } from "@/lib/supabase/admin";
 import { crearClienteServidor } from "@/lib/supabase/server";
 
@@ -89,6 +90,8 @@ export async function POST(request: Request) {
       { status: 409 }
     );
   }
+
+  await limpiarIdentidadesInvitadasPendientes(admin, { limite: 1 });
 
   const preflightPendiente = cookieStore.get(COOKIE_PREFLIGHT_INVITADO)?.value;
   if (esIdPreflightValido(preflightPendiente)) {
