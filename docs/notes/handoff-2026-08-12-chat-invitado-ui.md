@@ -8,31 +8,31 @@
 
 Este es el handoff autoritativo para continuar las dos PR. El handoff de PARCE/allowlist del 2026-08-06 es histórico: no volver a indexar PARCE.
 
-## Actualización — revisión independiente y correcciones
+## Actualización — migración remota aplicada
 
 Esta sección reemplaza los SHA y resultados anteriores cuando haya discrepancias.
 
-- PR #12 publicada en 578116a (fix: conservar protección del registro invitado).
-- La protección previa a auth.updateUser ahora es monotónica hasta expirar:
-  un error ambiguo de Auth o un intento concurrente ya no puede retirar la
-  marca de otro registro que sí avanzó.
-- La migración pendiente ya no crea ni expone
-  cancelar_registro_invitado_pendiente; sigue sin aplicarse remotamente.
-- Se añadió lib/invitados/registro.test.ts como contrato de regresión.
-- PR #13 fue rebasada sobre 578116a; el fix visual reescrito está en 74ab9db
-  y la cabeza incluye este commit documental posterior
-  (fix: cerrar hallazgos de accesibilidad visual).
-- La visual sube textos secundarios a opacidad /70, mantiene objetivos
-  táctiles de 44 px y elimina el mínimo artificial de 34 rem del chat público.
-- Verificación local actual en ambas cabezas: typecheck y build pasan; 46/46
-  pruebas pasan; Biome dirigido, git diff --check y detector Impeccable pasan.
-- Verificación real de PR #13 en 667 × 375: documento y shell miden 375 px;
-  header, composer, consentimiento y footer permanecen visibles. Con
-  prefers-color-scheme: dark, el fondo sigue siendo crema rgb(255, 248, 235).
-- Checks remotos posteriores: CI y Vercel verdes en PR #12 (578116a) y en
-  la cabeza de código rebasada de PR #13; ambas PR quedaron CLEAN.
-- Codex Review se reinvocó en ambas PR y volvió a rechazar por cuota; no
-  produjo comentarios nuevos ni una aprobación sobre los SHA actuales.
+- PR #12 permanece en 578116ad6cb1278fbcf6bc5e86eff7bd08057a71.
+- PR #13 permanece en 5256bff79b2431ad557a003adcdc0cd8003d95bc, apilada sobre
+  578116a. No hubo rebase: esta sesión no cambió código de PR #12.
+- Ambas PR siguen OPEN, MERGEABLE y CLEAN. Checks confirmados en esta sesión:
+  PR #12 `build (20)` SUCCESS y Vercel SUCCESS; PR #13 `build (20)` SUCCESS y
+  Vercel SUCCESS. Todos los hilos de review de ambas PR están resueltos.
+- Worktree local: rama `agent/zulu-ui-aplicacion` al día con origin; solo
+  quedan sin seguimiento `.cursor/mcp.json` y `mcp.json`.
+- La migración local `20260812190000_proteger_conversion_invitada_pendiente.sql`
+  no estaba aplicada. El conector la aplicó como versión remota
+  `20260812234408` / `proteger_conversion_invitada_pendiente` en
+  `ddimxdrggrrfcvzwwben`. El desfase de timestamp es el mismo patrón que
+  `20260812163500` local → `20260812164406` remoto.
+- Verificación remota posterior: columna, tabla, índices, RLS, revokes/grants,
+  definiciones, ausencia de `cancelar_registro_invitado_pendiente`,
+  preservación de las 3 cuentas y 7 conversaciones, e idempotencia de la
+  transferencia. Cero residuos sintéticos.
+- Advisors: el único aviso nuevo es el INFO intencional
+  `rls_enabled_no_policy` de `guest_transfer_receipts`. Rendimiento sin
+  hallazgos nuevos. El WARN de contraseñas filtradas sigue desactivado por
+  decisión documentada en ROADMAP.
 
 ## Decisiones aprobadas
 
@@ -121,9 +121,16 @@ Además del chat público, preflight, consentimiento, cuota atómica, transferen
 - `20260812164406 alinear_preflight_y_sesion_invitada`: corresponde a `supabase/migrations/20260812163500_alinear_preflight_y_sesion_invitada.sql`.
 - La RPC `preparar_turno_invitado_v2(text,text,text)` es `SECURITY DEFINER`, solo `service_role` puede ejecutarla; `anon` y `authenticated` no.
 - Prueba remota previa: devolvió `ttl_seconds = 600`; cero filas sintéticas residuales. Advisors previos sin hallazgos nuevos, salvo avisos preexistentes/intencionales ya documentados.
-- **Pendiente remoto:** `supabase/migrations/20260812190000_proteger_conversion_invitada_pendiente.sql` está revisada, incluye índices de expiración y de FK, y está publicada en la rama base, pero no se ha aplicado al proyecto `ddimxdrggrrfcvzwwben`.
-- En la sesión actual no aparece el MCP de Supabase, no está instalada la CLI y la ejecución remota de una CLI descargada fue denegada. No volver a intentarlo sin autorización explícita o sin habilitar el MCP.
-- Antes de mergear PR #12 hay que aplicar esa migración, comprobar columna/tabla/RLS/grants/funciones e idempotencia, y ejecutar advisors de seguridad y rendimiento.
+- `20260812234408 proteger_conversion_invitada_pendiente`: corresponde a `supabase/migrations/20260812190000_proteger_conversion_invitada_pendiente.sql`. Aplicada y verificada el 2026-08-12 en `ddimxdrggrrfcvzwwben`.
+  - `guest_identity_cleanup_queue.registration_pending_until timestamptz` nullable, comentario sin PII.
+  - `guest_transfer_receipts`: PK `guest_user_id`, FK `target_user_id → auth.users(id) ON DELETE CASCADE`, checks de usuarios distintos y `expires_at > transferred_at`.
+  - Índices: `guest_transfer_receipts_pkey`, `idx_guest_transfer_receipts_expires_at`, `idx_guest_transfer_receipts_target_user_id`.
+  - RLS habilitado, 0 políticas. Grants de tabla solo para `postgres` y `service_role`. `anon`/`authenticated`: SELECT/INSERT/UPDATE/DELETE = false.
+  - `marcar_registro_invitado_pendiente(uuid)`, `tomar_limpiezas_identidad_invitada(integer, uuid)` y `transferir_conversaciones_invitadas(uuid, uuid)`: `SECURITY DEFINER`, `search_path=""`, EXECUTE solo `service_role`; `anon`/`authenticated`/`public` = false.
+  - `cancelar_registro_invitado_pendiente` no existe.
+  - Preservación: 3 `auth.users` (0 anónimos), 3 perfiles, 7 conversaciones con los mismos UUID y dueños, 19 mensajes, 1 reserva, 6 documentos, 2 correos de allowlist.
+  - Idempotencia: primera transferencia = 1; reintento al mismo destino = 0; destino distinto = `transferencia_invitada_destino_distinto`; reintento tras borrar la identidad invitada = 0. `marcar` dejó `registration_pending_until` > 23 h y `tomar` con `p_preferida` devolvió 0 filas. Limpieza posterior: 0 recibos, 0 cola, 0 perfiles/conversaciones sintéticos.
+  - Advisors de seguridad: único aviso nuevo = INFO `rls_enabled_no_policy` de `guest_transfer_receipts` (intencional, tabla de solo servidor). WARN preexistente `auth_leaked_password_protection` (desactivado a propósito). Advisors de rendimiento: sin hallazgos nuevos; las FK sin índice y el índice sin uso de `guest_turn_reservations` son preexistentes.
 
 ## Validaciones finales
 
@@ -174,20 +181,21 @@ que permanezca en las notas históricas de este documento.
 - La protección del registro invitado es monotónica hasta expirar. Un error
   ambiguo de Auth o un intento concurrente ya no puede retirar la protección
   de otra pestaña.
-- La migración pendiente ya no crea ni concede
+- La migración aplicada no crea ni concede
   `cancelar_registro_invitado_pendiente`.
 - `lib/invitados/registro.test.ts` protege ese contrato.
 - Estado remoto de Supabase: la migración
-  `20260812190000_proteger_conversion_invitada_pendiente.sql` todavía no fue
-  aplicada ni verificada en esta sesión.
+  `20260812190000_proteger_conversion_invitada_pendiente.sql` está aplicada
+  como `20260812234408` y verificada (columna, tabla, índices, RLS, grants,
+  funciones, ausencia de cancelación, preservación e idempotencia).
 
 ### PR #13 — sistema visual
 
 - Rama: `agent/zulu-ui-aplicacion`.
 - Base: `agent/zulu-chat-invitado`.
-- Cabeza publicada antes de este commit exclusivamente documental:
-  `9c9d4bc3c11d23460b0c0bfe31755aa4f010ba43`.
-- GitHub: `CLEAN`; CI `build (20)` y Vercel verdes.
+- Cabeza publicada antes de este commit documental:
+  `5256bff79b2431ad557a003adcdc0cd8003d95bc`.
+- GitHub: `CLEAN`; CI `build (20)` y Vercel verdes sobre esa cabeza.
 - La rama fue rebasada sobre `578116a`.
 - Contraste secundario elevado a `/70`, objetivos táctiles relevantes de
   44 px y chat público corregido para viewports de poca altura.
@@ -198,12 +206,12 @@ que permanezca en las notas históricas de este documento.
 
 ### Validaciones realizadas
 
-- `pnpm typecheck`: pasa.
-- `pnpm test -- --run`: 46/46 pasan.
-- `pnpm build`: pasa y genera 15 páginas.
-- Biome dirigido y `git diff --check`: pasan.
-- Detector Impeccable sobre los cambios visuales: cero hallazgos mecánicos.
-- Worktree limpio al entregar el trabajo.
+- Esta sesión no cambió código de aplicación; no se reejecutaron typecheck,
+  pruebas, lint ni build.
+- Verificación remota de `20260812234408` en `ddimxdrggrrfcvzwwben`: columna,
+  tabla, índices, RLS, grants, funciones, preservación e idempotencia verdes.
+- Advisors: único aviso nuevo = INFO intencional de RLS sin políticas en
+  `guest_transfer_receipts`. Rendimiento sin hallazgos nuevos.
 
 ## Estado de Codex Review
 
@@ -225,31 +233,14 @@ que permanezca en las notas históricas de este documento.
 
 ## Trabajo inmediato
 
-1. Con el conector de Supabase habilitado, leer primero su skill completo.
-2. Confirmar en `ddimxdrggrrfcvzwwben` que
-   `20260812190000_proteger_conversion_invitada_pendiente.sql` no está
-   aplicada. Si aparece aplicada inesperadamente, no repetirla: comparar el
-   estado remoto con el archivo y documentar la discrepancia.
-3. Revisar y aplicar mediante el conector:
-   `supabase/migrations/20260812190000_proteger_conversion_invitada_pendiente.sql`.
-4. Verificar remotamente:
-   - columna `guest_identity_cleanup_queue.registration_pending_until`;
-   - tabla `guest_transfer_receipts`, índices, RLS y ausencia de acceso para
-     `anon` y `authenticated`;
-   - grants y definiciones de `marcar_registro_invitado_pendiente`,
-     `tomar_limpiezas_identidad_invitada` y
-     `transferir_conversaciones_invitadas`;
-   - ausencia de `cancelar_registro_invitado_pendiente`;
-   - preservación de cuentas y conversaciones existentes;
-   - idempotencia de la transferencia, sin dejar datos sintéticos.
-5. Ejecutar advisors de seguridad y rendimiento. Separar hallazgos nuevos de
-   avisos preexistentes e intencionales.
-6. Actualizar `ROADMAP.md` y este handoff únicamente con hechos confirmados.
-   Si cambia código de PR #12, rebasar PR #13, validar y publicar con
-   `--force-with-lease`.
-7. Reinvocar Codex Review en ambas PR cuando haya cuota. Corregir, responder,
-   resolver y reinvocar hasta revisión limpia/aprobación.
-8. No hacer merge.
+1. Reinvocar `@codex review` en PR #12 (SHA `578116a`) y PR #13 (cabeza
+   documental de esta sesión) cuando haya cuota. Corregir, responder, resolver
+   y reinvocar hasta revisión limpia o reacción de aprobación sobre esos SHA
+   exactos.
+2. Si Codex exige un cambio de código en PR #12, rebasar PR #13, repetir
+   typecheck, las 46 pruebas, lint/check y build, y publicar la visual con
+   `push --force-with-lease`.
+3. No hacer merge.
 
 ## Restricciones
 
@@ -288,24 +279,14 @@ bases de las PR, checks, hilos thread-aware y lista remota de migraciones. La
 578116ad6cb1278fbcf6bc5e86eff7bd08057a71. La PR #13 estaba CLEAN y verde;
 verifica su cabeza exacta porque el último cambio fue solo documental.
 
-Tendrás acceso al conector de Supabase. Úsalo en el proyecto
-ddimxdrggrrfcvzwwben. Confirma primero que
-20260812190000_proteger_conversion_invitada_pendiente.sql no está aplicada;
-luego revisa y aplica el archivo local
-supabase/migrations/20260812190000_proteger_conversion_invitada_pendiente.sql.
-No inventes resultados ni uses la CLI como sustituto si el conector funciona.
+La migración 20260812190000_proteger_conversion_invitada_pendiente.sql ya está
+aplicada en ddimxdrggrrfcvzwwben como 20260812234408 y verificada. No la
+reapliques. No ejecutes scripts/seed-allowlist.sql y no reindexes PARCE.
 
-Verifica columna, tabla, índices, RLS, revokes/grants, definiciones de funciones,
-ausencia de cancelar_registro_invitado_pendiente, preservación de datos
-existentes e idempotencia sin residuos sintéticos. Ejecuta los advisors de
-seguridad y rendimiento y distingue hallazgos nuevos de avisos preexistentes.
-No ejecutes scripts/seed-allowlist.sql y no reindexes PARCE.
-
-Si todo queda verde, actualiza ROADMAP.md y el handoff con hechos remotos
-confirmados. Después reinvoca @codex review en ambas PR cuando haya cuota.
-Resuelve cada comentario y reinvoca hasta obtener revisión limpia o aprobación
-sobre los SHA exactos. Si modificas PR #12, rebasa PR #13, repite typecheck,
-tests, lint/check, build y push --force-with-lease.
+Reinvoca @codex review en ambas PR cuando haya cuota. Resuelve cada comentario
+y reinvoca hasta obtener revisión limpia o aprobación sobre los SHA exactos.
+Si modificas PR #12, rebasa PR #13, repite typecheck, tests, lint/check, build
+y push --force-with-lease.
 
 Puedes hacer push. No hagas merge. Los commits deben estar en español y sin
 Co-Authored-By. No reintroduzcas dark mode: la dirección visual aprobada es
