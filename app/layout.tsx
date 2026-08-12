@@ -28,9 +28,7 @@ export default function RootLayout({
 }>) {
   return (
     <html className={`${futuraStd.variable} ${geistMono.variable}`} lang="es">
-      <body className="antialiased">
-        {children}
-      </body>
+      <body className="antialiased">{children}</body>
     </html>
   );
 }
