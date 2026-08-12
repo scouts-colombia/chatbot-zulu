@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { resolverDestinoSeguro } from "@/lib/auth/destino-seguro";
+import { esIdTraspasoBorradorValido } from "@/lib/invitados/borrador";
 import { crearClienteServidor } from "@/lib/supabase/server";
 
 export async function GET(request: Request) {
@@ -9,6 +10,7 @@ export async function GET(request: Request) {
     url.searchParams.get("next"),
     url.origin
   );
+  const borrador = destino.searchParams.get("borrador");
 
   if (code) {
     const supabase = await crearClienteServidor();
@@ -21,5 +23,8 @@ export async function GET(request: Request) {
 
   const errorUrl = new URL("/registro", url.origin);
   errorUrl.searchParams.set("error", "enlace_invalido");
+  if (esIdTraspasoBorradorValido(borrador)) {
+    errorUrl.searchParams.set("borrador", borrador);
+  }
   return NextResponse.redirect(errorUrl);
 }

@@ -89,6 +89,34 @@ describe("borrador invitado", () => {
     assert.equal(almacen.getItem(claveBorradorInvitado("conv-1")), "Pendiente");
   });
 
+  it("recupera el borrador en otra pestaña solo con el token explícito", () => {
+    const almacenCompartido = crearAlmacen();
+    const primeraPestana = crearAlmacen();
+    const pestanaDelCorreo = crearAlmacen();
+    guardarBorradorInvitado({
+      almacen: primeraPestana,
+      almacenPendiente: almacenCompartido,
+      conversationId: null,
+      traspasoId: TRASPASO,
+      texto: "Pendiente entre pestañas",
+      ahora: 1000,
+    });
+
+    assert.equal(
+      restaurarBorradorInvitado({
+        almacen: pestanaDelCorreo,
+        almacenPendiente: almacenCompartido,
+        conversationId: "conv-correo",
+        traspasoId: TRASPASO,
+        ahora: 2000,
+      }),
+      "Pendiente entre pestañas"
+    );
+    assert.equal(
+      pestanaDelCorreo.getItem(claveBorradorInvitado("conv-correo")),
+      "Pendiente entre pestañas"
+    );
+  });
   it("elimina el borrador pendiente cuando expira", () => {
     const almacen = crearAlmacen();
     guardarBorradorInvitado({

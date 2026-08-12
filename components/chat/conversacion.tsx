@@ -273,8 +273,10 @@ export function Conversacion({
     // Elimina la clave global de versiones anteriores para que un borrador
     // no pueda reaparecer al cambiar de identidad en una pestaña compartida.
     eliminarClaveGlobalAnterior(sessionStorage);
+    eliminarClaveGlobalAnterior(localStorage);
     const guardado = restaurarBorradorInvitado({
       almacen: sessionStorage,
+      almacenPendiente: localStorage,
       conversationId: conversationIdActual,
       traspasoId: borradorTransferenciaId,
     });
@@ -291,6 +293,7 @@ export function Conversacion({
     if (esInvitado && limpio) {
       guardarBorradorInvitado({
         almacen: sessionStorage,
+        almacenPendiente: localStorage,
         conversationId: conversationIdActual,
         traspasoId,
         texto: limpio,
@@ -522,7 +525,8 @@ export function Conversacion({
       limpiarBorradorInvitado(
         sessionStorage,
         idConversacionRespuesta,
-        borradorTransferenciaId
+        borradorTransferenciaId,
+        localStorage
       );
       if (esInvitado) {
         setLimiteInvitado(true);

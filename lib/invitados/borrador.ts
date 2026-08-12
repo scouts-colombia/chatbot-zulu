@@ -29,12 +29,14 @@ export function eliminarClaveGlobalAnterior(almacen: AlmacenBorrador) {
 
 export function guardarBorradorInvitado({
   almacen,
+  almacenPendiente = almacen,
   conversationId,
   traspasoId,
   texto,
   ahora = Date.now(),
 }: {
   almacen: AlmacenBorrador;
+  almacenPendiente?: AlmacenBorrador;
   conversationId: string | null;
   traspasoId?: string | null;
   texto: string;
@@ -47,7 +49,7 @@ export function guardarBorradorInvitado({
   if (!esIdTraspasoBorradorValido(traspasoId)) {
     return false;
   }
-  almacen.setItem(
+  almacenPendiente.setItem(
     claveBorradorPendiente(traspasoId),
     JSON.stringify({ texto, guardadoEn: ahora })
   );
@@ -85,11 +87,13 @@ function leerBorradorPendiente(
 
 export function restaurarBorradorInvitado({
   almacen,
+  almacenPendiente = almacen,
   conversationId,
   traspasoId,
   ahora = Date.now(),
 }: {
   almacen: AlmacenBorrador;
+  almacenPendiente?: AlmacenBorrador;
   conversationId: string | null;
   traspasoId?: string | null;
   ahora?: number;
@@ -102,11 +106,15 @@ export function restaurarBorradorInvitado({
 
   const clave = claveBorradorInvitado(conversationId);
   if (esIdTraspasoBorradorValido(traspasoId)) {
-    const pendiente = leerBorradorPendiente(almacen, traspasoId, ahora);
+    const pendiente = leerBorradorPendiente(
+      almacenPendiente,
+      traspasoId,
+      ahora
+    );
     if (pendiente && !almacen.getItem(clave)) {
       almacen.setItem(clave, pendiente);
     }
-    almacen.removeItem(claveBorradorPendiente(traspasoId));
+    almacenPendiente.removeItem(claveBorradorPendiente(traspasoId));
   }
   return almacen.getItem(clave);
 }
@@ -114,12 +122,13 @@ export function restaurarBorradorInvitado({
 export function limpiarBorradorInvitado(
   almacen: AlmacenBorrador,
   conversationId: string | null,
-  traspasoId?: string | null
+  traspasoId?: string | null,
+  almacenPendiente: AlmacenBorrador = almacen
 ) {
   if (conversationId) {
     almacen.removeItem(claveBorradorInvitado(conversationId));
   }
   if (esIdTraspasoBorradorValido(traspasoId)) {
-    almacen.removeItem(claveBorradorPendiente(traspasoId));
+    almacenPendiente.removeItem(claveBorradorPendiente(traspasoId));
   }
 }
