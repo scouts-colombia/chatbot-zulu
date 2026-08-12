@@ -120,6 +120,7 @@ async function ContenidoPrincipal({
         <ErrorRecuperacionBorrador
           borradorId={borradorTransferenciaId}
           conversationId={conversationIdTransferencia}
+          motivo="consulta"
         />
       );
     }
@@ -128,6 +129,13 @@ async function ContenidoPrincipal({
         `/chat/${conversationIdTransferencia}?borrador=${encodeURIComponent(borradorTransferenciaId)}`
       );
     }
+    return (
+      <ErrorRecuperacionBorrador
+        borradorId={borradorTransferenciaId}
+        conversationId={conversationIdTransferencia}
+        motivo="no_encontrada"
+      />
+    );
   }
 
   // Paginada: PostgREST corta en `db-max-rows` sin error, y un tope fijo sin
@@ -322,9 +330,11 @@ async function ContenidoPrincipal({
 function ErrorRecuperacionBorrador({
   borradorId,
   conversationId,
+  motivo,
 }: {
   borradorId: string;
   conversationId: string;
+  motivo: "consulta" | "no_encontrada";
 }) {
   const parametros = new URLSearchParams({
     borrador: borradorId,
@@ -337,11 +347,14 @@ function ErrorRecuperacionBorrador({
           No pudimos recuperar tu conversación
         </h1>
         <p className="mt-2 text-muted-foreground text-sm" role="alert">
-          La conversación ya fue asociada a tu cuenta, pero no pudimos abrirla
-          en este momento. Reintenta para conservar el contexto de tu pregunta.
+          {motivo === "consulta"
+            ? "La conversación ya fue asociada, pero no pudimos verificarla en este momento. Reintenta para conservar el contexto de tu pregunta."
+            : "Ese hilo no pertenece a esta cuenta. Vuelve al inicio e inicia sesión con la cuenta correcta para no crear una conversación duplicada."}
         </p>
         <Button asChild className="mt-5 min-h-11 bg-scouts-purple text-white">
-          <a href={`/?${parametros.toString()}`}>Reintentar</a>
+          <a href={motivo === "consulta" ? `/?${parametros.toString()}` : "/"}>
+            {motivo === "consulta" ? "Reintentar" : "Volver al inicio"}
+          </a>
         </Button>
       </section>
     </main>
