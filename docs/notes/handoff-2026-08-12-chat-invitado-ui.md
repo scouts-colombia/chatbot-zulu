@@ -29,11 +29,10 @@ master
     └── agent/zulu-ui-aplicacion → PR #13
 ```
 
-- Base local/remota: `agent/zulu-chat-invitado` en `aaff17f` (`fix: purgar borradores en la portada`).
-- Visual local/remota antes de esta corrección: `agent/zulu-ui-aplicacion` en `43e8a25`, rebasada sobre `aaff17f`.
-- El worktree visual incorpora dos correcciones nuevas de Codex: contraste AA de metadatos y eliminación del lift/transición de listas bajo `prefers-reduced-motion`.
-- Commits visuales publicados sobre la base antes de esta corrección: `35e3917`, `84f3169`, `209bce4`, `633618f`, `7c25dc1`, `66d11c9`, `559932b`, `55baef6`, `9939316`, `43e8a25`.
-- En el último rebase se resolvió `app/page.tsx` conservando diseño crema, versión/token del consentimiento y los controles completos; `/login` conserva el fallback crema y su `Suspense`.
+- Base local/remota: `agent/zulu-chat-invitado` en `d9e39f8` (`fix: indexar recibos de transferencia invitada`).
+- Visual local: `agent/zulu-ui-aplicacion` rebasada sobre `d9e39f8`; el fix accesible reescrito está en `932072f`. El remoto todavía apunta a `644c805`, por lo que el push final deberá usar `--force-with-lease`.
+- El fix visual `932072f` contiene las correcciones de los dos hilos abiertos de PR #13: contraste AA en texto de 12 px y objetivo táctil móvil de 44 × 44 px para archivar. El worktree solo contiene este handoff pendiente de commit.
+- Los dos rebases visuales terminaron sin conflictos; el último reescribió 13 commits sobre `d9e39f8`.
 - Commits en español, sin `Co-Authored-By`. No hay cambios ajenos conocidos.
 
 ## PR #12 — estado funcional
@@ -78,37 +77,49 @@ Además del chat público, preflight, consentimiento, cuota atómica, transferen
 
 - La home monta `LimpiezaBorradoresPendientes` fuera del `Suspense`; consentimiento permanente, listado, chat público y fallbacks purgan al montar y cada minuto, y cancelan el intervalo al desmontar.
 
+### `80977e1`
+
+1. **Recuperación del hilo ante respuestas ilegibles o caída de red:** el preflight obtiene/crea y devuelve `conversationId` antes del request largo; el cliente valida y conserva ese UUID para restaurar exactamente el hilo ya persistido.
+2. **Transferencia idempotente:** la nueva migración guarda un recibo técnico temporal `guest_user_id → target_user_id`; durante una hora permite reintentar al mismo destino aun después de eliminar la identidad invitada y rechaza destinos distintos.
+3. **Registro pendiente de verificación:** antes de `updateUser`, el servidor posterga 24 horas la limpieza de la identidad invitada; un fallo explícito de Auth cancela la marca y la conversión confirmada conserva el trigger de limpieza existente.
+4. **Gestos de navegación:** `abrirRegistro` persiste el mapping opaco antes de mostrar los enlaces, de modo que click medio, menú contextual y pulsación larga no pierden el borrador.
+5. La migración nueva es `supabase/migrations/20260812190000_proteger_conversion_invitada_pendiente.sql`.
+
+### `d9e39f8`
+
+- Añade el índice `idx_guest_transfer_receipts_target_user_id` a la FK con `ON DELETE CASCADE`, evitando un scan completo al borrar una cuenta destino y previniendo un hallazgo nuevo del advisor.
+
 ## Supabase confirmado
 
 - `20260812151221 coordinar_conversion_y_limpieza_invitada`: conversión y limpieza mutuamente exclusivas, probadas sin residuos.
 - `20260812164406 alinear_preflight_y_sesion_invitada`: corresponde a `supabase/migrations/20260812163500_alinear_preflight_y_sesion_invitada.sql`.
 - La RPC `preparar_turno_invitado_v2(text,text,text)` es `SECURITY DEFINER`, solo `service_role` puede ejecutarla; `anon` y `authenticated` no.
-- Prueba remota: devolvió `ttl_seconds = 600` con la configuración actual; cero filas sintéticas residuales.
-- `handle_new_user()` lee `guest_preflight_ttl_minutes` y conserva una gracia mínima de 15 minutos.
-- Advisors sin hallazgos nuevos. Persisten avisos preexistentes/intencionales: RLS sin políticas en tablas server-only, protección de contraseñas filtradas desactivada por decisión del usuario, FKs antiguas sin índice e índice antiguo sin uso.
+- Prueba remota previa: devolvió `ttl_seconds = 600`; cero filas sintéticas residuales. Advisors previos sin hallazgos nuevos, salvo avisos preexistentes/intencionales ya documentados.
+- **Pendiente remoto:** `supabase/migrations/20260812190000_proteger_conversion_invitada_pendiente.sql` está revisada, incluye índices de expiración y de FK, y está publicada en la rama base, pero no se ha aplicado al proyecto `ddimxdrggrrfcvzwwben`.
+- En la sesión actual no aparece el MCP de Supabase, no está instalada la CLI y la ejecución remota de una CLI descargada fue denegada. No volver a intentarlo sin autorización explícita o sin habilitar el MCP.
+- Antes de mergear PR #12 hay que aplicar esa migración, comprobar columna/tabla/RLS/grants/funciones e idempotencia, y ejecutar advisors de seguridad y rendimiento.
 
 ## Validaciones finales
 
-### Base `aaff17f`
+### Base `d9e39f8`
 
 - `pnpm install --offline --frozen-lockfile`: pasa.
 - `pnpm typecheck`: pasa.
-- `pnpm test`: 45/45 pasan.
-- Biome dirigido en los 12 archivos TypeScript/TSX modificados: pasa.
+- `pnpm test -- --run`: 45/45 pasan.
+- `pnpm exec biome lint app components lib proxy.ts`: 62 archivos pasan.
 - `git diff --check`: pasa.
-- `pnpm build`: pasa; compila, TypeScript, genera 15 páginas y finaliza optimización.
+- `pnpm build`: pasa; genera 15 páginas y `/login` queda en Partial Prerender.
 
-### Visual rebasada con las correcciones de review (worktree previo al commit final)
+### Visual `932072f` tras el rebase
 
-- Instalación offline/frozen: pasa y retira `next-themes`.
-- Typecheck: pasa.
-- Pruebas: 45/45 pasan.
-- `biome lint` sobre 62 archivos de `app`, `components`, `lib` y `proxy.ts`: pasa sin hallazgos.
-- Metadatos afectados elevados de `text-foreground/45` o `/50` a `/70`; `.brand-list-item` ya no transforma ni transiciona con movimiento reducido.
+- `pnpm install --offline --frozen-lockfile`: pasa y retira `next-themes`.
+- `pnpm typecheck`: pasa.
+- `pnpm test -- --run`: 45/45 pasan.
+- `pnpm exec biome lint app components lib proxy.ts`: 62 archivos pasan.
 - `git diff --check`: pasa.
-- Búsqueda mecánica: no hay `next-themes`, `ThemeProvider`, `dark:`, clase `dark`, `prefers-color-scheme` ni toggles de tema en código/dependencias.
-- Build: pasa; las 15 páginas se generan y `/login` queda en Partial Prerender.
-- El detector Impeccable ya había devuelto `[]` sobre la implementación visual. No repetir normalización masiva de CRLF.
+- `pnpm build`: pasa; genera 15 páginas y `/login` queda en Partial Prerender.
+- Búsqueda mecánica: cero referencias funcionales a `next-themes`, `ThemeProvider`, `dark:`, clase `dark`, `prefers-color-scheme` o toggles de tema. Solo aparecen las dos frases de `DESIGN.md` y `.impeccable` que documentan que no existe dark mode.
+- Footer y contador de historial usan opacidad `/70`; el botón móvil de archivar tiene mínimo `44 × 44 px`.
 
 ## PR #13 — sistema visual
 
@@ -124,16 +135,16 @@ Además del chat público, preflight, consentimiento, cuota atómica, transferen
 
 ## Estado de Codex review
 
-- PR #12: todos los hilos anteriores están respondidos/resueltos. Codex fue reinvocado sobre `aaff17f` en https://github.com/scouts-colombia/chatbot-zulu/pull/12#issuecomment-5270463526; mantiene reacción 👀 y su resultado final sigue pendiente.
-- PR #13: Codex señaló en `43e8a25` que el hover de listas no respetaba movimiento reducido y que metadatos con opacidad `/45`–`/50` no alcanzaban AA. Ambos puntos están corregidos y las validaciones completas pasan; falta publicar el commit, responder/resolver los dos hilos y reinvocar sobre el SHA nuevo.
-- Criterio de cierre: ambas PR deben tener revisión limpia/👍 sobre su SHA exacto. Cada corrección en la base exige rebase, validación, force-push con lease y review nuevo de la visual.
+- PR #12: todos los hilos de revisión están respondidos y resueltos; el SHA base actual es `d9e39f8`. Se reinvocó Codex el 2026-08-12 en los comentarios `5271605204` y `5271668505`; ambos intentos respondieron `You have reached your Codex usage limits for code reviews`. No hubo hallazgos nuevos ni revisión limpia del SHA actual.
+- PR #13: en `e56c1ad` quedaron dos hilos accionables: texto normal de 12 px por debajo de AA (`3769089838`) y botón móvil de archivar por debajo de 44 px (`3769089849`). Los hilos fueron respondidos y resueltos sobre el push anterior; el fix persiste reescrito en `932072f`, todavía sin publicar tras el último rebase ni reinvocar review sobre ese SHA.
+- Criterio de cierre: ambas PR deben tener revisión limpia/👍 sobre su SHA exacto. Cada corrección en la base exige rebase, validación, `push --force-with-lease` y review nuevo de la visual.
 
 ## Trabajo inmediato
 
-1. Commit y push de las dos correcciones visuales y este handoff en `agent/zulu-ui-aplicacion`.
-2. Responder y resolver los dos hilos recientes de PR #13; reinvocar `@codex review` sobre el SHA publicado.
-3. Esperar PR #12 y PR #13. Corregir, responder, resolver y reinvocar hasta limpio/👍 en ambos SHA exactos.
-4. Si cambia PR #12, volver a rebasar y validar PR #13.
+1. Hacer commit de este handoff y push de PR #13 con `--force-with-lease`.
+2. Los hilos `3769089838` y `3769089849` ya están respondidos/resueltos; reinvocar `@codex review` sobre el SHA publicado.
+3. Reintentar Codex Review de PR #12 cuando vuelva la cuota. Corregir/reinvocar hasta limpio/👍 en ambas PR.
+4. Habilitar el MCP de Supabase o conseguir autorización explícita para una CLI fijada; aplicar y verificar `20260812190000_proteger_conversion_invitada_pendiente.sql` y correr advisors.
 5. No hacer merge.
 
 ## Restricciones
@@ -153,13 +164,17 @@ Continúa el trabajo en D:\dev\chatbot-zulu.
 Lee primero y toma como handoff autoritativo:
 docs/notes/handoff-2026-08-12-chat-invitado-ui.md
 
-Después lee AGENTS.md y CLAUDE.md completos. Preserva todos los cambios locales existentes.
+Después lee AGENTS.md y CLAUDE.md completos. Preserva todos los cambios locales existentes. Usa el skill de GitHub para comentarios de PR y el skill de Supabase cuando corresponda.
 
-Continúa desde “Trabajo inmediato”. Hay dos PR apiladas: #12 (agent/zulu-chat-invitado) y #13 (agent/zulu-ui-aplicacion). Verifica primero rama, worktree, SHA local/remoto y estado real de GitHub. La base está en aaff17f con review pendiente. La visual estaba en 43e8a25 y tiene preparadas/validadas correcciones de contraste AA y movimiento reducido; confirma si ya fueron publicadas.
+Continúa desde “Trabajo inmediato”. Hay dos PR apiladas: #12 (`agent/zulu-chat-invitado`) y #13 (`agent/zulu-ui-aplicacion`). Verifica rama, worktree, SHA local/remoto, estado thread-aware de GitHub y estado remoto de migraciones antes de actuar.
 
-La dirección visual aprobada es Ruta /diseno/componentes: fondo crema #fff8eb con lavados amarillo/durazno, Futura, colores vivos y liquid glass claro. El modo oscuro fue eliminado completamente. No reintroduzcas fondo morado, next-themes, clase dark ni variantes dark:.
+La base está en `d9e39f8`; todos sus hilos están resueltos, pero los últimos intentos de Codex Review fueron rechazados por límite de uso. La visual fue rebasada sobre esa base; revisa el handoff para saber si sus dos correcciones de accesibilidad ya fueron validadas/publicadas.
 
-Continúa el ciclo de Codex review de ambas PR. Responde y resuelve cada comentario, reinvoca @codex review después de cada corrección y no declares terminado hasta que ambas tengan revisión limpia/👍 sobre su SHA exacto. Si cambia la base, vuelve a rebasar y validar la visual.
+Queda pendiente aplicar en Supabase `ddimxdrggrrfcvzwwben` la migración `supabase/migrations/20260812190000_proteger_conversion_invitada_pendiente.sql`. En la sesión anterior no estaba expuesto el MCP y se denegó descargar la CLI. No inventes verificación remota: habilita/usa MCP o pide autorización explícita, aplica la migración, verifica tabla/columna/RLS/grants/funciones e idempotencia y corre advisors.
 
-Puedes hacer push; no hagas merge. Los commits deben estar en español y sin Co-Authored-By. No reindexes PARCE, no ejecutes scripts/seed-allowlist.sql y no alteres cambios ajenos.
+La dirección visual aprobada es Ruta `/diseno/componentes`: fondo crema `#fff8eb` con lavados amarillo/durazno, Futura, colores vivos y liquid glass claro. El modo oscuro fue eliminado completamente. No reintroduzcas fondo morado, `next-themes`, clase `dark` ni variantes `dark:`.
+
+Continúa el ciclo de Codex Review de ambas PR. Responde y resuelve cada comentario, reinvoca `@codex review` después de cada corrección y no declares terminado hasta que ambas tengan revisión limpia/👍 sobre su SHA exacto. Si cambia la base, vuelve a rebasar y validar la visual.
+
+Puedes hacer push; no hagas merge. Los commits deben estar en español y sin `Co-Authored-By`. No reindexes PARCE, no ejecutes `scripts/seed-allowlist.sql` y no alteres cambios ajenos.
 ```
