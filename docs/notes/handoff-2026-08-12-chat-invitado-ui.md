@@ -29,10 +29,10 @@ master
     └── agent/zulu-ui-aplicacion → PR #13
 ```
 
-- Base local/remota: `agent/zulu-chat-invitado` en `1889eb6` (`fix: evitar duplicar el hilo transferido`).
-- Visual local: `agent/zulu-ui-aplicacion`, rebasada sobre `1889eb6`. Último SHA antes de este commit documental: `e760c5d`.
-- Visual remota: todavía `5d7470e`; publicar el SHA final con `git push --force-with-lease origin agent/zulu-ui-aplicacion`.
-- Commits visuales actuales sobre la base: `a499a04`, `17da500`, `d3125e8`, `1acb1fb`, `0c53a86`, `8c34055`, `6666197`, `e760c5d`.
+- Base local/remota: `agent/zulu-chat-invitado` en `aaff17f` (`fix: purgar borradores en la portada`).
+- Visual local: `agent/zulu-ui-aplicacion`, rebasada sobre `aaff17f`. Último SHA antes de este commit documental: `9939316`.
+- Visual remota: todavía `3ce31fe`; publicar el SHA final con `git push --force-with-lease origin agent/zulu-ui-aplicacion`.
+- Commits visuales actuales sobre la base: `35e3917`, `84f3169`, `209bce4`, `633618f`, `7c25dc1`, `66d11c9`, `559932b`, `55baef6`, `9939316`.
 - En el último rebase se resolvió `app/page.tsx` conservando diseño crema, versión/token del consentimiento y los controles completos; `/login` conserva el fallback crema y su `Suspense`.
 - Commits en español, sin `Co-Authored-By`. No hay cambios ajenos conocidos.
 
@@ -74,6 +74,10 @@ Además del chat público, preflight, consentimiento, cuota atómica, transferen
 - Si RLS no encuentra el hilo transferido en la cuenta actual, la portada ya no permite crear un hilo vacío duplicado: muestra recuperación fail-closed y orienta a usar la cuenta correcta.
 - No requirió migración ni cambió cuota, privacidad del servidor o reglas de red.
 
+### `aaff17f`
+
+- La home monta `LimpiezaBorradoresPendientes` fuera del `Suspense`; consentimiento permanente, listado, chat público y fallbacks purgan al montar y cada minuto, y cancelan el intervalo al desmontar.
+
 ## Supabase confirmado
 
 - `20260812151221 coordinar_conversion_y_limpieza_invitada`: conversión y limpieza mutuamente exclusivas, probadas sin residuos.
@@ -85,7 +89,7 @@ Además del chat público, preflight, consentimiento, cuota atómica, transferen
 
 ## Validaciones finales
 
-### Base `1889eb6`
+### Base `aaff17f`
 
 - `pnpm install --offline --frozen-lockfile`: pasa.
 - `pnpm typecheck`: pasa.
@@ -94,12 +98,12 @@ Además del chat público, preflight, consentimiento, cuota atómica, transferen
 - `git diff --check`: pasa.
 - `pnpm build`: pasa; compila, TypeScript, genera 15 páginas y finaliza optimización.
 
-### Visual rebasada (antes de este commit documental: `e760c5d`)
+### Visual rebasada (antes de este commit documental: `9939316`)
 
 - Instalación offline/frozen: pasa y retira `next-themes`.
 - Typecheck: pasa.
 - Pruebas: 45/45 pasan.
-- `biome lint` sobre 61 archivos de `app`, `components`, `lib` y `proxy.ts`: pasa sin hallazgos.
+- `biome lint` sobre 62 archivos de `app`, `components`, `lib` y `proxy.ts`: pasa sin hallazgos.
 - `git diff --check`: pasa.
 - Búsqueda mecánica: no hay `next-themes`, `ThemeProvider`, `dark:`, clase `dark`, `prefers-color-scheme` ni toggles de tema en código/dependencias.
 - Build: pasa; las 15 páginas se generan y `/login` queda en Partial Prerender.
@@ -119,8 +123,8 @@ Además del chat público, preflight, consentimiento, cuota atómica, transferen
 
 ## Estado de Codex review
 
-- PR #12: los tres comentarios de la ronda sobre `eab632e` fueron corregidos en `7798f6d`, respondidos y resueltos; `1889eb6` añadió el cierre fail-closed para una cuenta destino distinta. Codex fue reinvocado sobre el SHA exacto en https://github.com/scouts-colombia/chatbot-zulu/pull/12#issuecomment-5270301277; resultado pendiente al escribir este handoff.
-- PR #13: los resultados previos quedaron obsoletos al cambiar la base. La visual está rebasada sobre `1889eb6`, validada, y falta publicar el SHA documental exacto y reinvocar.
+- PR #12: los tres comentarios de la ronda sobre `eab632e` fueron corregidos en `7798f6d`; `1889eb6` añadió el cierre fail-closed para cuenta distinta y el comentario posterior sobre la home se corrigió en `aaff17f`. Todos los hilos están respondidos/resueltos. Codex fue reinvocado sobre el SHA exacto en https://github.com/scouts-colombia/chatbot-zulu/pull/12#issuecomment-5270463526; resultado pendiente al escribir este handoff.
+- PR #13: los resultados previos quedaron obsoletos al cambiar la base. La visual está rebasada sobre `aaff17f`, validada, y falta publicar el SHA documental exacto y reinvocar.
 - Criterio de cierre: ambas PR deben tener revisión limpia/👍 sobre su SHA exacto. Cada corrección en la base exige rebase, validación, force-push con lease y review nuevo de la visual.
 
 ## Trabajo inmediato
@@ -150,7 +154,7 @@ docs/notes/handoff-2026-08-12-chat-invitado-ui.md
 
 Después lee AGENTS.md y CLAUDE.md completos. Preserva todos los cambios locales existentes.
 
-Continúa desde “Trabajo inmediato”. Hay dos PR apiladas: #12 (agent/zulu-chat-invitado) y #13 (agent/zulu-ui-aplicacion). Verifica primero rama, worktree, SHA local/remoto y estado real de GitHub. La base 1889eb6 ya está publicada y en Codex review; la visual está rebasada, validada y debe quedar publicada/revisada sobre su SHA documental final.
+Continúa desde “Trabajo inmediato”. Hay dos PR apiladas: #12 (agent/zulu-chat-invitado) y #13 (agent/zulu-ui-aplicacion). Verifica primero rama, worktree, SHA local/remoto y estado real de GitHub. La base aaff17f ya está publicada y en Codex review; la visual está rebasada, validada y debe quedar publicada/revisada sobre su SHA documental final.
 
 La dirección visual aprobada es Ruta /diseno/componentes: fondo crema #fff8eb con lavados amarillo/durazno, Futura, colores vivos y liquid glass claro. El modo oscuro fue eliminado completamente. No reintroduzcas fondo morado, next-themes, clase dark ni variantes dark:.
 
