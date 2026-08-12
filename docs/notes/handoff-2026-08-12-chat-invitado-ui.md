@@ -8,15 +8,19 @@
 
 Este es el handoff autoritativo para continuar las dos PR. El handoff de PARCE/allowlist del 2026-08-06 es histórico: no volver a indexar PARCE.
 
-## Actualización — migración remota aplicada
+## Actualización — Codex limpio sobre los SHA exactos
 
 Esta sección reemplaza los SHA y resultados anteriores cuando haya discrepancias.
 
-- PR #12 permanece en 578116ad6cb1278fbcf6bc5e86eff7bd08057a71.
-- PR #13 publicada en e13ba34 (`docs: registrar la migración remota de conversión invitada`), apilada sobre 578116a. No hubo rebase: esta sesión no cambió código de PR #12.
-- Ambas PR siguen OPEN y MERGEABLE. Checks confirmados: PR #12 `build (20)`
-  SUCCESS y Vercel SUCCESS en `578116a`; PR #13 `build (20)` SUCCESS y Vercel
-  SUCCESS en `e13ba34`. Todos los hilos de review de ambas PR están resueltos.
+- PR #12 permanece en `578116ad6cb1278fbcf6bc5e86eff7bd08057a71`.
+- PR #13 permanece en `56ae08663461f6c495a41aa8f0ca4647912aab28`, apilada sobre
+  `578116a`. No hubo rebase ni cambio de código de aplicación.
+- Codex Review, con cuota, sobre esos SHA exactos:
+  - PR #12 comentario `5274137318` → `5274171091`: "Didn't find any major issues."
+    Reviewed commit `578116ad6c`.
+  - PR #13 comentario `5274137422` → `5274167162`: "Didn't find any major issues."
+    Reviewed commit `56ae086634`.
+- Cero hilos de review sin resolver. No hay hallazgos nuevos que corregir.
 - Worktree local: rama `agent/zulu-ui-aplicacion` al día con origin; solo
   quedan sin seguimiento `.cursor/mcp.json` y `mcp.json`.
 - La migración local `20260812190000_proteger_conversion_invitada_pendiente.sql`
@@ -192,10 +196,10 @@ que permanezca en las notas históricas de este documento.
 
 - Rama: `agent/zulu-ui-aplicacion`.
 - Base: `agent/zulu-chat-invitado`.
-- Cabeza con CI `build (20)` y Vercel verdes:
-  `e13ba34dcc8a93ec23ab9eb22f03b855f1ff8610`. Este commit solo documenta la
-  reinvocación de Codex y el rechazo por cuota.
-- GitHub: OPEN, MERGEABLE y CLEAN sobre `e13ba34`.
+- Cabeza revisada por Codex, con CI `build (20)` y Vercel verdes en la
+  cabeza documental previa: `56ae08663461f6c495a41aa8f0ca4647912aab28`.
+  Este commit solo registra la revisión limpia.
+- GitHub: OPEN y MERGEABLE. Codex: revisión limpia sobre `56ae086634`.
 - La rama fue rebasada sobre `578116a`.
 - Contraste secundario elevado a `/70`, objetivos táctiles relevantes de
   44 px y chat público corregido para viewports de poca altura.
@@ -216,27 +220,26 @@ que permanezca en las notas históricas de este documento.
 ## Estado de Codex Review
 
 - Todos los hilos existentes de ambas PR están respondidos y resueltos.
-- Se reinvocó `@codex review` el 2026-08-12 sobre las cabezas actuales:
+  Cero hilos abiertos tras la ronda con cuota.
+- Reinvocación con cuota el 2026-08-12:
 
-  - PR #12 (`578116a`): comentario `5274121860`. Respuesta `5274122721`: límite de uso.
-  - PR #13 (`e13ba34`): comentario `5274121986`. Respuesta `5274123411`: límite de uso.
-- El conector no produjo comentarios nuevos ni una aprobación sobre esos SHA.
-  Los hilos anteriores siguen resueltos.
-- La revisión independiente encontró y ya corrigió:
-  1. cancelación insegura de la protección del registro invitado;
-  2. contraste insuficiente;
-  3. targets táctiles pequeños;
-  4. overflow en viewports bajos.
-- Criterio de cierre solicitado: reinvocar cuando vuelva la cuota y obtener una
-  revisión limpia o reacción de aprobación sobre el SHA exacto de cada PR.
+  - PR #12 (`578116ad6cb1278fbcf6bc5e86eff7bd08057a71`): comentario
+    `5274137318`. Respuesta `5274171091`: revisión limpia sobre
+    `578116ad6c`.
+  - PR #13 (`56ae08663461f6c495a41aa8f0ca4647912aab28`): comentario
+    `5274137422`. Respuesta `5274167162`: revisión limpia sobre
+    `56ae086634`.
+- Criterio de cierre cumplido: revisión limpia sobre el SHA exacto de cada PR.
+  No hace falta otra invocación salvo que cambie código.
 
 ## Trabajo inmediato
 
-1. Reinvocar `@codex review` en PR #12 (SHA `578116ad6cb1278fbcf6bc5e86eff7bd08057a71`) y PR #13 (SHA `e13ba34dcc8a93ec23ab9eb22f03b855f1ff8610`) cuando vuelva la cuota. Corregir, responder, resolver y reinvocar hasta revisión limpia o reacción de aprobación sobre esos SHA exactos.
-2. Si Codex exige un cambio de código en PR #12, rebasar PR #13, repetir
+1. No hacer merge. Lo hace el dueño del repositorio.
+2. No reinvocar Codex salvo que cambie código: ambas PR ya tienen revisión
+   limpia sobre `578116a` y `56ae086`.
+3. Si el dueño pide un cambio de código en PR #12, rebasar PR #13, repetir
    typecheck, las 46 pruebas, lint/check y build, y publicar la visual con
    `push --force-with-lease`.
-3. No hacer merge.
 
 ## Restricciones
 
@@ -272,17 +275,17 @@ Continúa exactamente desde “Trabajo inmediato”. Hay dos PR apiladas:
 Empieza con comprobaciones de solo lectura: rama, worktree, SHA local/remoto,
 bases de las PR, checks, hilos thread-aware y lista remota de migraciones. La
 última cabeza funcional confirmada de PR #12 es
-578116ad6cb1278fbcf6bc5e86eff7bd08057a71. La PR #13 estaba CLEAN y verde;
-verifica su cabeza exacta porque el último cambio fue solo documental.
+578116ad6cb1278fbcf6bc5e86eff7bd08057a71. Codex dejó revisión limpia sobre
+ese SHA y sobre 56ae08663461f6c495a41aa8f0ca4647912aab28 en PR #13.
 
 La migración 20260812190000_proteger_conversion_invitada_pendiente.sql ya está
 aplicada en ddimxdrggrrfcvzwwben como 20260812234408 y verificada. No la
 reapliques. No ejecutes scripts/seed-allowlist.sql y no reindexes PARCE.
 
-Reinvoca @codex review en ambas PR cuando haya cuota. Resuelve cada comentario
-y reinvoca hasta obtener revisión limpia o aprobación sobre los SHA exactos.
-Si modificas PR #12, rebasa PR #13, repite typecheck, tests, lint/check, build
-y push --force-with-lease.
+Codex ya dejó revisión limpia sobre PR #12 (578116ad6c) y PR #13 (56ae086634).
+No reinvocar salvo que cambie código. No hagas merge. Si modificas PR #12,
+rebasa PR #13, repite typecheck, tests, lint/check, build y push
+--force-with-lease.
 
 Puedes hacer push. No hagas merge. Los commits deben estar en español y sin
 Co-Authored-By. No reintroduzcas dark mode: la dirección visual aprobada es
