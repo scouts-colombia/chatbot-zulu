@@ -13,11 +13,10 @@ Este es el handoff autoritativo para continuar las dos PR. El handoff de PARCE/a
 Esta sección reemplaza los SHA y resultados anteriores cuando haya discrepancias.
 
 - PR #12 permanece en 578116ad6cb1278fbcf6bc5e86eff7bd08057a71.
-- PR #13 permanece en 5256bff79b2431ad557a003adcdc0cd8003d95bc, apilada sobre
-  578116a. No hubo rebase: esta sesión no cambió código de PR #12.
-- Ambas PR siguen OPEN, MERGEABLE y CLEAN. Checks confirmados en esta sesión:
-  PR #12 `build (20)` SUCCESS y Vercel SUCCESS; PR #13 `build (20)` SUCCESS y
-  Vercel SUCCESS. Todos los hilos de review de ambas PR están resueltos.
+- PR #13 publicada en e13ba34 (`docs: registrar la migración remota de conversión invitada`), apilada sobre 578116a. No hubo rebase: esta sesión no cambió código de PR #12.
+- Ambas PR siguen OPEN y MERGEABLE. Checks confirmados: PR #12 `build (20)`
+  SUCCESS y Vercel SUCCESS en `578116a`; PR #13 `build (20)` SUCCESS y Vercel
+  SUCCESS en `e13ba34`. Todos los hilos de review de ambas PR están resueltos.
 - Worktree local: rama `agent/zulu-ui-aplicacion` al día con origin; solo
   quedan sin seguimiento `.cursor/mcp.json` y `mcp.json`.
 - La migración local `20260812190000_proteger_conversion_invitada_pendiente.sql`
@@ -193,9 +192,10 @@ que permanezca en las notas históricas de este documento.
 
 - Rama: `agent/zulu-ui-aplicacion`.
 - Base: `agent/zulu-chat-invitado`.
-- Cabeza publicada antes de este commit documental:
-  `5256bff79b2431ad557a003adcdc0cd8003d95bc`.
-- GitHub: `CLEAN`; CI `build (20)` y Vercel verdes sobre esa cabeza.
+- Cabeza con CI `build (20)` y Vercel verdes:
+  `e13ba34dcc8a93ec23ab9eb22f03b855f1ff8610`. Este commit solo documenta la
+  reinvocación de Codex y el rechazo por cuota.
+- GitHub: OPEN, MERGEABLE y CLEAN sobre `e13ba34`.
 - La rama fue rebasada sobre `578116a`.
 - Contraste secundario elevado a `/70`, objetivos táctiles relevantes de
   44 px y chat público corregido para viewports de poca altura.
@@ -216,13 +216,12 @@ que permanezca en las notas históricas de este documento.
 ## Estado de Codex Review
 
 - Todos los hilos existentes de ambas PR están respondidos y resueltos.
-- Se reinvocó `@codex review` en las cabezas corregidas:
+- Se reinvocó `@codex review` el 2026-08-12 sobre las cabezas actuales:
 
-  - PR #12: comentario `5273404738`.
-  - PR #13: comentario `5273406466`.
-- En ambos casos el conector respondió que se alcanzó el límite de uso de
-  revisiones. No produjo comentarios nuevos ni una aprobación sobre las
-  cabezas actuales.
+  - PR #12 (`578116a`): comentario `5274121860`. Respuesta `5274122721`: límite de uso.
+  - PR #13 (`e13ba34`): comentario `5274121986`. Respuesta `5274123411`: límite de uso.
+- El conector no produjo comentarios nuevos ni una aprobación sobre esos SHA.
+  Los hilos anteriores siguen resueltos.
 - La revisión independiente encontró y ya corrigió:
   1. cancelación insegura de la protección del registro invitado;
   2. contraste insuficiente;
@@ -233,10 +232,7 @@ que permanezca en las notas históricas de este documento.
 
 ## Trabajo inmediato
 
-1. Reinvocar `@codex review` en PR #12 (SHA `578116a`) y PR #13 (cabeza
-   documental de esta sesión) cuando haya cuota. Corregir, responder, resolver
-   y reinvocar hasta revisión limpia o reacción de aprobación sobre esos SHA
-   exactos.
+1. Reinvocar `@codex review` en PR #12 (SHA `578116ad6cb1278fbcf6bc5e86eff7bd08057a71`) y PR #13 (SHA `e13ba34dcc8a93ec23ab9eb22f03b855f1ff8610`) cuando vuelva la cuota. Corregir, responder, resolver y reinvocar hasta revisión limpia o reacción de aprobación sobre esos SHA exactos.
 2. Si Codex exige un cambio de código en PR #12, rebasar PR #13, repetir
    typecheck, las 46 pruebas, lint/check y build, y publicar la visual con
    `push --force-with-lease`.
