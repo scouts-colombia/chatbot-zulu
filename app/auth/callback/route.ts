@@ -11,6 +11,7 @@ export async function GET(request: Request) {
     url.origin
   );
   const borrador = destino.searchParams.get("borrador");
+  const conversationId = destino.searchParams.get("conversacion");
 
   if (code) {
     const supabase = await crearClienteServidor();
@@ -25,6 +26,9 @@ export async function GET(request: Request) {
   errorUrl.searchParams.set("error", "enlace_invalido");
   if (esIdTraspasoBorradorValido(borrador)) {
     errorUrl.searchParams.set("borrador", borrador);
+    if (esIdTraspasoBorradorValido(conversationId)) {
+      errorUrl.searchParams.set("conversacion", conversationId);
+    }
   }
   return NextResponse.redirect(errorUrl);
 }

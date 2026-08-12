@@ -884,6 +884,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           codigo: "registro_requerido",
+          conversationId,
           mensaje:
             "Tu pregunta de prueba quedó registrada, pero no pudimos completar la respuesta. Crea una cuenta o inicia sesión para continuar.",
         },

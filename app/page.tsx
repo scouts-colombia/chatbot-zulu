@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { ChatPublico } from "@/components/chat/chat-publico";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,7 @@ export default function PaginaPrincipal({
   searchParams: Promise<{
     aviso?: string;
     borrador?: string;
+    conversacion?: string;
     pagina?: string;
   }>;
 }) {
@@ -48,12 +50,21 @@ async function ContenidoPrincipal({
   searchParams: Promise<{
     aviso?: string;
     borrador?: string;
+    conversacion?: string;
     pagina?: string;
   }>;
 }) {
-  const { aviso, borrador, pagina: paginaParam } = await searchParams;
+  const {
+    aviso,
+    borrador,
+    conversacion,
+    pagina: paginaParam,
+  } = await searchParams;
   const borradorTransferenciaId = esIdTraspasoBorradorValido(borrador)
     ? borrador
+    : null;
+  const conversationIdTransferencia = esIdTraspasoBorradorValido(conversacion)
+    ? conversacion
     : null;
   const pagina = Math.max(1, Number.parseInt(paginaParam ?? "1", 10) || 1);
   const supabase = await crearClienteServidor();
@@ -87,6 +98,37 @@ async function ContenidoPrincipal({
   const requiereConsentimiento =
     !mensajeEstado &&
     perfil?.privacy_policy_version_accepted !== VERSION_POLITICA_PRIVACIDAD;
+
+  if (
+    !mensajeEstado &&
+    !requiereConsentimiento &&
+    borradorTransferenciaId &&
+    conversationIdTransferencia
+  ) {
+    const { data: conversacionTransferida, error: errorTransferencia } =
+      await supabase
+        .from("conversations")
+        .select("id")
+        .eq("id", conversationIdTransferencia)
+        .maybeSingle();
+    if (errorTransferencia) {
+      console.error(
+        "[home] No se pudo verificar la conversación transferida:",
+        errorTransferencia
+      );
+      return (
+        <ErrorRecuperacionBorrador
+          borradorId={borradorTransferenciaId}
+          conversationId={conversationIdTransferencia}
+        />
+      );
+    }
+    if (conversacionTransferida) {
+      redirect(
+        `/chat/${conversationIdTransferencia}?borrador=${encodeURIComponent(borradorTransferenciaId)}`
+      );
+    }
+  }
 
   // Paginada: PostgREST corta en `db-max-rows` sin error, y un tope fijo sin
   // navegación dejaría las conversaciones antiguas inalcanzables, que el Scout
@@ -186,6 +228,13 @@ async function ContenidoPrincipal({
                     value={borradorTransferenciaId}
                   />
                 )}
+                {conversationIdTransferencia && (
+                  <input
+                    name="conversacion"
+                    type="hidden"
+                    value={conversationIdTransferencia}
+                  />
+                )}
                 <Button
                   className="btn-press min-h-11 w-full bg-scouts-purple text-white hover:bg-scouts-purple/90"
                   type="submit"
@@ -267,6 +316,35 @@ async function ContenidoPrincipal({
         )}
       </main>
     </div>
+  );
+}
+
+function ErrorRecuperacionBorrador({
+  borradorId,
+  conversationId,
+}: {
+  borradorId: string;
+  conversationId: string;
+}) {
+  const parametros = new URLSearchParams({
+    borrador: borradorId,
+    conversacion: conversationId,
+  });
+  return (
+    <main className="flex min-h-dvh items-center justify-center bg-background px-4">
+      <section className="w-full max-w-md rounded-xl border bg-card p-6 text-center shadow-sm">
+        <h1 className="font-semibold text-scouts-purple text-xl">
+          No pudimos recuperar tu conversación
+        </h1>
+        <p className="mt-2 text-muted-foreground text-sm" role="alert">
+          La conversación ya fue asociada a tu cuenta, pero no pudimos abrirla
+          en este momento. Reintenta para conservar el contexto de tu pregunta.
+        </p>
+        <Button asChild className="mt-5 min-h-11 bg-scouts-purple text-white">
+          <a href={`/?${parametros.toString()}`}>Reintentar</a>
+        </Button>
+      </section>
+    </main>
   );
 }
 

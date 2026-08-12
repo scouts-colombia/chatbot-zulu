@@ -9,7 +9,11 @@ export const metadata = { title: "Crear cuenta" };
 export default function PaginaRegistro({
   searchParams,
 }: {
-  searchParams: Promise<{ borrador?: string; error?: string }>;
+  searchParams: Promise<{
+    borrador?: string;
+    conversacion?: string;
+    error?: string;
+  }>;
 }) {
   return (
     <Suspense
@@ -29,11 +33,18 @@ export default function PaginaRegistro({
 async function ContenidoRegistro({
   searchParams,
 }: {
-  searchParams: Promise<{ borrador?: string; error?: string }>;
+  searchParams: Promise<{
+    borrador?: string;
+    conversacion?: string;
+    error?: string;
+  }>;
 }) {
-  const { borrador, error } = await searchParams;
+  const { borrador, conversacion, error } = await searchParams;
   const borradorTransferenciaId = esIdTraspasoBorradorValido(borrador)
     ? borrador
+    : null;
+  const conversationIdTransferencia = esIdTraspasoBorradorValido(conversacion)
+    ? conversacion
     : null;
   const supabase = await crearClienteServidor();
   const {
@@ -50,6 +61,7 @@ async function ContenidoRegistro({
       <FormularioAuth
         accion={registrarse}
         borradorTransferenciaId={borradorTransferenciaId}
+        conversationIdTransferencia={conversationIdTransferencia}
         errorInicial="No pudimos verificar tu sesión. Recarga la página e inténtalo de nuevo."
         modo="registro"
       />
@@ -65,6 +77,7 @@ async function ContenidoRegistro({
       <FormularioAuth
         accion={finalizarRegistro}
         borradorTransferenciaId={borradorTransferenciaId}
+        conversationIdTransferencia={conversationIdTransferencia}
         modo="finalizar"
       />
     );
@@ -74,6 +87,7 @@ async function ContenidoRegistro({
     <FormularioAuth
       accion={registrarse}
       borradorTransferenciaId={borradorTransferenciaId}
+      conversationIdTransferencia={conversationIdTransferencia}
       conversionInvitada={user?.is_anonymous === true}
       errorInicial={
         error === "enlace_invalido"

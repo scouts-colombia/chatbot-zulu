@@ -64,6 +64,10 @@ function destinoInicio(formData: FormData, aviso?: string) {
   }
   if (borradorId) {
     parametros.set("borrador", borradorId);
+    const conversationId = formData.get("conversacion");
+    if (esIdTraspasoBorradorValido(conversationId)) {
+      parametros.set("conversacion", conversationId);
+    }
   }
   const query = parametros.toString();
   return query ? `/?${query}` : "/";

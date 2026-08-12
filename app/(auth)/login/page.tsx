@@ -8,7 +8,7 @@ export const metadata = { title: "Iniciar sesión" };
 export default function PaginaLogin({
   searchParams,
 }: {
-  searchParams: Promise<{ borrador?: string }>;
+  searchParams: Promise<{ borrador?: string; conversacion?: string }>;
 }) {
   return (
     <Suspense
@@ -28,14 +28,17 @@ export default function PaginaLogin({
 async function ContenidoLogin({
   searchParams,
 }: {
-  searchParams: Promise<{ borrador?: string }>;
+  searchParams: Promise<{ borrador?: string; conversacion?: string }>;
 }) {
-  const { borrador } = await searchParams;
+  const { borrador, conversacion } = await searchParams;
   return (
     <FormularioAuth
       accion={iniciarSesion}
       borradorTransferenciaId={
         esIdTraspasoBorradorValido(borrador) ? borrador : null
+      }
+      conversationIdTransferencia={
+        esIdTraspasoBorradorValido(conversacion) ? conversacion : null
       }
       modo="login"
     />

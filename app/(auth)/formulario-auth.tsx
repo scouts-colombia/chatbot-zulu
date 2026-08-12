@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { limpiarBorradoresPendientesExpirados } from "@/lib/invitados/borrador";
 import type { EstadoFormulario } from "./acciones";
 
 type Props = {
@@ -12,6 +13,7 @@ type Props = {
   conversionInvitada?: boolean;
   errorInicial?: string;
   borradorTransferenciaId?: string | null;
+  conversationIdTransferencia?: string | null;
   accion: (
     estadoPrevio: EstadoFormulario,
     formData: FormData
@@ -23,9 +25,16 @@ export function FormularioAuth({
   accion,
   errorInicial,
   borradorTransferenciaId = null,
+  conversationIdTransferencia = null,
   conversionInvitada = false,
 }: Props) {
   const [estado, enviar, pendiente] = useActionState(accion, { error: null });
+  useEffect(() => {
+    const purgar = () => limpiarBorradoresPendientesExpirados(localStorage);
+    purgar();
+    const intervalo = window.setInterval(purgar, 60_000);
+    return () => window.clearInterval(intervalo);
+  }, []);
   const errorVisible = estado.mensaje ? null : (estado.error ?? errorInicial);
   const esRegistro = modo === "registro";
   const esFinalizar = modo === "finalizar";
@@ -64,6 +73,13 @@ export function FormularioAuth({
               name="borrador"
               type="hidden"
               value={borradorTransferenciaId}
+            />
+          )}
+          {conversationIdTransferencia && (
+            <input
+              name="conversacion"
+              type="hidden"
+              value={conversationIdTransferencia}
             />
           )}
           {esRegistro && (
@@ -147,11 +163,11 @@ export function FormularioAuth({
                 ¿Ya tienes cuenta?{" "}
                 <Link
                   className="font-medium text-scouts-purple underline underline-offset-4"
-                  href={
-                    borradorTransferenciaId
-                      ? `/login?borrador=${encodeURIComponent(borradorTransferenciaId)}`
-                      : "/login"
-                  }
+                  href={rutaAuthAlterna(
+                    "/login",
+                    borradorTransferenciaId,
+                    conversationIdTransferencia
+                  )}
                 >
                   Inicia sesión
                 </Link>
@@ -161,11 +177,11 @@ export function FormularioAuth({
                 ¿No tienes cuenta?{" "}
                 <Link
                   className="font-medium text-scouts-purple underline underline-offset-4"
-                  href={
-                    borradorTransferenciaId
-                      ? `/registro?borrador=${encodeURIComponent(borradorTransferenciaId)}`
-                      : "/registro"
-                  }
+                  href={rutaAuthAlterna(
+                    "/registro",
+                    borradorTransferenciaId,
+                    conversationIdTransferencia
+                  )}
                 >
                   Regístrate
                 </Link>
@@ -176,4 +192,19 @@ export function FormularioAuth({
       </div>
     </div>
   );
+}
+function rutaAuthAlterna(
+  ruta: "/login" | "/registro",
+  borradorId: string | null,
+  conversationId: string | null
+) {
+  const parametros = new URLSearchParams();
+  if (borradorId) {
+    parametros.set("borrador", borradorId);
+  }
+  if (conversationId) {
+    parametros.set("conversacion", conversationId);
+  }
+  const query = parametros.toString();
+  return query ? `${ruta}?${query}` : ruta;
 }

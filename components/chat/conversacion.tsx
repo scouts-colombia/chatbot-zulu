@@ -20,9 +20,14 @@ import {
   crearIdTraspasoBorrador,
   eliminarClaveGlobalAnterior,
   guardarBorradorInvitado,
+  limpiarBorradoresPendientesExpirados,
   limpiarBorradorInvitado,
   restaurarBorradorInvitado,
 } from "@/lib/invitados/borrador";
+import {
+  coordinarPreparacionInvitada,
+  ERROR_COORDINACION_INVITADA,
+} from "@/lib/invitados/coordinacion";
 import { marcarTurnoInvitadoEnCurso } from "@/lib/invitados/turno-en-curso";
 import { URL_POLITICA_PRIVACIDAD } from "@/lib/privacidad";
 import type { MensajeUI } from "./tipos";
@@ -35,6 +40,22 @@ import type { MensajeUI } from "./tipos";
  */
 const CARACTERES_POR_SEGUNDO = 220;
 const CONSULTA_MOVIMIENTO_REDUCIDO = "(prefers-reduced-motion: reduce)";
+
+function rutaAuthConBorrador(
+  ruta: "/login" | "/registro",
+  traspasoId: string | null,
+  conversationIdDestino: string | null
+) {
+  const parametros = new URLSearchParams();
+  if (traspasoId) {
+    parametros.set("borrador", traspasoId);
+  }
+  if (conversationIdDestino) {
+    parametros.set("conversacion", conversationIdDestino);
+  }
+  const query = parametros.toString();
+  return query ? `${ruta}?${query}` : ruta;
+}
 
 function suscribirMovimientoReducido(onStoreChange: () => void) {
   const media = window.matchMedia(CONSULTA_MOVIMIENTO_REDUCIDO);
@@ -266,9 +287,18 @@ export function Conversacion({
   const [traspasoBorradorId, setTraspasoBorradorId] = useState<string | null>(
     borradorTransferenciaId
   );
+  const [conversationIdTransferencia, setConversationIdTransferencia] =
+    useState<string | null>(conversationId ?? null);
   const [aceptaPolitica, setAceptaPolitica] = useState(false);
   const [versionPoliticaActual, setVersionPoliticaActual] =
     useState(versionPolitica);
+  useEffect(() => {
+    const purgar = () => limpiarBorradoresPendientesExpirados(localStorage);
+    purgar();
+    const intervalo = window.setInterval(purgar, 60_000);
+    return () => window.clearInterval(intervalo);
+  }, []);
+
   useEffect(() => {
     // Elimina la clave global de versiones anteriores para que un borrador
     // no pueda reaparecer al cambiar de identidad en una pestaña compartida.
@@ -287,24 +317,29 @@ export function Conversacion({
 
   const persistirBorrador = (
     texto = borrador,
-    traspasoId = traspasoBorradorId
+    traspasoId = traspasoBorradorId,
+    conversationIdDestino = conversationIdTransferencia
   ) => {
     const limpio = texto.trim();
     if (esInvitado && limpio) {
       guardarBorradorInvitado({
         almacen: sessionStorage,
         almacenPendiente: localStorage,
-        conversationId: conversationIdActual,
+        conversationId: traspasoId ? null : conversationIdActual,
+        conversationIdDestino: traspasoId ? conversationIdDestino : null,
         traspasoId,
         texto: limpio,
       });
     }
   };
-  const abrirRegistro = (mensaje: string, texto = borrador) => {
+  const abrirRegistro = (
+    mensaje: string,
+    texto = borrador,
+    conversationIdDestino = conversationIdActual
+  ) => {
     setBorrador(texto);
-    setTraspasoBorradorId((actual) =>
-      conversationIdActual ? null : (actual ?? crearIdTraspasoBorrador())
-    );
+    setConversationIdTransferencia(conversationIdDestino);
+    setTraspasoBorradorId((actual) => actual ?? crearIdTraspasoBorrador());
     setMotivoRegistro(mensaje);
     setMostrarRegistro(true);
   };
@@ -418,21 +453,30 @@ export function Conversacion({
       setMensajes((previos) => previos.filter((m) => m.id !== idLocal));
       setBorrador(limpio);
     };
-    const exigirRegistroTrasEnvio = (mensaje: string) => {
-      abrirRegistro(mensaje, limpio);
+    const exigirRegistroTrasEnvio = (
+      mensaje: string,
+      conversationIdDestino?: string
+    ) => {
+      abrirRegistro(
+        mensaje,
+        limpio,
+        conversationIdDestino ?? conversationIdActual
+      );
     };
 
     let solicitudPrincipalIniciada = false;
     try {
       if (esInvitado && !sesionInvitadaLista) {
-        const preparacion = await fetch("/api/chat/invitado", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            aceptaPolitica,
-            versionPoliticaAceptada: versionPoliticaActual,
-          }),
-        });
+        const preparacion = await coordinarPreparacionInvitada(() =>
+          fetch("/api/chat/invitado", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              aceptaPolitica,
+              versionPoliticaAceptada: versionPoliticaActual,
+            }),
+          })
+        );
         const datosPreparacion = await preparacion.json().catch(() => null);
         if (!preparacion.ok || !datosPreparacion) {
           revertir();
@@ -481,7 +525,10 @@ export function Conversacion({
         if (datos?.codigo === "registro_requerido") {
           exigirRegistroTrasEnvio(
             datos.mensaje ??
-              "Crea una cuenta o inicia sesión para continuar usando el chat."
+              "Crea una cuenta o inicia sesión para continuar usando el chat.",
+            typeof datos.conversationId === "string"
+              ? datos.conversationId
+              : undefined
           );
           return;
         }
@@ -552,8 +599,17 @@ export function Conversacion({
       };
       setMensajes((previos) => [...previos, mensajeAsistente]);
       setAnimandoId(mensajeAsistente.id);
-    } catch {
+    } catch (error) {
       revertir();
+      if (
+        error instanceof Error &&
+        error.message === ERROR_COORDINACION_INVITADA
+      ) {
+        exigirRegistroTrasEnvio(
+          "Tu navegador no permite coordinar de forma segura la prueba entre pestañas. Crea una cuenta o inicia sesión para continuar sin perder tu pregunta."
+        );
+        return;
+      }
       if (esInvitado && solicitudPrincipalIniciada) {
         exigirRegistroTrasEnvio(
           "Se perdió la conexión mientras procesábamos tu pregunta de prueba. Crea una cuenta o inicia sesión para continuar sin perderla."
@@ -731,12 +787,18 @@ export function Conversacion({
               className="btn-press min-h-11 bg-scouts-purple text-white hover:bg-scouts-purple/90"
             >
               <Link
-                href={
-                  traspasoBorradorId
-                    ? `/registro?borrador=${encodeURIComponent(traspasoBorradorId)}`
-                    : "/registro"
+                href={rutaAuthConBorrador(
+                  "/registro",
+                  traspasoBorradorId,
+                  conversationIdTransferencia
+                )}
+                onClick={() =>
+                  persistirBorrador(
+                    borrador,
+                    traspasoBorradorId,
+                    conversationIdTransferencia
+                  )
                 }
-                onClick={() => persistirBorrador(borrador, traspasoBorradorId)}
               >
                 Crear cuenta
               </Link>
@@ -747,12 +809,18 @@ export function Conversacion({
               variant="outline"
             >
               <Link
-                href={
-                  traspasoBorradorId
-                    ? `/login?borrador=${encodeURIComponent(traspasoBorradorId)}`
-                    : "/login"
+                href={rutaAuthConBorrador(
+                  "/login",
+                  traspasoBorradorId,
+                  conversationIdTransferencia
+                )}
+                onClick={() =>
+                  persistirBorrador(
+                    borrador,
+                    traspasoBorradorId,
+                    conversationIdTransferencia
+                  )
                 }
-                onClick={() => persistirBorrador(borrador, traspasoBorradorId)}
               >
                 Iniciar sesión
               </Link>
