@@ -18,8 +18,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { ETIQUETAS_ESTADO } from "@/lib/chat/contrato";
 import {
   crearIdTraspasoBorrador,
-  esIdTraspasoBorradorValido,
   eliminarClaveGlobalAnterior,
+  esIdTraspasoBorradorValido,
   guardarBorradorInvitado,
   limpiarBorradoresPendientesExpirados,
   limpiarBorradorInvitado,
