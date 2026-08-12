@@ -12,14 +12,15 @@ Este es el handoff autoritativo para continuar las dos PR. El handoff de PARCE/a
 
 Esta sección reemplaza los SHA y resultados anteriores cuando haya discrepancias.
 
-- PR #12 publicada en eed2466 (fix: conservar protección del registro invitado).
+- PR #12 publicada en 578116a (fix: conservar protección del registro invitado).
 - La protección previa a auth.updateUser ahora es monotónica hasta expirar:
   un error ambiguo de Auth o un intento concurrente ya no puede retirar la
   marca de otro registro que sí avanzó.
 - La migración pendiente ya no crea ni expone
   cancelar_registro_invitado_pendiente; sigue sin aplicarse remotamente.
 - Se añadió lib/invitados/registro.test.ts como contrato de regresión.
-- PR #13 fue rebasada sobre eed2466 y publicada en 28124ae
+- PR #13 fue rebasada sobre 578116a; el fix visual reescrito está en 74ab9db
+  y la cabeza incluye este commit documental posterior
   (fix: cerrar hallazgos de accesibilidad visual).
 - La visual sube textos secundarios a opacidad /70, mantiene objetivos
   táctiles de 44 px y elimina el mínimo artificial de 34 rem del chat público.
@@ -162,8 +163,8 @@ Además del chat público, preflight, consentimiento, cuota atómica, transferen
 
 ## Trabajo inmediato
 
-1. Esperar y verificar los checks remotos de PR #12 en eed2466 y PR #13 en
-   28124ae.
+1. Esperar y verificar los checks remotos de las cabezas publicadas actuales de
+   PR #12 y PR #13.
 2. Habilitar el MCP de Supabase; aplicar y verificar
    20260812190000_proteger_conversion_invitada_pendiente.sql en
    ddimxdrggrrfcvzwwben, incluyendo columna, tabla, RLS, grants, funciones,
