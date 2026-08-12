@@ -90,7 +90,7 @@ function ErrorChatPublico() {
 function MarcoChatPublico({ children }: { children: React.ReactNode }) {
   return (
     <div
-      className="pnpj-fondo relative flex h-dvh min-h-[34rem] flex-col overflow-hidden text-pnpj-tinta"
+      className="pnpj-fondo relative flex h-dvh flex-col overflow-hidden text-pnpj-tinta"
       data-design-direction="ruta-editorial-glass"
       data-design-mode="operate"
     >

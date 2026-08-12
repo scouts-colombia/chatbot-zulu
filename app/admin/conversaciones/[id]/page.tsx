@@ -399,7 +399,7 @@ function Encabezado({
       <h2 className="mt-3 font-semibold text-xl text-scouts-purple">
         {titulo}
       </h2>
-      <p className="mt-1 text-foreground/55 text-sm">
+      <p className="mt-1 text-foreground/70 text-sm">
         {dueno?.nombre ?? "—"} · {dueno?.email ?? "—"}
         {archivada && " · archivada"}
       </p>

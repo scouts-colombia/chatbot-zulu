@@ -26,7 +26,7 @@ export function FormularioDocumento({
         <input name="id" type="hidden" value={id} />
         <input name="activar" type="hidden" value={String(!activo)} />
         <Button
-          className="btn-press min-h-10 border-scouts-purple/20 text-scouts-purple hover:bg-scouts-purple/8"
+          className="btn-press min-h-11 border-scouts-purple/20 text-scouts-purple hover:bg-scouts-purple/8"
           disabled={pendiente || bloqueado}
           size="sm"
           title={

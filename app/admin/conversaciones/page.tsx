@@ -87,7 +87,7 @@ async function ListaConversaciones({
 
   if (!conversaciones || conversaciones.length === 0) {
     return (
-      <p className="rounded-2xl bg-scouts-purple/5 p-5 text-foreground/60 text-sm">
+      <p className="rounded-2xl bg-scouts-purple/5 p-5 text-foreground/70 text-sm">
         {pagina > 1
           ? "No hay más conversaciones en esta página."
           : "No hay conversaciones todavía."}
@@ -114,7 +114,7 @@ async function ListaConversaciones({
           <h2 className="mt-3 font-semibold text-2xl text-scouts-purple">
             Conversaciones
           </h2>
-          <p className="mt-1 text-foreground/55 text-sm">
+          <p className="mt-1 text-foreground/70 text-sm">
             Revisa el historial visible para los Scouts.
           </p>
         </div>

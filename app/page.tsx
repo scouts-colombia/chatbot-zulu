@@ -225,7 +225,7 @@ async function ContenidoPrincipal({
                 aceptación se conserva como un evento histórico y será necesaria
                 de nuevo si la versión cambia.
               </p>
-              <p className="mt-2 text-foreground/60 text-xs">
+              <p className="mt-2 text-foreground/70 text-xs">
                 Versión que registrarás: {VERSION_POLITICA_PRIVACIDAD}
               </p>
               {(aviso === "consentimiento" ||
@@ -370,7 +370,7 @@ async function ContenidoPrincipal({
                             />
                             <Button
                               aria-label="Archivar conversación"
-                              className="min-h-11 min-w-11 sm:min-h-8 sm:min-w-8"
+                              className="min-h-11 min-w-11"
                               size="sm"
                               type="submit"
                               variant="ghost"
@@ -393,7 +393,7 @@ async function ContenidoPrincipal({
                     className={
                       errorConversaciones
                         ? "rounded-2xl bg-scouts-red/8 px-5 py-8 text-center text-scouts-red text-sm"
-                        : "rounded-2xl bg-scouts-purple/5 px-5 py-10 text-center text-foreground/60 text-sm"
+                        : "rounded-2xl bg-scouts-purple/5 px-5 py-10 text-center text-foreground/70 text-sm"
                     }
                     role={errorConversaciones ? "alert" : undefined}
                   >

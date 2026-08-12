@@ -71,7 +71,7 @@ async function ListaUsuarios({
           <h2 className="mt-3 font-semibold text-2xl text-scouts-purple">
             Usuarios
           </h2>
-          <p className="mt-1 text-foreground/55 text-sm">
+          <p className="mt-1 text-foreground/70 text-sm">
             Gestiona el estado de las cuentas registradas.
           </p>
         </div>

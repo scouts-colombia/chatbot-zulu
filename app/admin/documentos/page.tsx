@@ -43,7 +43,7 @@ async function ListaDocumentos() {
 
   if (!documentos || documentos.length === 0) {
     return (
-      <p className="rounded-2xl bg-scouts-purple/5 p-5 text-foreground/60 text-sm">
+      <p className="rounded-2xl bg-scouts-purple/5 p-5 text-foreground/70 text-sm">
         No hay documentos indexados. Corre scripts/index-knowledge-documents.ts.
       </p>
     );
@@ -57,7 +57,7 @@ async function ListaDocumentos() {
           <h2 className="mt-3 font-semibold text-2xl text-scouts-purple">
             Documentos
           </h2>
-          <p className="mt-1 text-foreground/55 text-sm">
+          <p className="mt-1 text-foreground/70 text-sm">
             Controla qué fuentes pueden fundamentar las respuestas.
           </p>
         </div>
