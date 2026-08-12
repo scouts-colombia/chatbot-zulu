@@ -263,16 +263,11 @@ export async function registrarse(
     );
 
     if (error) {
-      const { error: errorCancelacion } = await admin.rpc(
-        "cancelar_registro_invitado_pendiente",
-        { p_guest_user_id: usuarioActual.id }
-      );
-      if (errorCancelacion) {
-        console.error(
-          "[auth] No se pudo cancelar la protección del registro invitado:",
-          errorCancelacion
-        );
-      }
+      // La respuesta de Auth puede ser ambigua (por ejemplo, una caída de red
+      // después de que el proveedor aceptó el cambio) y otra pestaña puede
+      // estar completando el mismo registro. La protección es deliberadamente
+      // monotónica y expira sola: quitarla aquí permitiría que la limpieza
+      // borre una identidad cuyo correo de confirmación ya fue enviado.
       return { error: traducirError(error.code, error.message) };
     }
 

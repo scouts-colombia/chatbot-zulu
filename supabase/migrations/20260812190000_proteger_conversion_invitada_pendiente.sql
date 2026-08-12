@@ -90,36 +90,6 @@ revoke execute on function public.marcar_registro_invitado_pendiente(uuid)
 grant execute on function public.marcar_registro_invitado_pendiente(uuid)
   to service_role;
 
-create function public.cancelar_registro_invitado_pendiente(
-  p_guest_user_id uuid
-)
-returns void
-language plpgsql
-security definer
-set search_path = ''
-as $$
-begin
-  if p_guest_user_id is null then
-    return;
-  end if;
-
-  perform pg_advisory_xact_lock(
-    hashtextextended('guest-user:' || p_guest_user_id::text, 0)
-  );
-
-  update public.guest_identity_cleanup_queue
-  set registration_pending_until = null
-  where guest_user_id = p_guest_user_id
-    and target_user_id is null
-    and deletion_claimed_at is null;
-end;
-$$;
-
-revoke execute on function public.cancelar_registro_invitado_pendiente(uuid)
-  from public, anon, authenticated;
-grant execute on function public.cancelar_registro_invitado_pendiente(uuid)
-  to service_role;
-
 create or replace function public.tomar_limpiezas_identidad_invitada(
   p_limite integer default 3,
   p_preferida uuid default null
