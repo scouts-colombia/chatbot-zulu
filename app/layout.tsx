@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { Geist_Mono } from "next/font/google";
-import { TooltipProvider } from "@/components/ui/tooltip";
 import { futuraStd } from "./futura";
 
 import "./globals.css";
@@ -30,7 +29,7 @@ export default function RootLayout({
   return (
     <html className={`${futuraStd.variable} ${geistMono.variable}`} lang="es">
       <body className="antialiased">
-        <TooltipProvider>{children}</TooltipProvider>
+        {children}
       </body>
     </html>
   );
