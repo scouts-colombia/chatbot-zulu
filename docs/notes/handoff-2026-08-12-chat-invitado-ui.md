@@ -21,50 +21,70 @@ Este es el handoff autoritativo para continuar las dos PR. El handoff de PARCE/a
 - Dentro de `/admin` se usan `<a>`, nunca `next/link`, porque la auditoría ocurre al renderizar en servidor.
 - El usuario autorizó push de ambas ramas. No hacer merge; lo hará el dueño del repositorio.
 
-## Topología Git
+## Topología y estado Git
 
 ```text
 master
-└── agent/zulu-chat-invitado    → PR #12
+└── agent/zulu-chat-invitado     → PR #12
     └── agent/zulu-ui-aplicacion → PR #13
 ```
 
-Estado local confirmado tras el último rebase:
+- Base local/remota: `agent/zulu-chat-invitado` en `95e5287` (`fix: cerrar casos límite del flujo invitado`).
+- Visual local: `agent/zulu-ui-aplicacion`, rebasada sobre `95e5287`. Último SHA antes de este commit documental: `1c9b7ee`.
+- Visual remota: todavía `19fd87d`; publicar el SHA final con `git push --force-with-lease origin agent/zulu-ui-aplicacion`.
+- Commits visuales actuales sobre la base: `1c3d960`, `01e05ac`, `654160c`, `5725926`, `7a22aeb`, `e759c8e`, `1c9b7ee`.
+- En el último rebase se resolvió `app/page.tsx` conservando diseño crema, versión/token del consentimiento y los controles completos; `/login` conserva el fallback crema y su `Suspense`.
+- Commits en español, sin `Co-Authored-By`. No hay cambios ajenos conocidos.
 
-- Base local/remota: `agent/zulu-chat-invitado` en `ecaccde` (`fix: aislar borradores y proteger identidades invitadas`).
-- Visual local: `agent/zulu-ui-aplicacion`, rebasada sobre `ecaccde` y con worktree limpio antes de esta actualización documental.
-- Visual remota: todavía en `efa8319`; la rama local diverge por el rebase y debe publicarse con `git push --force-with-lease origin agent/zulu-ui-aplicacion` después de validar.
-- Commits visuales actuales, de más nuevo a más antiguo: `cc5f87b`, `25d3dd3`, `006ab93`, `16faf7b`, `c45404e`; encima está el commit documental de este handoff.
-- El rebase tuvo conflictos únicamente en `app/page.tsx` y `app/chat/[id]/page.tsx`. Se conservaron el diseño crema y el token `borradorTransferenciaId` en la creación/apertura de conversación.
+## PR #12 — estado funcional
 
-## PR #12 — implementación y última corrección
+Además del chat público, preflight, consentimiento, cuota atómica, transferencia, limpieza y serialización, los últimos commits corrigieron:
 
-Además del chat público, preflight, consentimiento, cuota atómica, transferencia, limpieza y serialización ya implementados, `ecaccde` corrige los tres últimos comentarios de Codex:
+### `ecaccde`
 
-1. **Carrera limpieza/conversión.** La migración `supabase/migrations/20260812101500_coordinar_conversion_y_limpieza_invitada.sql` bloquea la fila de limpieza durante la conversión. Si ya existe `deletion_claimed_at`, la conversión se revierte con `identidad_invitada_expirando`; si no, retira la fila antes de completar el cambio. El worker también vuelve a leer Auth y solo elimina cuando `is_anonymous === true`.
-2. **Metadata de citas.** `app/api/chat/route.ts` comprueba el error de `knowledge_documents` y falla cerrado antes de construir/persistir citas degradadas.
-3. **Privacidad del borrador.** Ya no existe una clave pendiente global. Se usa `zulu:borrador-invitado:pendiente:<uuid>` únicamente al iniciar explícitamente login/registro; el UUID opaco se propaga por ese flujo y solo el destino que lo presenta puede migrarlo. La portada pública no restaura borradores pendientes.
+1. Carrera entre limpieza y conversión: lock de fila en la migración y revalidación `is_anonymous` en el worker.
+2. Error de metadata de citas: fallo cerrado antes de construir/persistir citas degradadas.
+3. Borrador pendiente: clave ligada a UUID opaco explícito; la portada pública no restaura borradores de otra visita.
 
-Archivos funcionales principales de esta corrección: acciones/formularios auth, home, creación y apertura de conversación, `components/chat/conversacion.tsx`, `lib/invitados/borrador.ts`, `lib/invitados/limpieza.ts`, sus pruebas, la ruta de chat y ROADMAP.
+### `95e5287`
 
-### Supabase confirmado
+1. **Sesión de identidad eliminada:** el proxy reconoce el código oficial `user_not_found` de `@supabase/auth-js` 2.110.6 y hace `signOut({ scope: "local" })`; los errores transitorios siguen fail-closed.
+2. **Borrador y consentimiento:** el UUID opaco atraviesa el formulario y todos los redirects del consentimiento, hasta crear/abrir la conversación.
+3. **TTL único:** las rutas ya no tienen una constante de 10 minutos. La RPC v2 devuelve el TTL efectivo y la cookie usa ese valor; la limpieza espera al menos `max(15 minutos, TTL)`.
+4. **Versión de política:** invitado y cuenta permanente envían la versión mostrada; el servidor rechaza un tab obsoleto, conserva pregunta/token y exige leer/aceptar la versión nueva.
+5. **Reduced motion:** el typewriter usa `useSyncExternalStore` con `prefers-reduced-motion`; muestra la respuesta completa y libera citas/preguntas guiadas sin intervalo.
+6. `/login` tiene un límite `Suspense` y PR #12 compila/prerenderiza por sí sola.
 
-- La migración local anterior `20260811185056_expirar_identidades_y_fijar_destino_invitado.sql` está aplicada como versión remota `20260811185716`.
-- La migración nueva de coordinación está aplicada como versión remota `20260812151221 coordinar_conversion_y_limpieza_invitada`.
-- Prueba transaccional remota:
-  - identidad anónima reclamada: la conversión se rechazó y permaneció anónima;
-  - identidad anónima no reclamada: la conversión terminó, retiró la cola y actualizó perfil;
-  - rollback final y cero residuos `@example.test` en Auth/perfiles.
-- `handle_anonymous_user_converted()` es `SECURITY DEFINER`; `anon` y `authenticated` no pueden ejecutarla; su definición inspecciona `deletion_claimed_at`.
-- Advisors sin hallazgos nuevos. Persisten solo avisos preexistentes/intencionales: RLS sin políticas en tablas server-only, protección de contraseñas filtradas desactivada por decisión del usuario, FKs antiguas sin índice e índice antiguo sin uso.
+## Supabase confirmado
 
-### Validación local de la base
+- `20260812151221 coordinar_conversion_y_limpieza_invitada`: conversión y limpieza mutuamente exclusivas, probadas sin residuos.
+- `20260812164406 alinear_preflight_y_sesion_invitada`: corresponde a `supabase/migrations/20260812163500_alinear_preflight_y_sesion_invitada.sql`.
+- La RPC `preparar_turno_invitado_v2(text,text,text)` es `SECURITY DEFINER`, solo `service_role` puede ejecutarla; `anon` y `authenticated` no.
+- Prueba remota: devolvió `ttl_seconds = 600` con la configuración actual; cero filas sintéticas residuales.
+- `handle_new_user()` lee `guest_preflight_ttl_minutes` y conserva una gracia mínima de 15 minutos.
+- Advisors sin hallazgos nuevos. Persisten avisos preexistentes/intencionales: RLS sin políticas en tablas server-only, protección de contraseñas filtradas desactivada por decisión del usuario, FKs antiguas sin índice e índice antiguo sin uso.
 
+## Validaciones finales
+
+### Base `95e5287`
+
+- `pnpm install --offline --frozen-lockfile`: pasa.
 - `pnpm typecheck`: pasa.
-- `pnpm test`: 38/38 pasan.
-- Biome dirigido sobre los 13 archivos TypeScript modificados: pasa.
+- `pnpm test`: 41/41 pasan.
+- Biome dirigido en 13 archivos de código: pasa.
 - `git diff --check`: pasa.
-- `pnpm build`: dos intentos fallaron únicamente porque Google Fonts no respondió al descargar Geist Mono; no hubo error de código. La misma base visual había compilado antes de esa caída de red.
+- `pnpm build`: pasa; compila, TypeScript, genera 15 páginas y finaliza optimización.
+
+### Visual rebasada (antes de este commit documental: `1c9b7ee`)
+
+- Instalación offline/frozen: pasa y retira `next-themes`.
+- Typecheck: pasa.
+- Pruebas: 41/41 pasan.
+- `biome lint` sobre 47 archivos TypeScript/TSX del stack: pasa sin hallazgos.
+- `git diff --check`: pasa.
+- Búsqueda mecánica: no hay `next-themes`, `ThemeProvider`, `dark:`, clase `dark`, `prefers-color-scheme` ni toggles de tema en código/dependencias.
+- Build: pasa; las 15 páginas se generan y `/login` queda en Partial Prerender.
+- El detector Impeccable ya había devuelto `[]` sobre la implementación visual. No repetir normalización masiva de CRLF.
 
 ## PR #13 — sistema visual
 
@@ -75,24 +95,22 @@ Archivos funcionales principales de esta corrección: acciones/formularios auth,
 - Navegación admin móvil ordenada sin romper el invariante de `<a>`.
 - Acceso móvil admin con nombre accesible.
 - `next-themes` y todo el modo oscuro retirados.
-- El layout raíz ya no monta el `TooltipProvider` global sin consumidores; `/login` tiene su propio `Suspense`, por lo que Next 16 puede hacer Partial Prerender sin bloquear la ruta.
-- `DESIGN.md` y `.impeccable/surfaces/app-page-tsx.md` ya describen crema y ausencia de dark mode.
-- Validación final después del rebase: `pnpm install --offline --frozen-lockfile` pasó y retiró `next-themes`; `pnpm typecheck` pasó; `pnpm test` pasó 38/38; `pnpm build` pasó y prerenderizó las 15 páginas; `git diff --check` pasó.
-- Biome dirigido procesó 18 archivos y solo reportó formato CRLF conocido, sin hallazgos semánticos. No normalizar masivamente. El detector Impeccable ya había devuelto `[]` sobre la implementación visual.
+- El layout raíz no monta un `TooltipProvider` global sin consumidores; `/login` tiene su propio `Suspense`.
+- `DESIGN.md` y `.impeccable/surfaces/app-page-tsx.md` describen crema y ausencia de dark mode.
 
 ## Estado de Codex review
 
-- PR #12: `ecaccde` está publicado. Los tres hilos nuevos son `PRRT_kwDOSuVTrc6YWIeN`, `PRRT_kwDOSuVTrc6YWIeP` y `PRRT_kwDOSuVTrc6YWIeS`. Las respuestas se intentaron mediante el conector, pero GitHub quedó en timeout; verificar si aparecieron, responder las que falten, resolver los tres hilos y comentar `@codex review` sobre `ecaccde`.
-- PR #13: la revisión limpia conocida corresponde al SHA remoto viejo `efa8319`, por lo que no sirve después del rebase. La validación local nueva está verde; falta publicar el nuevo SHA exacto y reinvocar `@codex review`.
+- PR #12: los cinco hilos de la ronda sobre `ecaccde` fueron corregidos en `95e5287`, respondidos y resueltos. Se reinvocó Codex en https://github.com/scouts-colombia/chatbot-zulu/pull/12#issuecomment-5269783332; resultado pendiente al escribir este handoff.
+- PR #13: Codex declaró limpio `19fd87d` (“Didn't find any major issues”), pero ese resultado quedó obsoleto al cambiar la base. Falta publicar el nuevo SHA documental exacto y reinvocar.
 - Criterio de cierre: ambas PR deben tener revisión limpia/👍 sobre su SHA exacto. Cada corrección en la base exige rebase, validación, force-push con lease y review nuevo de la visual.
 
 ## Trabajo inmediato
 
-1. Commit en español, sin `Co-Authored-By`, de la corrección de prerender y este handoff.
+1. Commit de este handoff en español, sin `Co-Authored-By`.
 2. Publicar la visual con `git push --force-with-lease origin agent/zulu-ui-aplicacion`.
-3. En PR #12, comprobar respuestas, cerrar los tres hilos y reinvocar Codex sobre `ecaccde`.
-4. En PR #13, verificar `headRefOid` y reinvocar Codex sobre el SHA recién publicado.
-5. Esperar ambas revisiones. Corregir, responder, resolver y reinvocar hasta obtener limpio/👍 en los SHA exactos.
+3. Verificar `head.sha` de PR #13 y reinvocar `@codex review` sobre el nuevo SHA.
+4. Esperar PR #12 y PR #13. Corregir, responder, resolver y reinvocar hasta limpio/👍 en ambos SHA exactos.
+5. Si cambia PR #12, volver a rebasar y validar PR #13.
 6. No hacer merge.
 
 ## Restricciones
@@ -100,7 +118,7 @@ Archivos funcionales principales de esta corrección: acciones/formularios auth,
 - Preservar cambios ajenos; no hacer formateo masivo.
 - No ejecutar `scripts/seed-allowlist.sql` con correos de ejemplo.
 - No reindexar PARCE.
-- No cambiar Gemini, RAG, cuotas, privacidad, citas, reglas para menores ni navegación admin.
+- No cambiar Gemini, RAG, cuotas, privacidad, citas, reglas para menores ni navegación admin fuera de los fixes ya documentados.
 - No reintroducir caché, streaming, pgvector, RAG manual, raw provider response, NextAuth, Drizzle como dueño del esquema ni dark mode.
 - `apply_patch` falla en esta máquina con `CryptUnprotectData`; se usa escritura UTF-8 sin BOM como fallback.
 
@@ -114,7 +132,7 @@ docs/notes/handoff-2026-08-12-chat-invitado-ui.md
 
 Después lee AGENTS.md y CLAUDE.md completos. Preserva todos los cambios locales existentes.
 
-Continúa desde “Trabajo inmediato”. Hay dos PR apiladas: #12 (agent/zulu-chat-invitado) y #13 (agent/zulu-ui-aplicacion). Verifica primero rama, worktree, SHA local/remoto y estado real de GitHub. La base corregida ecaccde ya está publicada; la visual fue rebasada sobre ella y necesita validación, actualización final del handoff y force-push con lease.
+Continúa desde “Trabajo inmediato”. Hay dos PR apiladas: #12 (agent/zulu-chat-invitado) y #13 (agent/zulu-ui-aplicacion). Verifica primero rama, worktree, SHA local/remoto y estado real de GitHub. La base 95e5287 ya está publicada y en Codex review; la visual está rebasada, validada y debe quedar publicada/revisada sobre su SHA documental final.
 
 La dirección visual aprobada es Ruta /diseno/componentes: fondo crema #fff8eb con lavados amarillo/durazno, Futura, colores vivos y liquid glass claro. El modo oscuro fue eliminado completamente. No reintroduzcas fondo morado, next-themes, clase dark ni variantes dark:.
 
