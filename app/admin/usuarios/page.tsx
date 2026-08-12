@@ -100,7 +100,7 @@ async function ListaUsuarios({
                     </span>
                   )}
                 </p>
-                <p className="truncate text-foreground/50 text-xs">
+                <p className="truncate text-foreground/70 text-xs">
                   {perfil.email}
                 </p>
               </div>
@@ -165,7 +165,7 @@ function Paginacion({
       ) : (
         <span />
       )}
-      <span className="text-foreground/50 text-xs">
+      <span className="text-foreground/70 text-xs">
         {totalPaginas === null
           ? `Página ${pagina}`
           : `Página ${pagina} de ${totalPaginas} · ${total} usuarios`}

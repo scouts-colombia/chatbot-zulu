@@ -30,9 +30,9 @@ master
 ```
 
 - Base local/remota: `agent/zulu-chat-invitado` en `aaff17f` (`fix: purgar borradores en la portada`).
-- Visual local: `agent/zulu-ui-aplicacion`, rebasada sobre `aaff17f`. Último SHA antes de este commit documental: `9939316`.
-- Visual remota: todavía `3ce31fe`; publicar el SHA final con `git push --force-with-lease origin agent/zulu-ui-aplicacion`.
-- Commits visuales actuales sobre la base: `35e3917`, `84f3169`, `209bce4`, `633618f`, `7c25dc1`, `66d11c9`, `559932b`, `55baef6`, `9939316`.
+- Visual local/remota antes de esta corrección: `agent/zulu-ui-aplicacion` en `43e8a25`, rebasada sobre `aaff17f`.
+- El worktree visual incorpora dos correcciones nuevas de Codex: contraste AA de metadatos y eliminación del lift/transición de listas bajo `prefers-reduced-motion`.
+- Commits visuales publicados sobre la base antes de esta corrección: `35e3917`, `84f3169`, `209bce4`, `633618f`, `7c25dc1`, `66d11c9`, `559932b`, `55baef6`, `9939316`, `43e8a25`.
 - En el último rebase se resolvió `app/page.tsx` conservando diseño crema, versión/token del consentimiento y los controles completos; `/login` conserva el fallback crema y su `Suspense`.
 - Commits en español, sin `Co-Authored-By`. No hay cambios ajenos conocidos.
 
@@ -98,12 +98,13 @@ Además del chat público, preflight, consentimiento, cuota atómica, transferen
 - `git diff --check`: pasa.
 - `pnpm build`: pasa; compila, TypeScript, genera 15 páginas y finaliza optimización.
 
-### Visual rebasada (antes de este commit documental: `9939316`)
+### Visual rebasada con las correcciones de review (worktree previo al commit final)
 
 - Instalación offline/frozen: pasa y retira `next-themes`.
 - Typecheck: pasa.
 - Pruebas: 45/45 pasan.
 - `biome lint` sobre 62 archivos de `app`, `components`, `lib` y `proxy.ts`: pasa sin hallazgos.
+- Metadatos afectados elevados de `text-foreground/45` o `/50` a `/70`; `.brand-list-item` ya no transforma ni transiciona con movimiento reducido.
 - `git diff --check`: pasa.
 - Búsqueda mecánica: no hay `next-themes`, `ThemeProvider`, `dark:`, clase `dark`, `prefers-color-scheme` ni toggles de tema en código/dependencias.
 - Build: pasa; las 15 páginas se generan y `/login` queda en Partial Prerender.
@@ -123,14 +124,14 @@ Además del chat público, preflight, consentimiento, cuota atómica, transferen
 
 ## Estado de Codex review
 
-- PR #12: los tres comentarios de la ronda sobre `eab632e` fueron corregidos en `7798f6d`; `1889eb6` añadió el cierre fail-closed para cuenta distinta y el comentario posterior sobre la home se corrigió en `aaff17f`. Todos los hilos están respondidos/resueltos. Codex fue reinvocado sobre el SHA exacto en https://github.com/scouts-colombia/chatbot-zulu/pull/12#issuecomment-5270463526; resultado pendiente al escribir este handoff.
-- PR #13: los resultados previos quedaron obsoletos al cambiar la base. La visual está rebasada sobre `aaff17f`, validada, y falta publicar el SHA documental exacto y reinvocar.
+- PR #12: todos los hilos anteriores están respondidos/resueltos. Codex fue reinvocado sobre `aaff17f` en https://github.com/scouts-colombia/chatbot-zulu/pull/12#issuecomment-5270463526; mantiene reacción 👀 y su resultado final sigue pendiente.
+- PR #13: Codex señaló en `43e8a25` que el hover de listas no respetaba movimiento reducido y que metadatos con opacidad `/45`–`/50` no alcanzaban AA. Ambos puntos están corregidos y las validaciones completas pasan; falta publicar el commit, responder/resolver los dos hilos y reinvocar sobre el SHA nuevo.
 - Criterio de cierre: ambas PR deben tener revisión limpia/👍 sobre su SHA exacto. Cada corrección en la base exige rebase, validación, force-push con lease y review nuevo de la visual.
 
 ## Trabajo inmediato
 
-1. Publicar el commit documental de la visual con `git push --force-with-lease origin agent/zulu-ui-aplicacion`.
-2. Verificar `head.sha` de PR #13 y reinvocar `@codex review` sobre el nuevo SHA.
+1. Commit y push de las dos correcciones visuales y este handoff en `agent/zulu-ui-aplicacion`.
+2. Responder y resolver los dos hilos recientes de PR #13; reinvocar `@codex review` sobre el SHA publicado.
 3. Esperar PR #12 y PR #13. Corregir, responder, resolver y reinvocar hasta limpio/👍 en ambos SHA exactos.
 4. Si cambia PR #12, volver a rebasar y validar PR #13.
 5. No hacer merge.
@@ -154,7 +155,7 @@ docs/notes/handoff-2026-08-12-chat-invitado-ui.md
 
 Después lee AGENTS.md y CLAUDE.md completos. Preserva todos los cambios locales existentes.
 
-Continúa desde “Trabajo inmediato”. Hay dos PR apiladas: #12 (agent/zulu-chat-invitado) y #13 (agent/zulu-ui-aplicacion). Verifica primero rama, worktree, SHA local/remoto y estado real de GitHub. La base aaff17f ya está publicada y en Codex review; la visual está rebasada, validada y debe quedar publicada/revisada sobre su SHA documental final.
+Continúa desde “Trabajo inmediato”. Hay dos PR apiladas: #12 (agent/zulu-chat-invitado) y #13 (agent/zulu-ui-aplicacion). Verifica primero rama, worktree, SHA local/remoto y estado real de GitHub. La base está en aaff17f con review pendiente. La visual estaba en 43e8a25 y tiene preparadas/validadas correcciones de contraste AA y movimiento reducido; confirma si ya fueron publicadas.
 
 La dirección visual aprobada es Ruta /diseno/componentes: fondo crema #fff8eb con lavados amarillo/durazno, Futura, colores vivos y liquid glass claro. El modo oscuro fue eliminado completamente. No reintroduzcas fondo morado, next-themes, clase dark ni variantes dark:.
 

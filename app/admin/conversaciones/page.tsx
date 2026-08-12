@@ -142,12 +142,12 @@ async function ListaConversaciones({
                 >
                   {conversacion.title}
                 </a>
-                <p className="truncate text-foreground/50 text-xs">
+                <p className="truncate text-foreground/70 text-xs">
                   {dueno?.nombre ?? dueno?.email ?? "—"}
                   {conversacion.archived && " · archivada"}
                 </p>
               </div>
-              <time className="shrink-0 text-foreground/45 text-xs">
+              <time className="shrink-0 text-foreground/70 text-xs">
                 {new Date(conversacion.updated_at as string).toLocaleDateString(
                   "es-CO"
                 )}
@@ -169,7 +169,7 @@ async function ListaConversaciones({
           ) : (
             <span />
           )}
-          <span className="text-foreground/50 text-xs">
+          <span className="text-foreground/70 text-xs">
             {totalPaginas === null
               ? `Página ${pagina} · total desconocido`
               : `Página ${pagina} de ${totalPaginas} · ${count} conversaciones`}

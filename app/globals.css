@@ -617,6 +617,11 @@ textarea:focus-visible {
   .btn-press:active:not(:disabled) {
     transform: none;
   }
+  .brand-list-item,
+  .brand-list-item:hover {
+    transform: none;
+    transition: none;
+  }
 }
 
 @layer components {

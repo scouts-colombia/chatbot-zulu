@@ -81,7 +81,7 @@ async function ListaDocumentos() {
               <p className="truncate font-medium text-sm text-scouts-purple">
                 {documento.display_name}
               </p>
-              <p className="text-foreground/50 text-xs">
+              <p className="text-foreground/70 text-xs">
                 v{documento.version}
                 {documento.indexed_at &&
                   ` · indexado ${new Date(documento.indexed_at as string).toLocaleDateString("es-CO")}`}

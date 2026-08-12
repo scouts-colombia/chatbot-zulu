@@ -355,7 +355,7 @@ async function ContenidoPrincipal({
                             <span className="block truncate font-medium text-foreground text-sm">
                               {conversacion.title}
                             </span>
-                            <time className="text-foreground/50 text-xs">
+                            <time className="text-foreground/70 text-xs">
                               Actualizada{" "}
                               {new Date(
                                 conversacion.updated_at as string
@@ -502,7 +502,7 @@ function PaginacionConversaciones({
       ) : (
         <span />
       )}
-      <span className="text-foreground/50 text-xs">
+      <span className="text-foreground/70 text-xs">
         {totalPaginas === null
           ? `Página ${pagina}`
           : `Página ${pagina} de ${totalPaginas}`}

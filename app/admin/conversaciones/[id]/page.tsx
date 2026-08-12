@@ -245,7 +245,7 @@ async function DetalleConversacion({
                     : "rounded-bl-sm border-scouts-purple/10 bg-white/80 text-foreground",
                 ].join(" ")}
               >
-                <p className="mb-1 text-foreground/45 text-xs">
+                <p className="mb-1 text-foreground/70 text-xs">
                   {mensaje.sender} ·{" "}
                   {new Date(mensaje.created_at as string).toLocaleString(
                     "es-CO"
@@ -345,7 +345,7 @@ function PaginacionMensajes({
       ) : (
         <span />
       )}
-      <span className="text-foreground/50 text-xs">
+      <span className="text-foreground/70 text-xs">
         {totalPaginas === null
           ? `Tramo ${pagina}`
           : `Tramo ${pagina} de ${totalPaginas} · ${total} mensajes`}
