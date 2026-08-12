@@ -29,6 +29,11 @@ comment on table public.guest_transfer_receipts is
 create index idx_guest_transfer_receipts_expires_at
   on public.guest_transfer_receipts (expires_at);
 
+-- PostgreSQL no crea índices para la columna referenciante. Este índice evita
+-- escanear todos los recibos al eliminar una cuenta destino (ON DELETE CASCADE).
+create index idx_guest_transfer_receipts_target_user_id
+  on public.guest_transfer_receipts (target_user_id);
+
 alter table public.guest_transfer_receipts enable row level security;
 
 revoke all on table public.guest_transfer_receipts
