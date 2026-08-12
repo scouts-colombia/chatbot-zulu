@@ -8,6 +8,26 @@
 
 Este es el handoff autoritativo para continuar las dos PR. El handoff de PARCE/allowlist del 2026-08-06 es histórico: no volver a indexar PARCE.
 
+## Actualización — revisión independiente y correcciones
+
+Esta sección reemplaza los SHA y resultados anteriores cuando haya discrepancias.
+
+- PR #12 publicada en eed2466 (fix: conservar protección del registro invitado).
+- La protección previa a auth.updateUser ahora es monotónica hasta expirar:
+  un error ambiguo de Auth o un intento concurrente ya no puede retirar la
+  marca de otro registro que sí avanzó.
+- La migración pendiente ya no crea ni expone
+  cancelar_registro_invitado_pendiente; sigue sin aplicarse remotamente.
+- Se añadió lib/invitados/registro.test.ts como contrato de regresión.
+- PR #13 fue rebasada sobre eed2466 y publicada en 28124ae
+  (fix: cerrar hallazgos de accesibilidad visual).
+- La visual sube textos secundarios a opacidad /70, mantiene objetivos
+  táctiles de 44 px y elimina el mínimo artificial de 34 rem del chat público.
+- Verificación local actual en ambas cabezas: typecheck y build pasan; 46/46
+  pruebas pasan; Biome dirigido, git diff --check y detector Impeccable pasan.
+- Verificación real de PR #13 en 667 × 375: documento y shell miden 375 px;
+  header, composer, consentimiento y footer permanecen visibles. Con
+  prefers-color-scheme: dark, el fondo sigue siendo crema rgb(255, 248, 235).
 ## Decisiones aprobadas
 
 - `/` abre directamente el chat, no el login.
@@ -142,12 +162,17 @@ Además del chat público, preflight, consentimiento, cuota atómica, transferen
 
 ## Trabajo inmediato
 
-1. Hacer commit de este handoff y push de PR #13 con `--force-with-lease`.
-2. Esperar los checks `Lint / build (20)` de ambas PR; si pasan, reinvocar `@codex review` sobre los dos SHA publicados.
-3. Codex Review ha rechazado por cuota los últimos intentos; reintentar cuando vuelva la cuota y corregir/reinvocar hasta limpio/👍 en ambas PR.
-4. Habilitar el MCP de Supabase o conseguir autorización explícita para una CLI fijada; aplicar y verificar `20260812190000_proteger_conversion_invitada_pendiente.sql` y correr advisors.
-5. No hacer merge.
-
+1. Esperar y verificar los checks remotos de PR #12 en eed2466 y PR #13 en
+   28124ae.
+2. Habilitar el MCP de Supabase; aplicar y verificar
+   20260812190000_proteger_conversion_invitada_pendiente.sql en
+   ddimxdrggrrfcvzwwben, incluyendo columna, tabla, RLS, grants, funciones,
+   idempotencia y advisors.
+3. Reinvocar Codex Review sobre ambos SHA cuando la cuota vuelva. La revisión
+   independiente ya cerró los hallazgos conocidos, pero no sustituye el
+   criterio explícito de aprobación solicitado para ambas PR.
+4. No hacer merge hasta completar la verificación remota de la migración y el
+   ciclo final de revisión.
 ## Restricciones
 
 - Preservar cambios ajenos; no hacer formateo masivo.
