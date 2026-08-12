@@ -107,7 +107,7 @@ function MarcoChatPublico({ children }: { children: React.ReactNode }) {
         <NavegacionCuentaPublica />
       </header>
       <main className="relative z-10 min-h-0 flex-1">{children}</main>
-      <p className="relative z-10 px-4 pb-3 text-center text-pnpj-tinta/60 text-xs">
+      <p className="relative z-10 px-4 pb-3 text-center text-pnpj-tinta/70 text-xs">
         Una pregunta de prueba por dispositivo. Las respuestas citan documentos
         oficiales.
       </p>

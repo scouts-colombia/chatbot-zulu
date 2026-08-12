@@ -322,7 +322,7 @@ async function ContenidoPrincipal({
                     <h2 className="font-semibold text-lg text-scouts-purple">
                       Tus conversaciones
                     </h2>
-                    <p className="text-foreground/55 text-xs">
+                    <p className="text-foreground/70 text-xs">
                       {totalConversaciones == null
                         ? "Historial reciente"
                         : `${totalConversaciones} en tu historial activo`}
@@ -370,6 +370,7 @@ async function ContenidoPrincipal({
                             />
                             <Button
                               aria-label="Archivar conversación"
+                              className="min-h-11 min-w-11 sm:min-h-8 sm:min-w-8"
                               size="sm"
                               type="submit"
                               variant="ghost"
