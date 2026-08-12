@@ -300,13 +300,6 @@ async function ContenidoPrincipal({
                       value={borradorTransferenciaId}
                     />
                   )}
-                  {conversationIdTransferencia && (
-                    <input
-                      name="conversacion"
-                      type="hidden"
-                      value={conversationIdTransferencia}
-                    />
-                  )}
                   <Button
                     className="btn-press min-h-12 w-full bg-scouts-yellow px-5 text-scouts-purple shadow-lg hover:bg-scouts-yellow/90 sm:w-auto"
                     type="submit"
