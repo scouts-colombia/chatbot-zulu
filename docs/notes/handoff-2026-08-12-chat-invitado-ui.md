@@ -160,32 +160,111 @@ Además del chat público, preflight, consentimiento, cuota atómica, transferen
 - El layout raíz no monta un `TooltipProvider` global sin consumidores; `/login` tiene su propio `Suspense`.
 - `DESIGN.md` y `.impeccable/surfaces/app-page-tsx.md` describen crema y ausencia de dark mode.
 
-## Estado de Codex review
+## Estado de entrega para la próxima sesión
 
-- PR #12: todos los hilos de revisión están respondidos y resueltos; el SHA base actual es `4240843`. Se reinvocó Codex el 2026-08-12 en los comentarios `5271605204` y `5271668505`; ambos intentos respondieron `You have reached your Codex usage limits for code reviews`. No hubo hallazgos nuevos ni revisión limpia del SHA actual.
-- PR #13: en `e56c1ad` quedaron dos hilos accionables: texto normal de 12 px por debajo de AA (`3769089838`) y botón móvil de archivar por debajo de 44 px (`3769089849`). Los hilos fueron respondidos y resueltos; el fix persiste reescrito en `9065a66` y el formato de CI en `62f4837`, todavía sin publicar tras el último rebase ni reinvocar review sobre el SHA final.
-- Criterio de cierre: ambas PR deben tener revisión limpia/👍 sobre su SHA exacto. Cada corrección en la base exige rebase, validación, `push --force-with-lease` y review nuevo de la visual.
+Esta es la fotografía final y prevalece sobre cualquier SHA o conteo anterior
+que permanezca en las notas históricas de este documento.
+
+### PR #12 — chat invitado
+
+- Rama: `agent/zulu-chat-invitado`.
+- Base: `master`.
+- Cabeza publicada: `578116ad6cb1278fbcf6bc5e86eff7bd08057a71`.
+- GitHub: `CLEAN`; CI `build (20)` y Vercel verdes.
+- La protección del registro invitado es monotónica hasta expirar. Un error
+  ambiguo de Auth o un intento concurrente ya no puede retirar la protección
+  de otra pestaña.
+- La migración pendiente ya no crea ni concede
+  `cancelar_registro_invitado_pendiente`.
+- `lib/invitados/registro.test.ts` protege ese contrato.
+- Estado remoto de Supabase: la migración
+  `20260812190000_proteger_conversion_invitada_pendiente.sql` todavía no fue
+  aplicada ni verificada en esta sesión.
+
+### PR #13 — sistema visual
+
+- Rama: `agent/zulu-ui-aplicacion`.
+- Base: `agent/zulu-chat-invitado`.
+- Cabeza publicada antes de este commit exclusivamente documental:
+  `9c9d4bc3c11d23460b0c0bfe31755aa4f010ba43`.
+- GitHub: `CLEAN`; CI `build (20)` y Vercel verdes.
+- La rama fue rebasada sobre `578116a`.
+- Contraste secundario elevado a `/70`, objetivos táctiles relevantes de
+  44 px y chat público corregido para viewports de poca altura.
+- Verificación real en `667 × 375`: documento y shell miden 375 px; header,
+  composer, consentimiento y footer permanecen visibles.
+- Con `prefers-color-scheme: dark`, el fondo permanece crema
+  `rgb(255, 248, 235)`. No existe modo oscuro funcional.
+
+### Validaciones realizadas
+
+- `pnpm typecheck`: pasa.
+- `pnpm test -- --run`: 46/46 pasan.
+- `pnpm build`: pasa y genera 15 páginas.
+- Biome dirigido y `git diff --check`: pasan.
+- Detector Impeccable sobre los cambios visuales: cero hallazgos mecánicos.
+- Worktree limpio al entregar el trabajo.
+
+## Estado de Codex Review
+
+- Todos los hilos existentes de ambas PR están respondidos y resueltos.
+- Se reinvocó `@codex review` en las cabezas corregidas:
+
+  - PR #12: comentario `5273404738`.
+  - PR #13: comentario `5273406466`.
+- En ambos casos el conector respondió que se alcanzó el límite de uso de
+  revisiones. No produjo comentarios nuevos ni una aprobación sobre las
+  cabezas actuales.
+- La revisión independiente encontró y ya corrigió:
+  1. cancelación insegura de la protección del registro invitado;
+  2. contraste insuficiente;
+  3. targets táctiles pequeños;
+  4. overflow en viewports bajos.
+- Criterio de cierre solicitado: reinvocar cuando vuelva la cuota y obtener una
+  revisión limpia o reacción de aprobación sobre el SHA exacto de cada PR.
 
 ## Trabajo inmediato
 
-1. Habilitar el MCP de Supabase; aplicar y verificar
-   20260812190000_proteger_conversion_invitada_pendiente.sql en
-   ddimxdrggrrfcvzwwben, incluyendo columna, tabla, RLS, grants, funciones,
-   idempotencia y advisors.
-2. Reinvocar Codex Review sobre ambos SHA cuando la cuota vuelva. La revisión
-   independiente ya cerró los hallazgos conocidos, pero no sustituye el
-   criterio explícito de aprobación solicitado para ambas PR.
-3. No hacer merge hasta completar la verificación remota de la migración y el
-   ciclo final de revisión.
+1. Con el conector de Supabase habilitado, leer primero su skill completo.
+2. Confirmar en `ddimxdrggrrfcvzwwben` que
+   `20260812190000_proteger_conversion_invitada_pendiente.sql` no está
+   aplicada. Si aparece aplicada inesperadamente, no repetirla: comparar el
+   estado remoto con el archivo y documentar la discrepancia.
+3. Revisar y aplicar mediante el conector:
+   `supabase/migrations/20260812190000_proteger_conversion_invitada_pendiente.sql`.
+4. Verificar remotamente:
+   - columna `guest_identity_cleanup_queue.registration_pending_until`;
+   - tabla `guest_transfer_receipts`, índices, RLS y ausencia de acceso para
+     `anon` y `authenticated`;
+   - grants y definiciones de `marcar_registro_invitado_pendiente`,
+     `tomar_limpiezas_identidad_invitada` y
+     `transferir_conversaciones_invitadas`;
+   - ausencia de `cancelar_registro_invitado_pendiente`;
+   - preservación de cuentas y conversaciones existentes;
+   - idempotencia de la transferencia, sin dejar datos sintéticos.
+5. Ejecutar advisors de seguridad y rendimiento. Separar hallazgos nuevos de
+   avisos preexistentes e intencionales.
+6. Actualizar `ROADMAP.md` y este handoff únicamente con hechos confirmados.
+   Si cambia código de PR #12, rebasar PR #13, validar y publicar con
+   `--force-with-lease`.
+7. Reinvocar Codex Review en ambas PR cuando haya cuota. Corregir, responder,
+   resolver y reinvocar hasta revisión limpia/aprobación.
+8. No hacer merge.
 
 ## Restricciones
 
 - Preservar cambios ajenos; no hacer formateo masivo.
+- El usuario autorizó push de ambas ramas. No hacer merge.
+- Commits en español y sin `Co-Authored-By`.
 - No ejecutar `scripts/seed-allowlist.sql` con correos de ejemplo.
-- No reindexar PARCE.
-- No cambiar Gemini, RAG, cuotas, privacidad, citas, reglas para menores ni navegación admin fuera de los fixes ya documentados.
-- No reintroducir caché, streaming, pgvector, RAG manual, raw provider response, NextAuth, Drizzle como dueño del esquema ni dark mode.
-- `apply_patch` falla en esta máquina con `CryptUnprotectData`; se usa escritura UTF-8 sin BOM como fallback.
+- No reindexar PARCE: ya está activo y verificado en Supabase y Gemini.
+- No cambiar Gemini, RAG, cuotas, privacidad, citas ni reglas para menores.
+- No reintroducir caché, streaming, pgvector, RAG manual, raw provider
+  response, NextAuth, Drizzle como dueño del esquema ni dark mode.
+- Dentro de `/admin` se usan elementos `<a>`, nunca `next/link`.
+- Un error de consulta no equivale a ausencia de datos; mantener fail-closed.
+- `apply_patch` ha fallado en esta máquina con `CryptUnprotectData`; el
+  fallback documentado es escritura UTF-8 sin BOM con reemplazos acotados.
 
 ## Prompt sugerido para la próxima sesión
 
@@ -195,17 +274,41 @@ Continúa el trabajo en D:\dev\chatbot-zulu.
 Lee primero y toma como handoff autoritativo:
 docs/notes/handoff-2026-08-12-chat-invitado-ui.md
 
-Después lee AGENTS.md y CLAUDE.md completos. Preserva todos los cambios locales existentes. Usa el skill de GitHub para comentarios de PR y el skill de Supabase cuando corresponda.
+Después lee AGENTS.md y CLAUDE.md completos y, antes de usar Supabase, lee
+completo el skill de Supabase disponible en la sesión. Preserva todos los
+cambios locales existentes.
 
-Continúa desde “Trabajo inmediato”. Hay dos PR apiladas: #12 (`agent/zulu-chat-invitado`) y #13 (`agent/zulu-ui-aplicacion`). Verifica rama, worktree, SHA local/remoto, estado thread-aware de GitHub y estado remoto de migraciones antes de actuar.
+Continúa exactamente desde “Trabajo inmediato”. Hay dos PR apiladas:
+- PR #12: agent/zulu-chat-invitado → master.
+- PR #13: agent/zulu-ui-aplicacion → agent/zulu-chat-invitado.
 
-La base está en `4240843`; todos sus hilos están resueltos, pero los últimos intentos de Codex Review fueron rechazados por límite de uso. La visual fue rebasada sobre esa base; revisa el handoff para saber si sus dos correcciones de accesibilidad ya fueron validadas/publicadas.
+Empieza con comprobaciones de solo lectura: rama, worktree, SHA local/remoto,
+bases de las PR, checks, hilos thread-aware y lista remota de migraciones. La
+última cabeza funcional confirmada de PR #12 es
+578116ad6cb1278fbcf6bc5e86eff7bd08057a71. La PR #13 estaba CLEAN y verde;
+verifica su cabeza exacta porque el último cambio fue solo documental.
 
-Queda pendiente aplicar en Supabase `ddimxdrggrrfcvzwwben` la migración `supabase/migrations/20260812190000_proteger_conversion_invitada_pendiente.sql`. En la sesión anterior no estaba expuesto el MCP y se denegó descargar la CLI. No inventes verificación remota: habilita/usa MCP o pide autorización explícita, aplica la migración, verifica tabla/columna/RLS/grants/funciones e idempotencia y corre advisors.
+Tendrás acceso al conector de Supabase. Úsalo en el proyecto
+ddimxdrggrrfcvzwwben. Confirma primero que
+20260812190000_proteger_conversion_invitada_pendiente.sql no está aplicada;
+luego revisa y aplica el archivo local
+supabase/migrations/20260812190000_proteger_conversion_invitada_pendiente.sql.
+No inventes resultados ni uses la CLI como sustituto si el conector funciona.
 
-La dirección visual aprobada es Ruta `/diseno/componentes`: fondo crema `#fff8eb` con lavados amarillo/durazno, Futura, colores vivos y liquid glass claro. El modo oscuro fue eliminado completamente. No reintroduzcas fondo morado, `next-themes`, clase `dark` ni variantes `dark:`.
+Verifica columna, tabla, índices, RLS, revokes/grants, definiciones de funciones,
+ausencia de cancelar_registro_invitado_pendiente, preservación de datos
+existentes e idempotencia sin residuos sintéticos. Ejecuta los advisors de
+seguridad y rendimiento y distingue hallazgos nuevos de avisos preexistentes.
+No ejecutes scripts/seed-allowlist.sql y no reindexes PARCE.
 
-Continúa el ciclo de Codex Review de ambas PR. Responde y resuelve cada comentario, reinvoca `@codex review` después de cada corrección y no declares terminado hasta que ambas tengan revisión limpia/👍 sobre su SHA exacto. Si cambia la base, vuelve a rebasar y validar la visual.
+Si todo queda verde, actualiza ROADMAP.md y el handoff con hechos remotos
+confirmados. Después reinvoca @codex review en ambas PR cuando haya cuota.
+Resuelve cada comentario y reinvoca hasta obtener revisión limpia o aprobación
+sobre los SHA exactos. Si modificas PR #12, rebasa PR #13, repite typecheck,
+tests, lint/check, build y push --force-with-lease.
 
-Puedes hacer push; no hagas merge. Los commits deben estar en español y sin `Co-Authored-By`. No reindexes PARCE, no ejecutes `scripts/seed-allowlist.sql` y no alteres cambios ajenos.
+Puedes hacer push. No hagas merge. Los commits deben estar en español y sin
+Co-Authored-By. No reintroduzcas dark mode: la dirección visual aprobada es
+Ruta /diseno/componentes, fondo crema #fff8eb, Futura, colores vivos y liquid
+glass claro. Dentro de /admin usa <a>, nunca next/link.
 ```
