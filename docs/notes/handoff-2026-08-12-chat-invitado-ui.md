@@ -29,10 +29,10 @@ master
     └── agent/zulu-ui-aplicacion → PR #13
 ```
 
-- Base local/remota: `agent/zulu-chat-invitado` en `d9e39f8` (`fix: indexar recibos de transferencia invitada`).
-- Visual local: `agent/zulu-ui-aplicacion` rebasada sobre `d9e39f8`; el fix accesible reescrito está en `932072f`. El remoto todavía apunta a `644c805`, por lo que el push final deberá usar `--force-with-lease`.
-- El fix visual `932072f` contiene las correcciones de los dos hilos abiertos de PR #13: contraste AA en texto de 12 px y objetivo táctil móvil de 44 × 44 px para archivar. El worktree solo contiene este handoff pendiente de commit.
-- Los dos rebases visuales terminaron sin conflictos; el último reescribió 13 commits sobre `d9e39f8`.
+- Base local/remota: `agent/zulu-chat-invitado` en `4240843` (`fix: ordenar imports del chat invitado`).
+- Visual local: `agent/zulu-ui-aplicacion` rebasada sobre `4240843`; el fix accesible reescrito está en `9065a66` y el formato de CI en `62f4837`. El remoto todavía apunta a `f604da3`, por lo que el push final deberá usar `--force-with-lease`.
+- El fix visual `9065a66` contiene las correcciones de los dos hilos abiertos de PR #13: contraste AA en texto de 12 px y objetivo táctil móvil de 44 × 44 px para archivar. El worktree solo contiene este handoff pendiente de commit.
+- Los tres rebases visuales terminaron sin conflictos; el último reescribió 13 commits sobre `4240843`.
 - Commits en español, sin `Co-Authored-By`. No hay cambios ajenos conocidos.
 
 ## PR #12 — estado funcional
@@ -101,7 +101,7 @@ Además del chat público, preflight, consentimiento, cuota atómica, transferen
 
 ## Validaciones finales
 
-### Base `d9e39f8`
+### Base `4240843`
 
 - `pnpm install --offline --frozen-lockfile`: pasa.
 - `pnpm typecheck`: pasa.
@@ -110,7 +110,7 @@ Además del chat público, preflight, consentimiento, cuota atómica, transferen
 - `git diff --check`: pasa.
 - `pnpm build`: pasa; genera 15 páginas y `/login` queda en Partial Prerender.
 
-### Visual `932072f` tras el rebase
+### Visual `62f4837` tras el rebase
 
 - `pnpm install --offline --frozen-lockfile`: pasa y retira `next-themes`.
 - `pnpm typecheck`: pasa.
@@ -120,6 +120,7 @@ Además del chat público, preflight, consentimiento, cuota atómica, transferen
 - `pnpm build`: pasa; genera 15 páginas y `/login` queda en Partial Prerender.
 - Búsqueda mecánica: cero referencias funcionales a `next-themes`, `ThemeProvider`, `dark:`, clase `dark`, `prefers-color-scheme` o toggles de tema. Solo aparecen las dos frases de `DESIGN.md` y `.impeccable` que documentan que no existe dark mode.
 - Footer y contador de historial usan opacidad `/70`; el botón móvil de archivar tiene mínimo `44 × 44 px`.
+- `62f4837` aplica el formato exacto de Biome al `<body>`; Biome dirigido, typecheck, 45/45 pruebas y build de 15 páginas pasan.
 
 ## PR #13 — sistema visual
 
@@ -135,15 +136,15 @@ Además del chat público, preflight, consentimiento, cuota atómica, transferen
 
 ## Estado de Codex review
 
-- PR #12: todos los hilos de revisión están respondidos y resueltos; el SHA base actual es `d9e39f8`. Se reinvocó Codex el 2026-08-12 en los comentarios `5271605204` y `5271668505`; ambos intentos respondieron `You have reached your Codex usage limits for code reviews`. No hubo hallazgos nuevos ni revisión limpia del SHA actual.
-- PR #13: en `e56c1ad` quedaron dos hilos accionables: texto normal de 12 px por debajo de AA (`3769089838`) y botón móvil de archivar por debajo de 44 px (`3769089849`). Los hilos fueron respondidos y resueltos sobre el push anterior; el fix persiste reescrito en `932072f`, todavía sin publicar tras el último rebase ni reinvocar review sobre ese SHA.
+- PR #12: todos los hilos de revisión están respondidos y resueltos; el SHA base actual es `4240843`. Se reinvocó Codex el 2026-08-12 en los comentarios `5271605204` y `5271668505`; ambos intentos respondieron `You have reached your Codex usage limits for code reviews`. No hubo hallazgos nuevos ni revisión limpia del SHA actual.
+- PR #13: en `e56c1ad` quedaron dos hilos accionables: texto normal de 12 px por debajo de AA (`3769089838`) y botón móvil de archivar por debajo de 44 px (`3769089849`). Los hilos fueron respondidos y resueltos; el fix persiste reescrito en `9065a66` y el formato de CI en `62f4837`, todavía sin publicar tras el último rebase ni reinvocar review sobre el SHA final.
 - Criterio de cierre: ambas PR deben tener revisión limpia/👍 sobre su SHA exacto. Cada corrección en la base exige rebase, validación, `push --force-with-lease` y review nuevo de la visual.
 
 ## Trabajo inmediato
 
 1. Hacer commit de este handoff y push de PR #13 con `--force-with-lease`.
-2. Los hilos `3769089838` y `3769089849` ya están respondidos/resueltos; reinvocar `@codex review` sobre el SHA publicado.
-3. Reintentar Codex Review de PR #12 cuando vuelva la cuota. Corregir/reinvocar hasta limpio/👍 en ambas PR.
+2. Esperar los checks `Lint / build (20)` de ambas PR; si pasan, reinvocar `@codex review` sobre los dos SHA publicados.
+3. Codex Review ha rechazado por cuota los últimos intentos; reintentar cuando vuelva la cuota y corregir/reinvocar hasta limpio/👍 en ambas PR.
 4. Habilitar el MCP de Supabase o conseguir autorización explícita para una CLI fijada; aplicar y verificar `20260812190000_proteger_conversion_invitada_pendiente.sql` y correr advisors.
 5. No hacer merge.
 
@@ -168,7 +169,7 @@ Después lee AGENTS.md y CLAUDE.md completos. Preserva todos los cambios locales
 
 Continúa desde “Trabajo inmediato”. Hay dos PR apiladas: #12 (`agent/zulu-chat-invitado`) y #13 (`agent/zulu-ui-aplicacion`). Verifica rama, worktree, SHA local/remoto, estado thread-aware de GitHub y estado remoto de migraciones antes de actuar.
 
-La base está en `d9e39f8`; todos sus hilos están resueltos, pero los últimos intentos de Codex Review fueron rechazados por límite de uso. La visual fue rebasada sobre esa base; revisa el handoff para saber si sus dos correcciones de accesibilidad ya fueron validadas/publicadas.
+La base está en `4240843`; todos sus hilos están resueltos, pero los últimos intentos de Codex Review fueron rechazados por límite de uso. La visual fue rebasada sobre esa base; revisa el handoff para saber si sus dos correcciones de accesibilidad ya fueron validadas/publicadas.
 
 Queda pendiente aplicar en Supabase `ddimxdrggrrfcvzwwben` la migración `supabase/migrations/20260812190000_proteger_conversion_invitada_pendiente.sql`. En la sesión anterior no estaba expuesto el MCP y se denegó descargar la CLI. No inventes verificación remota: habilita/usa MCP o pide autorización explícita, aplica la migración, verifica tabla/columna/RLS/grants/funciones e idempotencia y corre advisors.
 
