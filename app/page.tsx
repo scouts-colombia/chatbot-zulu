@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { ChatPublico } from "@/components/chat/chat-publico";
+import { LimpiezaBorradoresPendientes } from "@/components/chat/limpieza-borradores-pendientes";
 import { Button } from "@/components/ui/button";
 import { esIdTraspasoBorradorValido } from "@/lib/invitados/borrador";
 import {
@@ -32,15 +33,18 @@ export default function PaginaPrincipal({
   }>;
 }) {
   return (
-    <Suspense
-      fallback={
-        <div className="flex min-h-dvh items-center justify-center">
-          <p className="text-muted-foreground text-sm">Cargando...</p>
-        </div>
-      }
-    >
-      <ContenidoPrincipal searchParams={searchParams} />
-    </Suspense>
+    <>
+      <LimpiezaBorradoresPendientes />
+      <Suspense
+        fallback={
+          <div className="flex min-h-dvh items-center justify-center">
+            <p className="text-muted-foreground text-sm">Cargando...</p>
+          </div>
+        }
+      >
+        <ContenidoPrincipal searchParams={searchParams} />
+      </Suspense>
+    </>
   );
 }
 
