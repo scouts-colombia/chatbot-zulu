@@ -17,8 +17,9 @@ function silenciarErrores<T>(accion: () => Promise<T>) {
 }
 
 describe("limpieza de identidades invitadas", () => {
-  it("reclama un lote acotado y conserva para retry los borrados fallidos", async () => {
+  it("revalida el anonimato y conserva para retry los borrados fallidos", async () => {
     const eliminadas: string[] = [];
+    const verificadas: string[] = [];
     let parametros: unknown;
     const admin: ClienteLimpiezaInvitados = {
       rpc: (_funcion, recibidos) => {
@@ -34,6 +35,13 @@ describe("limpieza de identidades invitadas", () => {
       },
       auth: {
         admin: {
+          getUserById: (id) => {
+            verificadas.push(id);
+            return Promise.resolve({
+              data: { user: { is_anonymous: true } },
+              error: null,
+            });
+          },
           deleteUser: (id) => {
             eliminadas.push(id);
             return Promise.resolve({
@@ -55,12 +63,41 @@ describe("limpieza de identidades invitadas", () => {
       p_limite: 10,
       p_preferida: PREFERIDA,
     });
+    assert.deepEqual(verificadas, [PREFERIDA, SECUNDARIA]);
     assert.deepEqual(eliminadas, [PREFERIDA, SECUNDARIA]);
     assert.deepEqual(resultado, { reclamadas: 2, eliminadas: 1 });
   });
 
-  it("no intenta borrar si PostgreSQL no puede reclamar la cola", async () => {
+  it("no borra una identidad que ya se convirtió en cuenta permanente", async () => {
     let borrados = 0;
+    const admin: ClienteLimpiezaInvitados = {
+      rpc: () =>
+        Promise.resolve({
+          data: [{ guest_user_id: PREFERIDA }],
+          error: null,
+        }),
+      auth: {
+        admin: {
+          getUserById: () =>
+            Promise.resolve({
+              data: { user: { is_anonymous: false } },
+              error: null,
+            }),
+          deleteUser: () => {
+            borrados += 1;
+            return Promise.resolve({ error: null });
+          },
+        },
+      },
+    };
+
+    const resultado = await limpiarIdentidadesInvitadasPendientes(admin);
+    assert.equal(borrados, 0);
+    assert.deepEqual(resultado, { reclamadas: 1, eliminadas: 0 });
+  });
+
+  it("no intenta borrar si PostgreSQL no puede reclamar la cola", async () => {
+    let verificaciones = 0;
     const admin: ClienteLimpiezaInvitados = {
       rpc: () =>
         Promise.resolve({
@@ -69,10 +106,11 @@ describe("limpieza de identidades invitadas", () => {
         }),
       auth: {
         admin: {
-          deleteUser: () => {
-            borrados += 1;
-            return Promise.resolve({ error: null });
+          getUserById: () => {
+            verificaciones += 1;
+            return Promise.resolve({ data: { user: null }, error: null });
           },
+          deleteUser: () => Promise.resolve({ error: null }),
         },
       },
     };
@@ -84,7 +122,7 @@ describe("limpieza de identidades invitadas", () => {
       })
     );
 
-    assert.equal(borrados, 0);
+    assert.equal(verificaciones, 0);
     assert.deepEqual(resultado, { reclamadas: 0, eliminadas: 0 });
   });
 });

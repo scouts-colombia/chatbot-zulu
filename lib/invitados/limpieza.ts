@@ -2,6 +2,7 @@ const UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 type ErrorSupabase = { message: string } | null;
+type UsuarioAuthMinimo = { is_anonymous?: boolean } | null;
 
 export type ClienteLimpiezaInvitados = {
   rpc: (
@@ -10,6 +11,10 @@ export type ClienteLimpiezaInvitados = {
   ) => PromiseLike<{ data: unknown; error: ErrorSupabase }>;
   auth: {
     admin: {
+      getUserById: (userId: string) => PromiseLike<{
+        data: { user: UsuarioAuthMinimo };
+        error: ErrorSupabase;
+      }>;
       deleteUser: (userId: string) => PromiseLike<{ error: ErrorSupabase }>;
     };
   };
@@ -27,8 +32,9 @@ export type ResultadoLimpiezaInvitados = {
 
 /**
  * Reclama un lote privado y borra sus usuarios técnicos mediante Auth Admin.
- * Los fallos quedan en PostgreSQL con un nuevo next_attempt_at; nunca
- * bloquean el login de la cuenta permanente.
+ * La base bloquea atómicamente una conversión una vez entregado el claim. Esta
+ * segunda lectura evita además borrar una cuenta que ya no sea anónima ante
+ * estados legados o una regresión del trigger. Los fallos quedan para retry.
  */
 export async function limpiarIdentidadesInvitadasPendientes(
   admin: ClienteLimpiezaInvitados,
@@ -73,6 +79,21 @@ export async function limpiarIdentidadesInvitadasPendientes(
 
   let eliminadas = 0;
   for (const id of ids) {
+    const {
+      data: { user },
+      error: errorVerificacion,
+    } = await admin.auth.admin.getUserById(id);
+    if (errorVerificacion) {
+      console.error(
+        "[auth] No se pudo revalidar una identidad invitada encolada:",
+        errorVerificacion
+      );
+      continue;
+    }
+    if (user?.is_anonymous !== true) {
+      continue;
+    }
+
     const { error: errorBorrado } = await admin.auth.admin.deleteUser(id);
     if (errorBorrado) {
       console.error(

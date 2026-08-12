@@ -2,10 +2,12 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   claveBorradorInvitado,
+  esIdTraspasoBorradorValido,
   guardarBorradorInvitado,
-  leerBorradorPendiente,
   restaurarBorradorInvitado,
 } from "./borrador";
+
+const TRASPASO = "11111111-1111-4111-8111-111111111111";
 
 function crearAlmacen() {
   const valores = new Map<string, string>();
@@ -17,61 +19,99 @@ function crearAlmacen() {
 }
 
 describe("borrador invitado", () => {
-  it("conserva temporalmente un borrador sin conversación", () => {
+  it("no conserva un borrador sin conversación ni traspaso explícito", () => {
+    const almacen = crearAlmacen();
+    assert.equal(
+      guardarBorradorInvitado({
+        almacen,
+        conversationId: null,
+        texto: "Pregunta privada",
+      }),
+      false
+    );
+    assert.equal(
+      restaurarBorradorInvitado({
+        almacen,
+        conversationId: null,
+      }),
+      null
+    );
+  });
+
+  it("no muestra el borrador pendiente en otra visita pública", () => {
     const almacen = crearAlmacen();
     guardarBorradorInvitado({
       almacen,
       conversationId: null,
+      traspasoId: TRASPASO,
       texto: "¿Quién era BP?",
       ahora: 1000,
     });
-    assert.equal(leerBorradorPendiente(almacen, 2000), "¿Quién era BP?");
+    assert.equal(
+      restaurarBorradorInvitado({
+        almacen,
+        conversationId: null,
+        traspasoId: TRASPASO,
+        ahora: 2000,
+      }),
+      null
+    );
   });
 
-  it("elimina el borrador temporal cuando expira", () => {
+  it("migra el borrador solo con el token explícito correcto", () => {
     const almacen = crearAlmacen();
     guardarBorradorInvitado({
       almacen,
       conversationId: null,
-      texto: "Pregunta privada",
+      traspasoId: TRASPASO,
+      texto: "Pendiente",
       ahora: 1000,
     });
-    assert.equal(leerBorradorPendiente(almacen, 1_802_000), null);
-    assert.equal(almacen.getItem(claveBorradorInvitado(null)), null);
+
+    assert.equal(
+      restaurarBorradorInvitado({
+        almacen,
+        conversationId: "conv-1",
+        traspasoId: "22222222-2222-4222-8222-222222222222",
+        ahora: 2000,
+      }),
+      null
+    );
+    assert.equal(
+      restaurarBorradorInvitado({
+        almacen,
+        conversationId: "conv-1",
+        traspasoId: TRASPASO,
+        ahora: 2000,
+      }),
+      "Pendiente"
+    );
+    assert.equal(almacen.getItem(claveBorradorInvitado("conv-1")), "Pendiente");
   });
 
-  it("migra el borrador temporal al UUID sin sobrescribir uno asociado", () => {
+  it("elimina el borrador pendiente cuando expira", () => {
     const almacen = crearAlmacen();
     guardarBorradorInvitado({
       almacen,
       conversationId: null,
-      texto: "Pendiente",
+      traspasoId: TRASPASO,
+      texto: "Pregunta privada",
       ahora: 1000,
     });
     assert.equal(
       restaurarBorradorInvitado({
         almacen,
         conversationId: "conv-1",
-        ahora: 2000,
+        traspasoId: TRASPASO,
+        ahora: 1_802_000,
       }),
-      "Pendiente"
+      null
     );
-    assert.equal(almacen.getItem(claveBorradorInvitado(null)), null);
+  });
 
-    almacen.setItem(claveBorradorInvitado("conv-2"), "Asociado");
-    guardarBorradorInvitado({
-      almacen,
-      conversationId: null,
-      texto: "Otro pendiente",
-      ahora: 3000,
-    });
-    assert.equal(
-      restaurarBorradorInvitado({
-        almacen,
-        conversationId: "conv-2",
-        ahora: 4000,
-      }),
-      "Asociado"
-    );
+  it("valida identificadores opacos de traspaso", () => {
+    assert.equal(esIdTraspasoBorradorValido(TRASPASO), true);
+    assert.equal(esIdTraspasoBorradorValido("../../../otro"), false);
+    assert.equal(esIdTraspasoBorradorValido(null), false);
   });
 });

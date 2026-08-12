@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { esIdTraspasoBorradorValido } from "@/lib/invitados/borrador";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { finalizarRegistro, registrarse } from "../acciones";
 import { FormularioAuth } from "../formulario-auth";
@@ -8,7 +9,7 @@ export const metadata = { title: "Crear cuenta" };
 export default function PaginaRegistro({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ borrador?: string; error?: string }>;
 }) {
   return (
     <Suspense
@@ -28,9 +29,12 @@ export default function PaginaRegistro({
 async function ContenidoRegistro({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ borrador?: string; error?: string }>;
 }) {
-  const { error } = await searchParams;
+  const { borrador, error } = await searchParams;
+  const borradorTransferenciaId = esIdTraspasoBorradorValido(borrador)
+    ? borrador
+    : null;
   const supabase = await crearClienteServidor();
   const {
     data: { user },
@@ -45,6 +49,7 @@ async function ContenidoRegistro({
     return (
       <FormularioAuth
         accion={registrarse}
+        borradorTransferenciaId={borradorTransferenciaId}
         errorInicial="No pudimos verificar tu sesión. Recarga la página e inténtalo de nuevo."
         modo="registro"
       />
@@ -56,16 +61,23 @@ async function ContenidoRegistro({
     user.is_anonymous !== true &&
     user.user_metadata?.registro_pendiente_password === true
   ) {
-    return <FormularioAuth accion={finalizarRegistro} modo="finalizar" />;
+    return (
+      <FormularioAuth
+        accion={finalizarRegistro}
+        borradorTransferenciaId={borradorTransferenciaId}
+        modo="finalizar"
+      />
+    );
   }
 
   return (
     <FormularioAuth
       accion={registrarse}
+      borradorTransferenciaId={borradorTransferenciaId}
       conversionInvitada={user?.is_anonymous === true}
       errorInicial={
         error === "enlace_invalido"
-          ? "El enlace de verificaci\u00f3n venci\u00f3 o ya fue usado. Solicita uno nuevo."
+          ? "El enlace de verificación venció o ya fue usado. Solicita uno nuevo."
           : undefined
       }
       modo="registro"

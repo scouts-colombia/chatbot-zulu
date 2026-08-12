@@ -17,6 +17,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { ETIQUETAS_ESTADO } from "@/lib/chat/contrato";
 import {
+  crearIdTraspasoBorrador,
   eliminarClaveGlobalAnterior,
   guardarBorradorInvitado,
   limpiarBorradorInvitado,
@@ -202,6 +203,7 @@ export function Conversacion({
   limiteConsumido = false,
   requiereConsentimiento = false,
   sesionInvitadaEstablecida = false,
+  borradorTransferenciaId = null,
   versionPolitica,
 }: {
   conversationId?: string | null;
@@ -213,6 +215,7 @@ export function Conversacion({
   limiteConsumido?: boolean;
   requiereConsentimiento?: boolean;
   sesionInvitadaEstablecida?: boolean;
+  borradorTransferenciaId?: string | null;
   versionPolitica?: string;
 }) {
   const [conversationIdActual, setConversationIdActual] = useState(
@@ -229,6 +232,12 @@ export function Conversacion({
   const [sesionInvitadaLista, setSesionInvitadaLista] = useState(
     sesionInvitadaEstablecida
   );
+  const [mostrarRegistro, setMostrarRegistro] = useState(false);
+  const [motivoRegistro, setMotivoRegistro] = useState<string | null>(null);
+  const [traspasoBorradorId, setTraspasoBorradorId] = useState<string | null>(
+    borradorTransferenciaId
+  );
+  const [aceptaPolitica, setAceptaPolitica] = useState(false);
   useEffect(() => {
     // Elimina la clave global de versiones anteriores para que un borrador
     // no pueda reaparecer al cambiar de identidad en una pestaña compartida.
@@ -236,25 +245,35 @@ export function Conversacion({
     const guardado = restaurarBorradorInvitado({
       almacen: sessionStorage,
       conversationId: conversationIdActual,
+      traspasoId: borradorTransferenciaId,
     });
     if (guardado) {
       setBorrador((actual) => actual || guardado);
     }
-  }, [conversationIdActual]);
+  }, [borradorTransferenciaId, conversationIdActual]);
 
-  const persistirBorrador = (texto = borrador) => {
+  const persistirBorrador = (
+    texto = borrador,
+    traspasoId = traspasoBorradorId
+  ) => {
     const limpio = texto.trim();
     if (esInvitado && limpio) {
       guardarBorradorInvitado({
         almacen: sessionStorage,
         conversationId: conversationIdActual,
+        traspasoId,
         texto: limpio,
       });
     }
   };
-  const [mostrarRegistro, setMostrarRegistro] = useState(false);
-  const [motivoRegistro, setMotivoRegistro] = useState<string | null>(null);
-  const [aceptaPolitica, setAceptaPolitica] = useState(false);
+  const abrirRegistro = (mensaje: string, texto = borrador) => {
+    setBorrador(texto);
+    setTraspasoBorradorId((actual) =>
+      conversationIdActual ? null : (actual ?? crearIdTraspasoBorrador())
+    );
+    setMotivoRegistro(mensaje);
+    setMostrarRegistro(true);
+  };
   const mensajesRef = useRef<HTMLDivElement>(null);
   // Cursor del mensaje más antiguo cargado. Un contador se desfasaría en cuanto
   // el usuario envía un turno: la conversación crece por el final y el tramo
@@ -315,12 +334,10 @@ export function Conversacion({
       return;
     }
     if (esInvitado && limiteInvitado) {
-      setBorrador(limpio);
-      persistirBorrador(limpio);
-      setMotivoRegistro(
-        "Ya usaste tu pregunta de prueba. Crea una cuenta o inicia sesión para continuar."
+      abrirRegistro(
+        "Ya usaste tu pregunta de prueba. Crea una cuenta o inicia sesión para continuar.",
+        limpio
       );
-      setMostrarRegistro(true);
       return;
     }
     if (esInvitado && requiereConsentimiento && !aceptaPolitica) {
@@ -348,13 +365,7 @@ export function Conversacion({
       setBorrador(limpio);
     };
     const exigirRegistroTrasEnvio = (mensaje: string) => {
-      guardarBorradorInvitado({
-        almacen: sessionStorage,
-        conversationId: conversationIdActual,
-        texto: limpio,
-      });
-      setMotivoRegistro(mensaje);
-      setMostrarRegistro(true);
+      abrirRegistro(mensaje, limpio);
     };
 
     let solicitudPrincipalIniciada = false;
@@ -444,7 +455,11 @@ export function Conversacion({
       if (datos.conversationId) {
         setConversationIdActual(datos.conversationId);
       }
-      limpiarBorradorInvitado(sessionStorage, idConversacionRespuesta);
+      limpiarBorradorInvitado(
+        sessionStorage,
+        idConversacionRespuesta,
+        borradorTransferenciaId
+      );
       if (esInvitado) {
         setLimiteInvitado(true);
       }
@@ -645,7 +660,14 @@ export function Conversacion({
               asChild
               className="btn-press min-h-11 bg-scouts-purple text-white hover:bg-scouts-purple/90"
             >
-              <Link href="/registro" onClick={() => persistirBorrador()}>
+              <Link
+                href={
+                  traspasoBorradorId
+                    ? `/registro?borrador=${encodeURIComponent(traspasoBorradorId)}`
+                    : "/registro"
+                }
+                onClick={() => persistirBorrador(borrador, traspasoBorradorId)}
+              >
                 Crear cuenta
               </Link>
             </Button>
@@ -654,7 +676,14 @@ export function Conversacion({
               className="btn-press min-h-11 border-scouts-purple/25 text-scouts-purple hover:bg-scouts-purple/8"
               variant="outline"
             >
-              <Link href="/login" onClick={() => persistirBorrador()}>
+              <Link
+                href={
+                  traspasoBorradorId
+                    ? `/login?borrador=${encodeURIComponent(traspasoBorradorId)}`
+                    : "/login"
+                }
+                onClick={() => persistirBorrador(borrador, traspasoBorradorId)}
+              >
                 Iniciar sesión
               </Link>
             </Button>

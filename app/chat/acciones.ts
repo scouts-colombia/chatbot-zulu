@@ -3,9 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { cargarTramo } from "@/lib/chat/transcripcion";
+import { esIdTraspasoBorradorValido } from "@/lib/invitados/borrador";
 import { crearClienteServidor } from "@/lib/supabase/server";
 
-export async function crearConversacion() {
+export async function crearConversacion(formData?: FormData) {
   const supabase = await crearClienteServidor();
   const {
     data: { user },
@@ -24,7 +25,11 @@ export async function crearConversacion() {
     throw new Error(`No se pudo crear la conversación: ${error?.message}`);
   }
 
-  redirect(`/chat/${data.id}`);
+  const borrador = formData?.get("borrador");
+  const query = esIdTraspasoBorradorValido(borrador)
+    ? `?borrador=${encodeURIComponent(borrador)}`
+    : "";
+  redirect(`/chat/${data.id}${query}`);
 }
 
 export async function archivarConversacion(formData: FormData) {

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { ChatPublico } from "@/components/chat/chat-publico";
 import { Button } from "@/components/ui/button";
+import { esIdTraspasoBorradorValido } from "@/lib/invitados/borrador";
 import {
   URL_POLITICA_PRIVACIDAD,
   VERSION_POLITICA_PRIVACIDAD,
@@ -22,7 +23,11 @@ const TAMANO_PAGINA = 50;
 export default function PaginaPrincipal({
   searchParams,
 }: {
-  searchParams: Promise<{ aviso?: string; pagina?: string }>;
+  searchParams: Promise<{
+    aviso?: string;
+    borrador?: string;
+    pagina?: string;
+  }>;
 }) {
   return (
     <Suspense
@@ -40,9 +45,16 @@ export default function PaginaPrincipal({
 async function ContenidoPrincipal({
   searchParams,
 }: {
-  searchParams: Promise<{ aviso?: string; pagina?: string }>;
+  searchParams: Promise<{
+    aviso?: string;
+    borrador?: string;
+    pagina?: string;
+  }>;
 }) {
-  const { aviso, pagina: paginaParam } = await searchParams;
+  const { aviso, borrador, pagina: paginaParam } = await searchParams;
+  const borradorTransferenciaId = esIdTraspasoBorradorValido(borrador)
+    ? borrador
+    : null;
   const pagina = Math.max(1, Number.parseInt(paginaParam ?? "1", 10) || 1);
   const supabase = await crearClienteServidor();
 
@@ -171,6 +183,13 @@ async function ContenidoPrincipal({
         ) : (
           <div className="space-y-6">
             <form action={crearConversacion}>
+              {borradorTransferenciaId && (
+                <input
+                  name="borrador"
+                  type="hidden"
+                  value={borradorTransferenciaId}
+                />
+              )}
               <Button className="w-full" type="submit">
                 Nueva conversación
               </Button>

@@ -11,6 +11,7 @@ type Props = {
   modo: "login" | "registro" | "finalizar";
   conversionInvitada?: boolean;
   errorInicial?: string;
+  borradorTransferenciaId?: string | null;
   accion: (
     estadoPrevio: EstadoFormulario,
     formData: FormData
@@ -21,6 +22,7 @@ export function FormularioAuth({
   modo,
   accion,
   errorInicial,
+  borradorTransferenciaId = null,
   conversionInvitada = false,
 }: Props) {
   const [estado, enviar, pendiente] = useActionState(accion, { error: null });
@@ -57,6 +59,13 @@ export function FormularioAuth({
         </div>
 
         <form action={enviar} className="space-y-4">
+          {borradorTransferenciaId && (
+            <input
+              name="borrador"
+              type="hidden"
+              value={borradorTransferenciaId}
+            />
+          )}
           {esRegistro && (
             <div className="space-y-2">
               <Label htmlFor="nombre">Nombre</Label>
@@ -138,7 +147,11 @@ export function FormularioAuth({
                 ¿Ya tienes cuenta?{" "}
                 <Link
                   className="font-medium text-scouts-purple underline underline-offset-4"
-                  href="/login"
+                  href={
+                    borradorTransferenciaId
+                      ? `/login?borrador=${encodeURIComponent(borradorTransferenciaId)}`
+                      : "/login"
+                  }
                 >
                   Inicia sesión
                 </Link>
@@ -148,7 +161,11 @@ export function FormularioAuth({
                 ¿No tienes cuenta?{" "}
                 <Link
                   className="font-medium text-scouts-purple underline underline-offset-4"
-                  href="/registro"
+                  href={
+                    borradorTransferenciaId
+                      ? `/registro?borrador=${encodeURIComponent(borradorTransferenciaId)}`
+                      : "/registro"
+                  }
                 >
                   Regístrate
                 </Link>

@@ -719,10 +719,17 @@ export async function POST(request: Request) {
     // documento, que es lo que corrige el origen.
     let tituloDesalineado = false;
     if (idsDocumentos.length > 0) {
-      const { data: documentos } = await admin
+      const { data: documentos, error: errorMetadataCitas } = await admin
         .from("knowledge_documents")
         .select("id, version, display_name")
         .in("id", idsDocumentos);
+      if (errorMetadataCitas) {
+        console.error(
+          "[chat] No se pudo consultar la metadata local de las citas:",
+          errorMetadataCitas
+        );
+        throw new Error("consulta_metadata_citas_fallida");
+      }
       const docPorId = new Map(
         (documentos ?? []).map((doc) => [doc.id as string, doc])
       );

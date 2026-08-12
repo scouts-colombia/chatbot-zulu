@@ -1,43 +1,66 @@
 const BORRADOR_INVITADO_PREFIJO = "zulu:borrador-invitado";
-const BORRADOR_INVITADO_PENDIENTE = `${BORRADOR_INVITADO_PREFIJO}:pendiente`;
+const BORRADOR_INVITADO_PENDIENTE_ANTERIOR = `${BORRADOR_INVITADO_PREFIJO}:pendiente`;
 const VIGENCIA_BORRADOR_PENDIENTE_MS = 30 * 60 * 1000;
+const UUID_V4 =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 type AlmacenBorrador = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
-export function claveBorradorInvitado(conversationId: string | null) {
-  return conversationId
-    ? `${BORRADOR_INVITADO_PREFIJO}:${conversationId}`
-    : BORRADOR_INVITADO_PENDIENTE;
+export function esIdTraspasoBorradorValido(value: unknown): value is string {
+  return typeof value === "string" && UUID_V4.test(value);
+}
+
+export function crearIdTraspasoBorrador() {
+  return crypto.randomUUID();
+}
+
+export function claveBorradorInvitado(conversationId: string) {
+  return `${BORRADOR_INVITADO_PREFIJO}:${conversationId}`;
+}
+
+function claveBorradorPendiente(traspasoId: string) {
+  return `${BORRADOR_INVITADO_PREFIJO}:pendiente:${traspasoId}`;
 }
 
 export function eliminarClaveGlobalAnterior(almacen: AlmacenBorrador) {
   almacen.removeItem(BORRADOR_INVITADO_PREFIJO);
+  almacen.removeItem(BORRADOR_INVITADO_PENDIENTE_ANTERIOR);
 }
 
 export function guardarBorradorInvitado({
   almacen,
   conversationId,
+  traspasoId,
   texto,
   ahora = Date.now(),
 }: {
   almacen: AlmacenBorrador;
   conversationId: string | null;
+  traspasoId?: string | null;
   texto: string;
   ahora?: number;
 }) {
-  const clave = claveBorradorInvitado(conversationId);
-  if (!conversationId) {
-    almacen.setItem(clave, JSON.stringify({ texto, guardadoEn: ahora }));
-    return;
+  if (conversationId) {
+    almacen.setItem(claveBorradorInvitado(conversationId), texto);
+    return true;
   }
-  almacen.setItem(clave, texto);
+  if (!esIdTraspasoBorradorValido(traspasoId)) {
+    return false;
+  }
+  almacen.setItem(
+    claveBorradorPendiente(traspasoId),
+    JSON.stringify({ texto, guardadoEn: ahora })
+  );
+  return true;
 }
 
-export function leerBorradorPendiente(
+function leerBorradorPendiente(
   almacen: AlmacenBorrador,
-  ahora = Date.now()
+  traspasoId: string,
+  ahora: number
 ) {
-  const valor = almacen.getItem(BORRADOR_INVITADO_PENDIENTE);
+  const clave = claveBorradorPendiente(traspasoId);
+  const valor = almacen.getItem(clave);
   if (!valor) {
     return null;
   }
@@ -54,37 +77,49 @@ export function leerBorradorPendiente(
       return datos.texto;
     }
   } catch {
-    // Las versiones anteriores no tenían una clave temporal estructurada.
+    // Un valor inválido no se conserva ni se expone.
   }
-  almacen.removeItem(BORRADOR_INVITADO_PENDIENTE);
+  almacen.removeItem(clave);
   return null;
 }
 
 export function restaurarBorradorInvitado({
   almacen,
   conversationId,
+  traspasoId,
   ahora = Date.now(),
 }: {
   almacen: AlmacenBorrador;
   conversationId: string | null;
+  traspasoId?: string | null;
   ahora?: number;
 }) {
+  // Nunca se restaura un borrador pendiente en la portada pública: solo puede
+  // cruzar a una conversación concreta mediante el token opaco del flujo auth.
   if (!conversationId) {
-    return leerBorradorPendiente(almacen, ahora);
+    return null;
   }
+
   const clave = claveBorradorInvitado(conversationId);
-  const pendiente = leerBorradorPendiente(almacen, ahora);
-  if (pendiente && !almacen.getItem(clave)) {
-    almacen.setItem(clave, pendiente);
+  if (esIdTraspasoBorradorValido(traspasoId)) {
+    const pendiente = leerBorradorPendiente(almacen, traspasoId, ahora);
+    if (pendiente && !almacen.getItem(clave)) {
+      almacen.setItem(clave, pendiente);
+    }
+    almacen.removeItem(claveBorradorPendiente(traspasoId));
   }
-  almacen.removeItem(BORRADOR_INVITADO_PENDIENTE);
   return almacen.getItem(clave);
 }
 
 export function limpiarBorradorInvitado(
   almacen: AlmacenBorrador,
-  conversationId: string | null
+  conversationId: string | null,
+  traspasoId?: string | null
 ) {
-  almacen.removeItem(claveBorradorInvitado(conversationId));
-  almacen.removeItem(BORRADOR_INVITADO_PENDIENTE);
+  if (conversationId) {
+    almacen.removeItem(claveBorradorInvitado(conversationId));
+  }
+  if (esIdTraspasoBorradorValido(traspasoId)) {
+    almacen.removeItem(claveBorradorPendiente(traspasoId));
+  }
 }

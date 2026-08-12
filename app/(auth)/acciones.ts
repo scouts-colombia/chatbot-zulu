@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { esIdTraspasoBorradorValido } from "@/lib/invitados/borrador";
 import { construirHashesSolicitud } from "@/lib/invitados/identidad";
 import { limpiarIdentidadesInvitadasPendientes } from "@/lib/invitados/limpieza";
 import {
@@ -28,6 +29,9 @@ const MENSAJES_ERROR: Record<string, string> = {
 };
 
 function traducirError(codigo: string | undefined, mensaje: string) {
+  if (mensaje.includes("identidad_invitada_expirando")) {
+    return "Tu sesión de prueba expiró mientras completabas el registro. Vuelve al inicio e inténtalo de nuevo.";
+  }
   return MENSAJES_ERROR[codigo ?? ""] ?? `No se pudo completar: ${mensaje}`;
 }
 
@@ -46,11 +50,22 @@ async function obtenerOrigen() {
   );
 }
 
+function obtenerIdBorrador(formData: FormData) {
+  const value = formData.get("borrador");
+  return esIdTraspasoBorradorValido(value) ? value : null;
+}
+
+function destinoDespuesDeAuth(formData: FormData) {
+  const borradorId = obtenerIdBorrador(formData);
+  return borradorId ? `/?borrador=${encodeURIComponent(borradorId)}` : "/";
+}
+
 export async function iniciarSesion(
   _estadoPrevio: EstadoFormulario,
   formData: FormData
 ): Promise<EstadoFormulario> {
   const supabase = await crearClienteServidor();
+  const destino = destinoDespuesDeAuth(formData);
   const {
     data: { user: usuarioAnterior },
     error: errorUsuarioAnterior,
@@ -151,7 +166,7 @@ export async function iniciarSesion(
     });
 
     revalidatePath("/", "layout");
-    redirect("/");
+    redirect(destino);
   }
 
   const { error } = await supabase.auth.signInWithPassword(credenciales);
@@ -161,7 +176,7 @@ export async function iniciarSesion(
 
   await limpiarIdentidadesInvitadasPendientes(crearClienteAdmin());
   revalidatePath("/", "layout");
-  redirect("/");
+  redirect(destino);
 }
 
 export async function registrarse(
@@ -169,6 +184,7 @@ export async function registrarse(
   formData: FormData
 ): Promise<EstadoFormulario> {
   const supabase = await crearClienteServidor();
+  const destino = destinoDespuesDeAuth(formData);
 
   const nombre = String(formData.get("nombre") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim();
@@ -209,7 +225,7 @@ export async function registrarse(
         },
       },
       {
-        emailRedirectTo: `${origen}/auth/callback?next=${encodeURIComponent("/")}`,
+        emailRedirectTo: `${origen}/auth/callback?next=${encodeURIComponent(destino)}`,
       }
     );
 
@@ -230,7 +246,7 @@ export async function registrarse(
     password,
     options: {
       data: { nombre },
-      emailRedirectTo: `${origen}/auth/callback?next=${encodeURIComponent("/")}`,
+      emailRedirectTo: `${origen}/auth/callback?next=${encodeURIComponent(destino)}`,
     },
   });
 
@@ -247,7 +263,7 @@ export async function registrarse(
   }
 
   revalidatePath("/", "layout");
-  redirect("/");
+  redirect(destino);
 }
 
 export async function aceptarPoliticaPrivacidad() {
