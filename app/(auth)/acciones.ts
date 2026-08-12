@@ -232,6 +232,22 @@ export async function registrarse(
 
   if (usuarioActual?.is_anonymous === true) {
     const origen = await obtenerOrigen();
+    const admin = crearClienteAdmin();
+    const { error: errorProteccion } = await admin.rpc(
+      "marcar_registro_invitado_pendiente",
+      { p_guest_user_id: usuarioActual.id }
+    );
+    if (errorProteccion) {
+      console.error(
+        "[auth] No se pudo proteger la identidad durante el registro:",
+        errorProteccion
+      );
+      return {
+        error:
+          "No pudimos proteger tu sesión de prueba mientras verificas el correo. Inténtalo de nuevo.",
+      };
+    }
+
     const { error } = await supabase.auth.updateUser(
       {
         email,
@@ -247,6 +263,16 @@ export async function registrarse(
     );
 
     if (error) {
+      const { error: errorCancelacion } = await admin.rpc(
+        "cancelar_registro_invitado_pendiente",
+        { p_guest_user_id: usuarioActual.id }
+      );
+      if (errorCancelacion) {
+        console.error(
+          "[auth] No se pudo cancelar la protección del registro invitado:",
+          errorCancelacion
+        );
+      }
       return { error: traducirError(error.code, error.message) };
     }
 

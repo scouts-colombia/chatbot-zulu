@@ -25,6 +25,24 @@ const CuerpoSchema = z.object({
   versionPoliticaAceptada: z.string().min(1).max(200),
 });
 
+async function prepararConversacionInvitada(
+  admin: ReturnType<typeof crearClienteAdmin>,
+  userId: string
+) {
+  const { data, error } = await admin.rpc(
+    "obtener_o_crear_conversacion_invitada",
+    { p_user_id: userId }
+  );
+  if (error || typeof data !== "string") {
+    console.error(
+      "[chat/invitado] No se pudo preparar la conversación:",
+      error
+    );
+    return null;
+  }
+  return data;
+}
+
 async function obtenerIdentidadInvitada(request: Request) {
   const secret = process.env.GUEST_LIMIT_SECRET ?? "";
   const cookieStore = await cookies();
@@ -98,7 +116,17 @@ export async function POST(request: Request) {
 
   if (user) {
     if (user.is_anonymous === true) {
-      return NextResponse.json({ sesionPreparada: true });
+      const conversationId = await prepararConversacionInvitada(admin, user.id);
+      if (!conversationId) {
+        return NextResponse.json(
+          {
+            codigo: "conversacion_no_disponible",
+            mensaje: "No pudimos preparar tu conversación. Intenta de nuevo.",
+          },
+          { status: 503 }
+        );
+      }
+      return NextResponse.json({ sesionPreparada: true, conversationId });
     }
     return NextResponse.json(
       {
@@ -215,5 +243,19 @@ export async function POST(request: Request) {
     );
   }
 
-  return NextResponse.json({ sesionPreparada: true });
+  const conversationId = await prepararConversacionInvitada(
+    admin,
+    data.user.id
+  );
+  if (!conversationId) {
+    return NextResponse.json(
+      {
+        codigo: "conversacion_no_disponible",
+        mensaje: "No pudimos preparar tu conversación. Intenta de nuevo.",
+      },
+      { status: 503 }
+    );
+  }
+
+  return NextResponse.json({ sesionPreparada: true, conversationId });
 }

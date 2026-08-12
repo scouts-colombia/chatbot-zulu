@@ -18,6 +18,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ETIQUETAS_ESTADO } from "@/lib/chat/contrato";
 import {
   crearIdTraspasoBorrador,
+  esIdTraspasoBorradorValido,
   eliminarClaveGlobalAnterior,
   guardarBorradorInvitado,
   limpiarBorradoresPendientesExpirados,
@@ -315,31 +316,30 @@ export function Conversacion({
     }
   }, [borradorTransferenciaId, conversationIdActual]);
 
-  const persistirBorrador = (
-    texto = borrador,
-    traspasoId = traspasoBorradorId,
-    conversationIdDestino = conversationIdTransferencia
-  ) => {
-    const limpio = texto.trim();
-    if (esInvitado && limpio) {
-      guardarBorradorInvitado({
-        almacen: sessionStorage,
-        almacenPendiente: localStorage,
-        conversationId: traspasoId ? null : conversationIdActual,
-        conversationIdDestino: traspasoId ? conversationIdDestino : null,
-        traspasoId,
-        texto: limpio,
-      });
-    }
-  };
   const abrirRegistro = (
     mensaje: string,
     texto = borrador,
     conversationIdDestino = conversationIdActual
   ) => {
+    const limpio = texto.trim();
+    const traspasoId = traspasoBorradorId ?? crearIdTraspasoBorrador();
+
+    // Se persiste antes de renderizar enlaces: abrirlos con menú contextual,
+    // click medio o pulsación larga no depende de un onClick posterior.
+    if (esInvitado && limpio) {
+      guardarBorradorInvitado({
+        almacen: sessionStorage,
+        almacenPendiente: localStorage,
+        conversationId: null,
+        conversationIdDestino,
+        traspasoId,
+        texto: limpio,
+      });
+    }
+
     setBorrador(texto);
     setConversationIdTransferencia(conversationIdDestino);
-    setTraspasoBorradorId((actual) => actual ?? crearIdTraspasoBorrador());
+    setTraspasoBorradorId(traspasoId);
     setMotivoRegistro(mensaje);
     setMostrarRegistro(true);
   };
@@ -453,6 +453,7 @@ export function Conversacion({
       setMensajes((previos) => previos.filter((m) => m.id !== idLocal));
       setBorrador(limpio);
     };
+    let conversationIdSolicitud = conversationIdActual;
     const exigirRegistroTrasEnvio = (
       mensaje: string,
       conversationIdDestino?: string
@@ -460,7 +461,7 @@ export function Conversacion({
       abrirRegistro(
         mensaje,
         limpio,
-        conversationIdDestino ?? conversationIdActual
+        conversationIdDestino ?? conversationIdSolicitud
       );
     };
 
@@ -493,6 +494,16 @@ export function Conversacion({
           );
           return;
         }
+        if (!esIdTraspasoBorradorValido(datosPreparacion.conversationId)) {
+          revertir();
+          setAviso(
+            "No pudimos preparar tu conversación de prueba. Inténtalo de nuevo."
+          );
+          return;
+        }
+        conversationIdSolicitud = datosPreparacion.conversationId;
+        setConversationIdActual(conversationIdSolicitud);
+        setConversationIdTransferencia(conversationIdSolicitud);
         setSesionInvitadaLista(true);
       }
 
@@ -501,7 +512,7 @@ export function Conversacion({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          conversationId: conversationIdActual ?? undefined,
+          conversationId: conversationIdSolicitud ?? undefined,
           mensaje: limpio,
           aceptaPolitica:
             esInvitado && requiereConsentimiento ? aceptaPolitica : undefined,
@@ -792,13 +803,6 @@ export function Conversacion({
                   traspasoBorradorId,
                   conversationIdTransferencia
                 )}
-                onClick={() =>
-                  persistirBorrador(
-                    borrador,
-                    traspasoBorradorId,
-                    conversationIdTransferencia
-                  )
-                }
               >
                 Crear cuenta
               </Link>
@@ -814,13 +818,6 @@ export function Conversacion({
                   traspasoBorradorId,
                   conversationIdTransferencia
                 )}
-                onClick={() =>
-                  persistirBorrador(
-                    borrador,
-                    traspasoBorradorId,
-                    conversationIdTransferencia
-                  )
-                }
               >
                 Iniciar sesión
               </Link>

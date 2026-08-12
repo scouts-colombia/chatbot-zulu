@@ -66,7 +66,7 @@ export async function ChatPublico({ userId }: { userId: string | null }) {
         )}
         mensajesIniciales={mensajes}
         requiereConsentimiento={!consentimientoAceptado}
-        sesionInvitadaEstablecida={Boolean(userId)}
+        sesionInvitadaEstablecida={Boolean(userId && conversationId)}
         versionPolitica={VERSION_POLITICA_PRIVACIDAD}
       />
     </MarcoChatPublico>
