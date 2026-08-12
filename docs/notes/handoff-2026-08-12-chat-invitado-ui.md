@@ -30,8 +30,8 @@ master
 ```
 
 - Base local/remota: `agent/zulu-chat-invitado` en `4240843` (`fix: ordenar imports del chat invitado`).
-- Visual local: `agent/zulu-ui-aplicacion` rebasada sobre `4240843`; el fix accesible reescrito está en `9065a66` y el formato de CI en `62f4837`. El remoto todavía apunta a `f604da3`, por lo que el push final deberá usar `--force-with-lease`.
-- El fix visual `9065a66` contiene las correcciones de los dos hilos abiertos de PR #13: contraste AA en texto de 12 px y objetivo táctil móvil de 44 × 44 px para archivar. El worktree solo contiene este handoff pendiente de commit.
+- Visual local: `agent/zulu-ui-aplicacion` rebasada sobre `4240843`; el fix accesible reescrito está en `9065a66` y el formato de CI en `62f4837`. La historia rebasada fue publicada; antes de este commit documental el remoto apunta a `28bf124`.
+- El fix visual `9065a66` contiene las correcciones de los dos hilos abiertos de PR #13: contraste AA en texto de 12 px y objetivo táctil móvil de 44 × 44 px para archivar. Los fixes y el handoff están publicados; el worktree queda limpio tras este commit.
 - Los tres rebases visuales terminaron sin conflictos; el último reescribió 13 commits sobre `4240843`.
 - Commits en español, sin `Co-Authored-By`. No hay cambios ajenos conocidos.
 
@@ -120,7 +120,7 @@ Además del chat público, preflight, consentimiento, cuota atómica, transferen
 - `pnpm build`: pasa; genera 15 páginas y `/login` queda en Partial Prerender.
 - Búsqueda mecánica: cero referencias funcionales a `next-themes`, `ThemeProvider`, `dark:`, clase `dark`, `prefers-color-scheme` o toggles de tema. Solo aparecen las dos frases de `DESIGN.md` y `.impeccable` que documentan que no existe dark mode.
 - Footer y contador de historial usan opacidad `/70`; el botón móvil de archivar tiene mínimo `44 × 44 px`.
-- `62f4837` aplica el formato exacto de Biome al `<body>`; Biome dirigido, typecheck, 45/45 pruebas y build de 15 páginas pasan.
+- `62f4837` aplica el formato exacto de Biome al `<body>`; Biome dirigido, typecheck, 45/45 pruebas y build de 15 páginas pasan; `Lint / build (20)` remoto pasa en 22 s y Vercel está verde.
 
 ## PR #13 — sistema visual
 
