@@ -8,6 +8,8 @@ Regla de trabajo: las fases van en orden (la regla original de paralelismo entre
 
 ## Estado actual (2026-08-11) — handoff
 
+Handoff operativo de las PR apiladas: `docs/notes/handoff-2026-08-12-chat-invitado-ui.md`.
+
 **Dónde está el proyecto:** Fases 0 a 4 cerradas en master. La UI de consentimiento y el turno público están implementados en la PR #12; antes de exponerlos solo falta completar su configuración de despliegue. La modernización visual de la Fase 6 fue adelantada por decisión de producto del 2026-08-09 y se trabaja en una PR apilada. La evaluación RAG de la Fase 5 sigue pendiente y su certificación requiere resolver el corpus definitivo (el alcance pide 8 documentos y hay 6).
 
 **Hecho:**
