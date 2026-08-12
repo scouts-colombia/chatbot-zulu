@@ -8,6 +8,7 @@ import { esIdTraspasoBorradorValido } from "@/lib/invitados/borrador";
 import { construirHashesSolicitud } from "@/lib/invitados/identidad";
 import { limpiarIdentidadesInvitadasPendientes } from "@/lib/invitados/limpieza";
 import {
+  esVersionPoliticaVigente,
   URL_POLITICA_PRIVACIDAD,
   VERSION_POLITICA_PRIVACIDAD,
 } from "@/lib/privacidad";
@@ -55,9 +56,21 @@ function obtenerIdBorrador(formData: FormData) {
   return esIdTraspasoBorradorValido(value) ? value : null;
 }
 
-function destinoDespuesDeAuth(formData: FormData) {
+function destinoInicio(formData: FormData, aviso?: string) {
+  const parametros = new URLSearchParams();
   const borradorId = obtenerIdBorrador(formData);
-  return borradorId ? `/?borrador=${encodeURIComponent(borradorId)}` : "/";
+  if (aviso) {
+    parametros.set("aviso", aviso);
+  }
+  if (borradorId) {
+    parametros.set("borrador", borradorId);
+  }
+  const query = parametros.toString();
+  return query ? `/?${query}` : "/";
+}
+
+function destinoDespuesDeAuth(formData: FormData) {
+  return destinoInicio(formData);
 }
 
 export async function iniciarSesion(
@@ -266,7 +279,13 @@ export async function registrarse(
   redirect(destino);
 }
 
-export async function aceptarPoliticaPrivacidad() {
+export async function aceptarPoliticaPrivacidad(formData: FormData) {
+  const destino = destinoInicio(formData);
+  const destinoError = destinoInicio(formData, "consentimiento");
+  if (!esVersionPoliticaVigente(formData.get("versionPoliticaAceptada"))) {
+    redirect(destinoInicio(formData, "politica_actualizada"));
+  }
+
   const supabase = await crearClienteServidor();
   const {
     data: { user },
@@ -277,10 +296,10 @@ export async function aceptarPoliticaPrivacidad() {
       "[auth] No se pudo verificar la sesión para aceptar la política:",
       errorUsuario
     );
-    redirect("/?aviso=consentimiento");
+    redirect(destinoError);
   }
   if (!user || user.is_anonymous === true) {
-    redirect("/");
+    redirect(destino);
   }
 
   const origen = await obtenerOrigen();
@@ -294,7 +313,7 @@ export async function aceptarPoliticaPrivacidad() {
     });
   } catch (error) {
     console.error("[auth] No se pudo seudonimizar el consentimiento:", error);
-    redirect("/?aviso=consentimiento");
+    redirect(destinoError);
   }
 
   const admin = crearClienteAdmin();
@@ -307,13 +326,12 @@ export async function aceptarPoliticaPrivacidad() {
   });
   if (error) {
     console.error("[auth] No se pudo registrar el consentimiento:", error);
-    redirect("/?aviso=consentimiento");
+    redirect(destinoError);
   }
 
   revalidatePath("/", "layout");
-  redirect("/");
+  redirect(destino);
 }
-
 export async function cerrarSesion() {
   const supabase = await crearClienteServidor();
   await supabase.auth.signOut();

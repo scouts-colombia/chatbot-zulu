@@ -151,9 +151,12 @@ async function ContenidoPrincipal({
             <p className="mt-2 text-foreground/60 text-xs">
               Versión que registrarás: {VERSION_POLITICA_PRIVACIDAD}
             </p>
-            {aviso === "consentimiento" && (
+            {(aviso === "consentimiento" ||
+              aviso === "politica_actualizada") && (
               <p className="mt-3 text-destructive text-sm" role="alert">
-                No pudimos registrar tu aceptación. Intenta de nuevo.
+                {aviso === "politica_actualizada"
+                  ? "La política cambió desde que la viste. Revisa la versión vigente y vuelve a aceptarla."
+                  : "No pudimos registrar tu aceptación. Intenta de nuevo."}
               </p>
             )}
             <div className="mt-5 flex flex-col gap-3 sm:flex-row">
@@ -171,6 +174,18 @@ async function ContenidoPrincipal({
                 </a>
               </Button>
               <form action={aceptarPoliticaPrivacidad} className="flex-1">
+                <input
+                  name="versionPoliticaAceptada"
+                  type="hidden"
+                  value={VERSION_POLITICA_PRIVACIDAD}
+                />
+                {borradorTransferenciaId && (
+                  <input
+                    name="borrador"
+                    type="hidden"
+                    value={borradorTransferenciaId}
+                  />
+                )}
                 <Button
                   className="btn-press min-h-11 w-full bg-scouts-purple text-white hover:bg-scouts-purple/90"
                   type="submit"

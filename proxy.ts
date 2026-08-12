@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
+import { esSesionDeUsuarioEliminado } from "@/lib/auth/sesion";
 
 const RUTAS_SIN_SESION = new Set([
   "/",
@@ -49,9 +50,21 @@ export async function proxy(request: NextRequest) {
     }
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const resultadoUsuario = await supabase.auth.getUser();
+  let user = resultadoUsuario.data.user;
+
+  if (esSesionDeUsuarioEliminado(resultadoUsuario.error)) {
+    const { error: errorCierre } = await supabase.auth.signOut({
+      scope: "local",
+    });
+    if (errorCierre) {
+      console.error(
+        "[proxy] No se pudo limpiar una sesión de usuario eliminado:",
+        errorCierre
+      );
+    }
+    user = null;
+  }
 
   const redirigirA = (pathname: string) => {
     const url = request.nextUrl.clone();

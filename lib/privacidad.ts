@@ -3,3 +3,6 @@ export const VERSION_POLITICA_PRIVACIDAD =
 
 export const URL_POLITICA_PRIVACIDAD =
   "https://scout.org.co/politica-privacidad";
+export function esVersionPoliticaVigente(value: unknown) {
+  return value === VERSION_POLITICA_PRIVACIDAD;
+}

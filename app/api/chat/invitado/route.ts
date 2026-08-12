@@ -6,18 +6,23 @@ import {
   COOKIE_PREFLIGHT_INVITADO,
   construirIdentidadInvitada,
   crearIdDispositivo,
-  DURACION_PREFLIGHT_INVITADO_SEGUNDOS,
   esIdDispositivoValido,
   esIdPreflightValido,
   type IdentidadInvitada,
+  leerPreparacionPreflightInvitado,
 } from "@/lib/invitados/identidad";
 import { respuestaRegistroPorLimite } from "@/lib/invitados/limites";
 import { limpiarIdentidadesInvitadasPendientes } from "@/lib/invitados/limpieza";
+import {
+  esVersionPoliticaVigente,
+  VERSION_POLITICA_PRIVACIDAD,
+} from "@/lib/privacidad";
 import { crearClienteAdmin } from "@/lib/supabase/admin";
 import { crearClienteServidor } from "@/lib/supabase/server";
 
 const CuerpoSchema = z.object({
   aceptaPolitica: z.literal(true),
+  versionPoliticaAceptada: z.string().min(1).max(200),
 });
 
 async function obtenerIdentidadInvitada(request: Request) {
@@ -42,8 +47,9 @@ async function obtenerIdentidadInvitada(request: Request) {
 }
 
 export async function POST(request: Request) {
+  let cuerpo: z.infer<typeof CuerpoSchema>;
   try {
-    CuerpoSchema.parse(await request.json());
+    cuerpo = CuerpoSchema.parse(await request.json());
   } catch {
     return NextResponse.json(
       {
@@ -52,6 +58,18 @@ export async function POST(request: Request) {
           "Debes aceptar la política de privacidad vigente antes de usar el chat.",
       },
       { status: 403 }
+    );
+  }
+
+  if (!esVersionPoliticaVigente(cuerpo.versionPoliticaAceptada)) {
+    return NextResponse.json(
+      {
+        codigo: "politica_actualizada",
+        mensaje:
+          "La política de privacidad cambió. Revisa y acepta la versión vigente antes de enviar.",
+        versionPolitica: VERSION_POLITICA_PRIVACIDAD,
+      },
+      { status: 409 }
     );
   }
 
@@ -120,12 +138,13 @@ export async function POST(request: Request) {
     );
   }
 
-  const preflight = await admin.rpc("preparar_turno_invitado", {
+  const preflight = await admin.rpc("preparar_turno_invitado_v2", {
     p_device_hash: identidad.deviceHash,
     p_environment_hash: identidad.environmentHash,
     p_network_hash: identidad.networkHash,
   });
-  if (preflight.error || !preflight.data) {
+  const preparacion = leerPreparacionPreflightInvitado(preflight.data);
+  if (preflight.error || !preparacion) {
     if (
       /limite_invitado|limite_red_invitada/.test(preflight.error?.message ?? "")
     ) {
@@ -148,13 +167,13 @@ export async function POST(request: Request) {
     );
   }
 
-  const preflightId = preflight.data as string;
+  const { preflightId, ttlSeconds } = preparacion;
   cookieStore.set(COOKIE_PREFLIGHT_INVITADO, preflightId, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
-    maxAge: DURACION_PREFLIGHT_INVITADO_SEGUNDOS,
+    maxAge: ttlSeconds,
   });
 
   const { data, error } = await supabase.auth.signInAnonymously();

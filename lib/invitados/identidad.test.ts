@@ -7,6 +7,7 @@ import {
   esHashInvitado,
   esIdDispositivoValido,
   esIdPreflightValido,
+  leerPreparacionPreflightInvitado,
   obtenerIpCliente,
 } from "./identidad";
 
@@ -127,4 +128,20 @@ test("valida identificadores de preflight antes de confiar en la cookie", () => 
   assert.equal(esIdPreflightValido(DEVICE_ID), true);
   assert.equal(esIdPreflightValido("no-es-un-uuid"), false);
   assert.equal(esIdPreflightValido(undefined), false);
+});
+test("lee el TTL efectivo devuelto por PostgreSQL", () => {
+  const preparacion = leerPreparacionPreflightInvitado([
+    { preflight_id: DEVICE_ID, ttl_seconds: 1800 },
+  ]);
+  assert.deepEqual(preparacion, {
+    preflightId: DEVICE_ID,
+    ttlSeconds: 1800,
+  });
+  assert.equal(
+    leerPreparacionPreflightInvitado([
+      { preflight_id: DEVICE_ID, ttl_seconds: 0 },
+    ]),
+    null
+  );
+  assert.equal(leerPreparacionPreflightInvitado(null), null);
 });

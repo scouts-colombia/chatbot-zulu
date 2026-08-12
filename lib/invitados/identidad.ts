@@ -2,7 +2,6 @@ import { createHmac, randomUUID } from "node:crypto";
 
 export const COOKIE_DISPOSITIVO_INVITADO = "zulu_guest_device";
 export const COOKIE_PREFLIGHT_INVITADO = "zulu_guest_preflight";
-export const DURACION_PREFLIGHT_INVITADO_SEGUNDOS = 10 * 60;
 
 const HEX_64 = /^[0-9a-f]{64}$/;
 const UUID =
@@ -14,6 +13,33 @@ export type IdentidadInvitada = {
   networkHash: string;
   userAgentHash: string;
 };
+export type PreparacionPreflightInvitado = {
+  preflightId: string;
+  ttlSeconds: number;
+};
+
+export function leerPreparacionPreflightInvitado(
+  valor: unknown
+): PreparacionPreflightInvitado | null {
+  const candidato = Array.isArray(valor) ? valor[0] : valor;
+  if (!(candidato && typeof candidato === "object")) {
+    return null;
+  }
+  const fila = candidato as Record<string, unknown>;
+  const preflightId = fila.preflight_id;
+  const ttlSeconds = fila.ttl_seconds;
+  if (
+    typeof preflightId !== "string" ||
+    !esIdPreflightValido(preflightId) ||
+    typeof ttlSeconds !== "number" ||
+    !Number.isInteger(ttlSeconds) ||
+    ttlSeconds < 60 ||
+    ttlSeconds > 60 * 60
+  ) {
+    return null;
+  }
+  return { preflightId, ttlSeconds };
+}
 
 export function esIdDispositivoValido(value: string | undefined) {
   return Boolean(value && UUID.test(value));

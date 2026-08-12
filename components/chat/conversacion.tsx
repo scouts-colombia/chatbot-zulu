@@ -2,7 +2,7 @@
 
 import { ArrowUp, Check } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { cargarMensajesAnteriores } from "@/app/chat/acciones";
@@ -34,6 +34,21 @@ import type { MensajeUI } from "./tipos";
  * recuperar el foco el texto se pone al día de inmediato.
  */
 const CARACTERES_POR_SEGUNDO = 220;
+const CONSULTA_MOVIMIENTO_REDUCIDO = "(prefers-reduced-motion: reduce)";
+
+function suscribirMovimientoReducido(onStoreChange: () => void) {
+  const media = window.matchMedia(CONSULTA_MOVIMIENTO_REDUCIDO);
+  media.addEventListener("change", onStoreChange);
+  return () => media.removeEventListener("change", onStoreChange);
+}
+
+function obtenerMovimientoReducido() {
+  return window.matchMedia(CONSULTA_MOVIMIENTO_REDUCIDO).matches;
+}
+
+function obtenerMovimientoReducidoServidor() {
+  return false;
+}
 
 function TextoTypewriter({
   texto,
@@ -46,13 +61,27 @@ function TextoTypewriter({
   onTerminado: () => void;
   superficieMarca: boolean;
 }) {
-  const [visible, setVisible] = useState(animar ? 0 : texto.length);
+  const reducirMovimiento = useSyncExternalStore(
+    suscribirMovimientoReducido,
+    obtenerMovimientoReducido,
+    obtenerMovimientoReducidoServidor
+  );
+  const debeAnimar = animar && !reducirMovimiento;
+  const [visible, setVisible] = useState(debeAnimar ? 0 : texto.length);
   const terminadoRef = useRef(false);
 
   useEffect(() => {
-    if (!animar) {
+    if (!debeAnimar) {
+      setVisible(texto.length);
+      if (animar && !terminadoRef.current) {
+        terminadoRef.current = true;
+        setTimeout(onTerminado, 0);
+      }
       return;
     }
+
+    terminadoRef.current = false;
+    setVisible(0);
     const inicio = Date.now();
     const intervalo = setInterval(() => {
       const transcurrido = (Date.now() - inicio) / 1000;
@@ -69,7 +98,7 @@ function TextoTypewriter({
       }
     }, 33);
     return () => clearInterval(intervalo);
-  }, [animar, texto, onTerminado]);
+  }, [animar, debeAnimar, texto, onTerminado]);
 
   return (
     <div
@@ -238,6 +267,8 @@ export function Conversacion({
     borradorTransferenciaId
   );
   const [aceptaPolitica, setAceptaPolitica] = useState(false);
+  const [versionPoliticaActual, setVersionPoliticaActual] =
+    useState(versionPolitica);
   useEffect(() => {
     // Elimina la clave global de versiones anteriores para que un borrador
     // no pueda reaparecer al cambiar de identidad en una pestaña compartida.
@@ -273,6 +304,26 @@ export function Conversacion({
     );
     setMotivoRegistro(mensaje);
     setMostrarRegistro(true);
+  };
+  const actualizarPoliticaSiCambio = (
+    datos: {
+      codigo?: string;
+      mensaje?: string;
+      versionPolitica?: unknown;
+    } | null
+  ) => {
+    if (datos?.codigo !== "politica_actualizada") {
+      return false;
+    }
+    if (typeof datos.versionPolitica === "string") {
+      setVersionPoliticaActual(datos.versionPolitica);
+    }
+    setAceptaPolitica(false);
+    setAviso(
+      datos.mensaje ??
+        "La política de privacidad cambió. Revísala y vuelve a aceptarla."
+    );
+    return true;
   };
   const mensajesRef = useRef<HTMLDivElement>(null);
   // Cursor del mensaje más antiguo cargado. Un contador se desfasaría en cuanto
@@ -374,11 +425,17 @@ export function Conversacion({
         const preparacion = await fetch("/api/chat/invitado", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ aceptaPolitica }),
+          body: JSON.stringify({
+            aceptaPolitica,
+            versionPoliticaAceptada: versionPoliticaActual,
+          }),
         });
         const datosPreparacion = await preparacion.json().catch(() => null);
         if (!preparacion.ok || !datosPreparacion) {
           revertir();
+          if (actualizarPoliticaSiCambio(datosPreparacion)) {
+            return;
+          }
           if (datosPreparacion?.codigo === "registro_requerido") {
             exigirRegistroTrasEnvio(datosPreparacion.mensaje);
             return;
@@ -401,6 +458,10 @@ export function Conversacion({
           mensaje: limpio,
           aceptaPolitica:
             esInvitado && requiereConsentimiento ? aceptaPolitica : undefined,
+          versionPoliticaAceptada:
+            esInvitado && requiereConsentimiento
+              ? versionPoliticaActual
+              : undefined,
         }),
       });
       // El cuerpo se parsea con tolerancia y DESPUÉS de mirar el status: un
@@ -411,6 +472,9 @@ export function Conversacion({
 
       if (!respuesta.ok) {
         revertir();
+        if (actualizarPoliticaSiCambio(datos)) {
+          return;
+        }
         if (datos?.codigo === "registro_requerido") {
           exigirRegistroTrasEnvio(
             datos.mensaje ??
@@ -610,7 +674,7 @@ export function Conversacion({
             <label className="mt-3 flex cursor-pointer items-start gap-2.5 text-white/86 text-xs leading-5">
               <span className="relative mt-0.5 flex size-5 shrink-0 items-center justify-center">
                 <input
-                  aria-label={`Acepto la política de privacidad, versión ${versionPolitica ?? "vigente"}`}
+                  aria-label={`Acepto la política de privacidad, versión ${versionPoliticaActual ?? "vigente"}`}
                   checked={aceptaPolitica}
                   className="peer absolute inset-0 cursor-pointer opacity-0"
                   onChange={(evento) =>
@@ -635,8 +699,10 @@ export function Conversacion({
                 >
                   política de privacidad
                 </a>
-                {versionPolitica ? ` (versión ${versionPolitica})` : ""}. Mi
-                primera pregunta quedará asociada si creo una cuenta.
+                {versionPoliticaActual
+                  ? ` (versión ${versionPoliticaActual})`
+                  : ""}
+                . Mi primera pregunta quedará asociada si creo una cuenta.
               </span>
             </label>
           )}

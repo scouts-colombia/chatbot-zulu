@@ -18,14 +18,15 @@ import {
   COOKIE_PREFLIGHT_INVITADO,
   construirIdentidadInvitada,
   crearIdDispositivo,
-  DURACION_PREFLIGHT_INVITADO_SEGUNDOS,
   esIdDispositivoValido,
   esIdPreflightValido,
   type IdentidadInvitada,
+  leerPreparacionPreflightInvitado,
 } from "@/lib/invitados/identidad";
 import { respuestaRegistroPorLimite } from "@/lib/invitados/limites";
 
 import {
+  esVersionPoliticaVigente,
   URL_POLITICA_PRIVACIDAD,
   VERSION_POLITICA_PRIVACIDAD,
 } from "@/lib/privacidad";
@@ -38,6 +39,7 @@ const CuerpoSchema = z.object({
   conversationId: z.string().uuid().optional(),
   mensaje: z.string().trim().min(1).max(2000),
   aceptaPolitica: z.boolean().optional(),
+  versionPoliticaAceptada: z.string().min(1).max(200).optional(),
 });
 
 const MENSAJE_BLOQUEADO =
@@ -265,7 +267,29 @@ export async function POST(request: Request) {
   // hay versión que aceptar.
   const requiereConsentimiento =
     perfil.privacy_policy_version_accepted !== VERSION_POLITICA_PRIVACIDAD;
-  if (requiereConsentimiento && !(esInvitado && cuerpo.aceptaPolitica)) {
+  const versionConsentidaValida = esVersionPoliticaVigente(
+    cuerpo.versionPoliticaAceptada
+  );
+  if (
+    requiereConsentimiento &&
+    esInvitado &&
+    cuerpo.aceptaPolitica &&
+    !versionConsentidaValida
+  ) {
+    return responderLiberandoPreflight(
+      {
+        codigo: "politica_actualizada",
+        mensaje:
+          "La política de privacidad cambió. Revisa y acepta la versión vigente antes de enviar.",
+        versionPolitica: VERSION_POLITICA_PRIVACIDAD,
+      },
+      { status: 409 }
+    );
+  }
+  if (
+    requiereConsentimiento &&
+    !(esInvitado && cuerpo.aceptaPolitica && versionConsentidaValida)
+  ) {
     return responderLiberandoPreflight(
       {
         codigo: "consentimiento_requerido",
@@ -294,12 +318,13 @@ export async function POST(request: Request) {
   }
 
   if (esInvitado && !preflightId && identidadInvitada) {
-    const preflight = await admin.rpc("preparar_turno_invitado", {
+    const preflight = await admin.rpc("preparar_turno_invitado_v2", {
       p_device_hash: identidadInvitada.deviceHash,
       p_environment_hash: identidadInvitada.environmentHash,
       p_network_hash: identidadInvitada.networkHash,
     });
-    if (preflight.error || !preflight.data) {
+    const preparacion = leerPreparacionPreflightInvitado(preflight.data);
+    if (preflight.error || !preparacion) {
       if (
         /limite_invitado|limite_red_invitada/.test(
           preflight.error?.message ?? ""
@@ -323,13 +348,13 @@ export async function POST(request: Request) {
         { status: 503 }
       );
     }
-    preflightId = preflight.data as string;
+    preflightId = preparacion.preflightId;
     cookieStore.set(COOKIE_PREFLIGHT_INVITADO, preflightId, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/",
-      maxAge: DURACION_PREFLIGHT_INVITADO_SEGUNDOS,
+      maxAge: preparacion.ttlSeconds,
     });
   }
   let conversationId = cuerpo.conversationId;
