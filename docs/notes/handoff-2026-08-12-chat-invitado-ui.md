@@ -29,6 +29,11 @@ Esta sección reemplaza los SHA y resultados anteriores cuando haya discrepancia
 - Verificación real de PR #13 en 667 × 375: documento y shell miden 375 px;
   header, composer, consentimiento y footer permanecen visibles. Con
   prefers-color-scheme: dark, el fondo sigue siendo crema rgb(255, 248, 235).
+- Checks remotos posteriores: CI y Vercel verdes en PR #12 (578116a) y en
+  la cabeza de código rebasada de PR #13; ambas PR quedaron CLEAN.
+- Codex Review se reinvocó en ambas PR y volvió a rechazar por cuota; no
+  produjo comentarios nuevos ni una aprobación sobre los SHA actuales.
+
 ## Decisiones aprobadas
 
 - `/` abre directamente el chat, no el login.
@@ -163,17 +168,16 @@ Además del chat público, preflight, consentimiento, cuota atómica, transferen
 
 ## Trabajo inmediato
 
-1. Esperar y verificar los checks remotos de las cabezas publicadas actuales de
-   PR #12 y PR #13.
-2. Habilitar el MCP de Supabase; aplicar y verificar
+1. Habilitar el MCP de Supabase; aplicar y verificar
    20260812190000_proteger_conversion_invitada_pendiente.sql en
    ddimxdrggrrfcvzwwben, incluyendo columna, tabla, RLS, grants, funciones,
    idempotencia y advisors.
-3. Reinvocar Codex Review sobre ambos SHA cuando la cuota vuelva. La revisión
+2. Reinvocar Codex Review sobre ambos SHA cuando la cuota vuelva. La revisión
    independiente ya cerró los hallazgos conocidos, pero no sustituye el
    criterio explícito de aprobación solicitado para ambas PR.
-4. No hacer merge hasta completar la verificación remota de la migración y el
+3. No hacer merge hasta completar la verificación remota de la migración y el
    ciclo final de revisión.
+
 ## Restricciones
 
 - Preservar cambios ajenos; no hacer formateo masivo.
