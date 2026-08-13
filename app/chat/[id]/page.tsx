@@ -3,14 +3,17 @@ import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import { Conversacion } from "@/components/chat/conversacion";
 import { cargarTramo } from "@/lib/chat/transcripcion";
+import { esIdTraspasoBorradorValido } from "@/lib/invitados/borrador";
 import { crearClienteServidor } from "@/lib/supabase/server";
 
 export const metadata = { title: "Conversación" };
 
 export default function PaginaConversacion({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ borrador?: string }>;
 }) {
   return (
     <Suspense
@@ -20,17 +23,22 @@ export default function PaginaConversacion({
         </div>
       }
     >
-      <ContenidoConversacion params={params} />
+      <ContenidoConversacion params={params} searchParams={searchParams} />
     </Suspense>
   );
 }
 
 async function ContenidoConversacion({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ borrador?: string }>;
 }) {
-  const { id } = await params;
+  const [{ id }, { borrador }] = await Promise.all([params, searchParams]);
+  const borradorTransferenciaId = esIdTraspasoBorradorValido(borrador)
+    ? borrador
+    : null;
   const supabase = await crearClienteServidor();
 
   const {
@@ -106,6 +114,7 @@ async function ContenidoConversacion({
       </header>
       <Conversacion
         archivada={conversacion.archived}
+        borradorTransferenciaId={borradorTransferenciaId}
         conversationId={conversacion.id}
         cursorInicial={tramo.cursor}
         hayMasAntiguos={tramo.hayMasAntiguos}

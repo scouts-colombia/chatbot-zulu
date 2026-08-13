@@ -1,37 +1,87 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { limpiarBorradoresPendientesExpirados } from "@/lib/invitados/borrador";
 import type { EstadoFormulario } from "./acciones";
 
 type Props = {
-  modo: "login" | "registro";
+  modo: "login" | "registro" | "finalizar";
+  conversionInvitada?: boolean;
+  errorInicial?: string;
+  borradorTransferenciaId?: string | null;
+  conversationIdTransferencia?: string | null;
   accion: (
     estadoPrevio: EstadoFormulario,
     formData: FormData
   ) => Promise<EstadoFormulario>;
 };
 
-export function FormularioAuth({ modo, accion }: Props) {
+export function FormularioAuth({
+  modo,
+  accion,
+  errorInicial,
+  borradorTransferenciaId = null,
+  conversationIdTransferencia = null,
+  conversionInvitada = false,
+}: Props) {
   const [estado, enviar, pendiente] = useActionState(accion, { error: null });
+  useEffect(() => {
+    const purgar = () => limpiarBorradoresPendientesExpirados(localStorage);
+    purgar();
+    const intervalo = window.setInterval(purgar, 60_000);
+    return () => window.clearInterval(intervalo);
+  }, []);
+  const errorVisible = estado.mensaje ? null : (estado.error ?? errorInicial);
   const esRegistro = modo === "registro";
+  const esFinalizar = modo === "finalizar";
 
   return (
-    <div className="flex min-h-dvh items-center justify-center px-4">
-      <div className="w-full max-w-sm space-y-6">
+    <div
+      className="auth-hero relative flex min-h-dvh items-center justify-center overflow-hidden px-4 py-20"
+      data-design-direction="ruta-liquid-glass"
+      data-design-mode="operate"
+    >
+      <div aria-hidden="true" className="brand-orb brand-orb-yellow" />
+      <div aria-hidden="true" className="brand-orb brand-orb-blue" />
+      <Link
+        className="focus-ring absolute top-4 left-4 rounded-lg px-3 py-2 text-white/85 text-sm hover:text-white sm:top-6 sm:left-6"
+        href="/"
+      >
+        ← Volver a Zulú
+      </Link>
+      <div className="auth-card-enter auth-card-surface relative z-10 w-full max-w-sm space-y-6 rounded-3xl p-6 sm:p-8">
         <div className="space-y-1 text-center">
-          <h1 className="font-semibold text-2xl">Chat Scout</h1>
+          <h1 className="font-semibold text-2xl text-scouts-purple">Zulú</h1>
           <p className="text-muted-foreground text-sm">
-            {esRegistro
-              ? "Crea tu cuenta para consultar los manuales oficiales"
-              : "Inicia sesión para consultar los manuales oficiales"}
+            {esFinalizar
+              ? "Crea una contraseña para terminar tu registro"
+              : conversionInvitada
+                ? "Crea tu contraseña y verifica el correo sin perder la conversación"
+                : esRegistro
+                  ? "Crea tu cuenta para consultar los manuales oficiales"
+                  : "Inicia sesión para consultar los manuales oficiales"}
           </p>
         </div>
 
         <form action={enviar} className="space-y-4">
+          {borradorTransferenciaId && (
+            <input
+              name="borrador"
+              type="hidden"
+              value={borradorTransferenciaId}
+            />
+          )}
+          {conversationIdTransferencia && (
+            <input
+              name="conversacion"
+              type="hidden"
+              value={conversationIdTransferencia}
+            />
+          )}
           {esRegistro && (
             <div className="space-y-2">
               <Label htmlFor="nombre">Nombre</Label>
@@ -45,69 +95,116 @@ export function FormularioAuth({ modo, accion }: Props) {
             </div>
           )}
 
-          <div className="space-y-2">
-            <Label htmlFor="email">Correo</Label>
-            <Input
-              autoComplete="email"
-              id="email"
-              name="email"
-              placeholder="tu@correo.com"
-              required
-              type="email"
-            />
-          </div>
+          {!esFinalizar && (
+            <div className="space-y-2">
+              <Label htmlFor="email">Correo</Label>
+              <Input
+                autoComplete="email"
+                id="email"
+                name="email"
+                placeholder="tu@correo.com"
+                required
+                type="email"
+              />
+            </div>
+          )}
 
-          <div className="space-y-2">
-            <Label htmlFor="password">Contraseña</Label>
-            <Input
-              autoComplete={esRegistro ? "new-password" : "current-password"}
-              id="password"
-              minLength={8}
-              name="password"
-              required
-              type="password"
-            />
-          </div>
+          {(esRegistro || esFinalizar || !conversionInvitada) && (
+            <div className="space-y-2">
+              <Label htmlFor="password">Contraseña</Label>
+              <Input
+                autoComplete={
+                  esRegistro || esFinalizar
+                    ? "new-password"
+                    : "current-password"
+                }
+                id="password"
+                minLength={8}
+                name="password"
+                required
+                type="password"
+              />
+            </div>
+          )}
 
-          {estado.error && (
+          {errorVisible && (
             <p className="text-destructive text-sm" role="alert">
-              {estado.error}
+              {errorVisible}
             </p>
           )}
 
           {estado.mensaje && (
-            <p className="text-muted-foreground text-sm" role="status">
+            <output className="block text-muted-foreground text-sm">
               {estado.mensaje}
-            </p>
+            </output>
           )}
 
-          <Button className="w-full" disabled={pendiente} type="submit">
+          <Button
+            className="btn-press min-h-11 w-full bg-scouts-purple text-white hover:bg-scouts-purple/90"
+            disabled={pendiente}
+            type="submit"
+          >
             {pendiente
               ? "Un momento..."
-              : esRegistro
-                ? "Crear cuenta"
-                : "Iniciar sesión"}
+              : esFinalizar
+                ? "Guardar contraseña"
+                : conversionInvitada
+                  ? "Verificar y crear cuenta"
+                  : esRegistro
+                    ? "Crear cuenta"
+                    : "Iniciar sesión"}
           </Button>
         </form>
 
-        <p className="text-center text-muted-foreground text-sm">
-          {esRegistro ? (
-            <>
-              ¿Ya tienes cuenta?{" "}
-              <Link className="underline underline-offset-4" href="/login">
-                Inicia sesión
-              </Link>
-            </>
-          ) : (
-            <>
-              ¿No tienes cuenta?{" "}
-              <Link className="underline underline-offset-4" href="/registro">
-                Regístrate
-              </Link>
-            </>
-          )}
-        </p>
+        {!esFinalizar && (
+          <p className="text-center text-muted-foreground text-sm">
+            {esRegistro ? (
+              <>
+                ¿Ya tienes cuenta?{" "}
+                <Link
+                  className="font-medium text-scouts-purple underline underline-offset-4"
+                  href={rutaAuthAlterna(
+                    "/login",
+                    borradorTransferenciaId,
+                    conversationIdTransferencia
+                  )}
+                >
+                  Inicia sesión
+                </Link>
+              </>
+            ) : (
+              <>
+                ¿No tienes cuenta?{" "}
+                <Link
+                  className="font-medium text-scouts-purple underline underline-offset-4"
+                  href={rutaAuthAlterna(
+                    "/registro",
+                    borradorTransferenciaId,
+                    conversationIdTransferencia
+                  )}
+                >
+                  Regístrate
+                </Link>
+              </>
+            )}
+          </p>
+        )}
       </div>
     </div>
   );
+}
+function rutaAuthAlterna(
+  ruta: "/login" | "/registro",
+  borradorId: string | null,
+  conversationId: string | null
+) {
+  const parametros = new URLSearchParams();
+  if (borradorId) {
+    parametros.set("borrador", borradorId);
+  }
+  if (conversationId) {
+    parametros.set("conversacion", conversationId);
+  }
+  const query = parametros.toString();
+  return query ? `${ruta}?${query}` : ruta;
 }

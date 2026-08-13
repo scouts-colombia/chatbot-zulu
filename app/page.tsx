@@ -1,9 +1,16 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
+import { ChatPublico } from "@/components/chat/chat-publico";
+import { LimpiezaBorradoresPendientes } from "@/components/chat/limpieza-borradores-pendientes";
 import { Button } from "@/components/ui/button";
+import { esIdTraspasoBorradorValido } from "@/lib/invitados/borrador";
+import {
+  URL_POLITICA_PRIVACIDAD,
+  VERSION_POLITICA_PRIVACIDAD,
+} from "@/lib/privacidad";
 import { crearClienteServidor } from "@/lib/supabase/server";
-import { cerrarSesion } from "./(auth)/acciones";
+import { aceptarPoliticaPrivacidad, cerrarSesion } from "./(auth)/acciones";
 import { archivarConversacion, crearConversacion } from "./chat/acciones";
 
 const MENSAJES_ESTADO: Record<string, string> = {
@@ -18,47 +25,122 @@ const TAMANO_PAGINA = 50;
 export default function PaginaPrincipal({
   searchParams,
 }: {
-  searchParams: Promise<{ aviso?: string; pagina?: string }>;
+  searchParams: Promise<{
+    aviso?: string;
+    borrador?: string;
+    conversacion?: string;
+    pagina?: string;
+  }>;
 }) {
   return (
-    <Suspense
-      fallback={
-        <div className="flex min-h-dvh items-center justify-center">
-          <p className="text-muted-foreground text-sm">Cargando...</p>
-        </div>
-      }
-    >
-      <ContenidoPrincipal searchParams={searchParams} />
-    </Suspense>
+    <>
+      <LimpiezaBorradoresPendientes />
+      <Suspense
+        fallback={
+          <div className="flex min-h-dvh items-center justify-center">
+            <p className="text-muted-foreground text-sm">Cargando...</p>
+          </div>
+        }
+      >
+        <ContenidoPrincipal searchParams={searchParams} />
+      </Suspense>
+    </>
   );
 }
 
 async function ContenidoPrincipal({
   searchParams,
 }: {
-  searchParams: Promise<{ aviso?: string; pagina?: string }>;
+  searchParams: Promise<{
+    aviso?: string;
+    borrador?: string;
+    conversacion?: string;
+    pagina?: string;
+  }>;
 }) {
-  const { aviso, pagina: paginaParam } = await searchParams;
+  const {
+    aviso,
+    borrador,
+    conversacion,
+    pagina: paginaParam,
+  } = await searchParams;
+  const borradorTransferenciaId = esIdTraspasoBorradorValido(borrador)
+    ? borrador
+    : null;
+  const conversationIdTransferencia = esIdTraspasoBorradorValido(conversacion)
+    ? conversacion
+    : null;
   const pagina = Math.max(1, Number.parseInt(paginaParam ?? "1", 10) || 1);
   const supabase = await crearClienteServidor();
 
   const {
     data: { user },
+    error: errorAutenticacion,
   } = await supabase.auth.getUser();
 
-  if (!user) {
-    redirect("/login");
+  const sesionAusente = errorAutenticacion?.name === "AuthSessionMissingError";
+  if (errorAutenticacion && !sesionAusente) {
+    console.error("[home] No se pudo verificar la sesión:", errorAutenticacion);
+    return <ErrorAutenticacion />;
+  }
+
+  if (!user || user.is_anonymous === true) {
+    return <ChatPublico userId={user?.id ?? null} />;
   }
 
   const { data: perfil } = await supabase
     .from("profiles")
-    .select("nombre, email, role, account_status")
+    .select(
+      "nombre, email, role, account_status, privacy_policy_version_accepted"
+    )
     .eq("id", user.id)
     .single();
 
   const mensajeEstado = perfil
     ? MENSAJES_ESTADO[perfil.account_status]
     : "No pudimos cargar tu perfil. Cierra sesión e inténtalo de nuevo; si persiste, contacta a la organización.";
+  const requiereConsentimiento =
+    !mensajeEstado &&
+    perfil?.privacy_policy_version_accepted !== VERSION_POLITICA_PRIVACIDAD;
+
+  if (
+    !mensajeEstado &&
+    !requiereConsentimiento &&
+    borradorTransferenciaId &&
+    conversationIdTransferencia
+  ) {
+    const { data: conversacionTransferida, error: errorTransferencia } =
+      await supabase
+        .from("conversations")
+        .select("id")
+        .eq("id", conversationIdTransferencia)
+        .maybeSingle();
+    if (errorTransferencia) {
+      console.error(
+        "[home] No se pudo verificar la conversación transferida:",
+        errorTransferencia
+      );
+      return (
+        <ErrorRecuperacionBorrador
+          borradorId={borradorTransferenciaId}
+          conversationId={conversationIdTransferencia}
+          motivo="consulta"
+        />
+      );
+    }
+    if (conversacionTransferida) {
+      redirect(
+        `/chat/${conversationIdTransferencia}?borrador=${encodeURIComponent(borradorTransferenciaId)}`
+      );
+    }
+    return (
+      <ErrorRecuperacionBorrador
+        borradorId={borradorTransferenciaId}
+        conversationId={conversationIdTransferencia}
+        motivo="no_encontrada"
+      />
+    );
+  }
 
   // Paginada: PostgREST corta en `db-max-rows` sin error, y un tope fijo sin
   // navegación dejaría las conversaciones antiguas inalcanzables, que el Scout
@@ -69,7 +151,7 @@ async function ContenidoPrincipal({
     data: conversaciones,
     count: totalConversaciones,
     error: errorConversaciones,
-  } = mensajeEstado
+  } = mensajeEstado || requiereConsentimiento
     ? { data: [], count: 0, error: null }
     : await supabase
         .from("conversations")
@@ -110,9 +192,80 @@ async function ContenidoPrincipal({
           <p className="mx-auto max-w-md text-center text-muted-foreground">
             {mensajeEstado}
           </p>
+        ) : requiereConsentimiento ? (
+          <section className="auth-card-surface mx-auto max-w-lg rounded-2xl p-6">
+            <h2 className="font-semibold text-scouts-purple text-xl">
+              Antes de continuar
+            </h2>
+            <p className="mt-2 text-foreground/70 text-sm">
+              Lee la política de privacidad vigente de Scouts Colombia. Tu
+              aceptación se conserva como un evento histórico y será necesaria
+              de nuevo si la versión cambia.
+            </p>
+            <p className="mt-2 text-foreground/60 text-xs">
+              Versión que registrarás: {VERSION_POLITICA_PRIVACIDAD}
+            </p>
+            {(aviso === "consentimiento" ||
+              aviso === "politica_actualizada") && (
+              <p className="mt-3 text-destructive text-sm" role="alert">
+                {aviso === "politica_actualizada"
+                  ? "La política cambió desde que la viste. Revisa la versión vigente y vuelve a aceptarla."
+                  : "No pudimos registrar tu aceptación. Intenta de nuevo."}
+              </p>
+            )}
+            <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+              <Button
+                asChild
+                className="min-h-11 border-scouts-purple/25 text-scouts-purple"
+                variant="outline"
+              >
+                <a
+                  href={URL_POLITICA_PRIVACIDAD}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  Leer política
+                </a>
+              </Button>
+              <form action={aceptarPoliticaPrivacidad} className="flex-1">
+                <input
+                  name="versionPoliticaAceptada"
+                  type="hidden"
+                  value={VERSION_POLITICA_PRIVACIDAD}
+                />
+                {borradorTransferenciaId && (
+                  <input
+                    name="borrador"
+                    type="hidden"
+                    value={borradorTransferenciaId}
+                  />
+                )}
+                {conversationIdTransferencia && (
+                  <input
+                    name="conversacion"
+                    type="hidden"
+                    value={conversationIdTransferencia}
+                  />
+                )}
+                <Button
+                  className="btn-press min-h-11 w-full bg-scouts-purple text-white hover:bg-scouts-purple/90"
+                  type="submit"
+                >
+                  Acepto y quiero continuar
+                </Button>
+              </form>
+            </div>
+          </section>
         ) : (
           <div className="space-y-6">
             <form action={crearConversacion}>
+              {borradorTransferenciaId && (
+                <input
+                  name="borrador"
+                  type="hidden"
+                  value={borradorTransferenciaId}
+                />
+              )}
               <Button className="w-full" type="submit">
                 Nueva conversación
               </Button>
@@ -178,6 +331,61 @@ async function ContenidoPrincipal({
   );
 }
 
+function ErrorRecuperacionBorrador({
+  borradorId,
+  conversationId,
+  motivo,
+}: {
+  borradorId: string;
+  conversationId: string;
+  motivo: "consulta" | "no_encontrada";
+}) {
+  const parametros = new URLSearchParams({
+    borrador: borradorId,
+    conversacion: conversationId,
+  });
+  return (
+    <main className="flex min-h-dvh items-center justify-center bg-background px-4">
+      <section className="w-full max-w-md rounded-xl border bg-card p-6 text-center shadow-sm">
+        <h1 className="font-semibold text-scouts-purple text-xl">
+          No pudimos recuperar tu conversación
+        </h1>
+        <p className="mt-2 text-muted-foreground text-sm" role="alert">
+          {motivo === "consulta"
+            ? "La conversación ya fue asociada, pero no pudimos verificarla en este momento. Reintenta para conservar el contexto de tu pregunta."
+            : "Ese hilo no pertenece a esta cuenta. Vuelve al inicio e inicia sesión con la cuenta correcta para no crear una conversación duplicada."}
+        </p>
+        <Button asChild className="mt-5 min-h-11 bg-scouts-purple text-white">
+          <a href={motivo === "consulta" ? `/?${parametros.toString()}` : "/"}>
+            {motivo === "consulta" ? "Reintentar" : "Volver al inicio"}
+          </a>
+        </Button>
+      </section>
+    </main>
+  );
+}
+
+function ErrorAutenticacion() {
+  return (
+    <main className="flex min-h-dvh items-center justify-center bg-background px-4">
+      <section
+        className="w-full max-w-md rounded-3xl border bg-card p-8 text-center shadow-[var(--shadow-float)]"
+        role="alert"
+      >
+        <h1 className="font-semibold text-scouts-purple text-xl">
+          No pudimos verificar tu sesión
+        </h1>
+        <p className="mt-2 text-muted-foreground text-sm">
+          No entraremos al modo invitado mientras exista esta duda. Reintenta
+          para conservar tu cuenta y tus conversaciones.
+        </p>
+        <Button asChild className="mt-5 min-h-11 bg-scouts-purple text-white">
+          <a href="/">Reintentar</a>
+        </Button>
+      </section>
+    </main>
+  );
+}
 /**
  * Si no viene `count` no se finge un total: se ofrece "Siguiente" mientras la
  * página venga llena, en vez de ocultar la navegación y dar a entender que no

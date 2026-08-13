@@ -44,6 +44,7 @@ async function ListaUsuarios({
     .select("id, nombre, email, role, account_status, created_at", {
       count: "exact",
     })
+    .eq("is_guest", false)
     .order("created_at", { ascending: false })
     .range(inicio, inicio + TAMANO_PAGINA - 1);
 
