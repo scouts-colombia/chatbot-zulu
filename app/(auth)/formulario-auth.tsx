@@ -41,14 +41,12 @@ export function FormularioAuth({
 
   return (
     <div
-      className="auth-hero relative flex min-h-dvh items-center justify-center overflow-hidden px-4 py-20"
-      data-design-direction="ruta-liquid-glass"
+      className="pnpj-fondo relative flex min-h-dvh items-center justify-center overflow-hidden px-4 py-20"
+      data-design-direction="ruta-editorial-glass"
       data-design-mode="operate"
     >
-      <div aria-hidden="true" className="brand-orb brand-orb-yellow" />
-      <div aria-hidden="true" className="brand-orb brand-orb-blue" />
       <Link
-        className="focus-ring absolute top-4 left-4 rounded-lg px-3 py-2 text-white/85 text-sm hover:text-white sm:top-6 sm:left-6"
+        className="focus-ring absolute top-4 left-4 rounded-lg px-3 py-2 text-scouts-purple/80 text-sm hover:text-scouts-purple sm:top-6 sm:left-6"
         href="/"
       >
         ← Volver a Zulú

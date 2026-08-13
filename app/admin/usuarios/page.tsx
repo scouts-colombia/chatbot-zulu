@@ -1,3 +1,4 @@
+import { Users } from "lucide-react";
 import { Suspense } from "react";
 import { requerirAdmin } from "@/lib/admin/guard";
 import { crearClienteAdmin } from "@/lib/supabase/admin";
@@ -16,7 +17,9 @@ export default function PaginaUsuariosAdmin({
 }) {
   return (
     <Suspense
-      fallback={<p className="text-muted-foreground text-sm">Cargando...</p>}
+      fallback={
+        <p className="text-sm text-scouts-purple/65">Cargando usuarios...</p>
+      }
     >
       <ListaUsuarios searchParams={searchParams} />
     </Suspense>
@@ -51,36 +54,57 @@ async function ListaUsuarios({
   // Un fallo de la consulta dejaría la lista vacía como si no hubiera usuarios.
   if (errorPerfiles) {
     return (
-      <p className="text-destructive text-sm" role="alert">
+      <p
+        className="rounded-2xl bg-scouts-red/8 p-4 text-scouts-red text-sm"
+        role="alert"
+      >
         No se pudieron cargar los usuarios. Intenta de nuevo.
       </p>
     );
   }
 
   return (
-    <div className="space-y-4">
-      <p className="text-muted-foreground text-sm">
+    <div className="space-y-5">
+      <header className="flex items-end justify-between gap-4">
+        <div>
+          <span className="brand-kicker">Acceso</span>
+          <h2 className="mt-3 font-semibold text-2xl text-scouts-purple">
+            Usuarios
+          </h2>
+          <p className="mt-1 text-foreground/70 text-sm">
+            Gestiona el estado de las cuentas registradas.
+          </p>
+        </div>
+        <Users
+          aria-hidden="true"
+          className="hidden size-7 text-scouts-red sm:block"
+        />
+      </header>
+      <p className="rounded-2xl border border-scouts-orange/15 bg-scouts-orange/6 p-4 text-foreground/65 text-sm">
         El cambio de estado queda auditado con tu usuario y el motivo. El rol no
         se gestiona desde aquí (se asigna por procedimiento controlado).
       </p>
       <ul className="space-y-2">
         {(perfiles ?? []).map((perfil) => (
-          <li className="space-y-2 rounded-lg border px-3 py-2" key={perfil.id}>
+          <li
+            className="brand-list-item space-y-3 rounded-2xl px-3 py-3 sm:px-4"
+            key={perfil.id}
+          >
             <div className="flex items-center gap-2">
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm">
+                <p className="truncate font-medium text-sm text-scouts-purple">
                   {perfil.nombre ?? "—"}
                   {perfil.role === "admin" && (
-                    <span className="ml-2 rounded-full bg-secondary px-2 py-0.5 text-secondary-foreground text-xs">
+                    <span className="ml-2 rounded-full bg-scouts-yellow px-2 py-0.5 text-scouts-purple text-xs">
                       admin
                     </span>
                   )}
                 </p>
-                <p className="truncate text-muted-foreground text-xs">
+                <p className="truncate text-foreground/70 text-xs">
                   {perfil.email}
                 </p>
               </div>
-              <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-muted-foreground text-xs">
+              <span className="shrink-0 rounded-full bg-scouts-purple/8 px-2.5 py-1 text-scouts-purple/70 text-xs">
                 {perfil.account_status}
               </span>
             </div>
@@ -130,10 +154,10 @@ function Paginacion({
   }
 
   return (
-    <nav className="flex items-center justify-between text-sm">
+    <nav className="flex items-center justify-between pt-2 text-sm">
       {hayAnterior ? (
         <a
-          className="hover:underline"
+          className="brand-page-link"
           href={`/admin/usuarios?pagina=${pagina - 1}`}
         >
           ← Anterior
@@ -141,14 +165,14 @@ function Paginacion({
       ) : (
         <span />
       )}
-      <span className="text-muted-foreground text-xs">
+      <span className="text-foreground/70 text-xs">
         {totalPaginas === null
           ? `Página ${pagina}`
           : `Página ${pagina} de ${totalPaginas} · ${total} usuarios`}
       </span>
       {haySiguiente ? (
         <a
-          className="hover:underline"
+          className="brand-page-link"
           href={`/admin/usuarios?pagina=${pagina + 1}`}
         >
           Siguiente →

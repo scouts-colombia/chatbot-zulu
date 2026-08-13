@@ -41,7 +41,7 @@ export function NavegacionCuentaPublica() {
       </span>
       <Button
         asChild
-        className="btn-press min-h-11 border-white/35 bg-white/10 px-4 text-white backdrop-blur-md hover:bg-white/18"
+        className="btn-press min-h-11 border-scouts-purple/20 bg-white/40 px-4 text-scouts-purple backdrop-blur-md hover:bg-white/70"
         variant="outline"
       >
         <Link

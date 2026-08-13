@@ -21,11 +21,12 @@ export function FormularioDocumento({
   const bloqueado = !(activo || listoParaActivar);
 
   return (
-    <div className="flex flex-col items-end gap-1">
+    <div className="ml-auto flex flex-col items-end gap-1">
       <form action={enviar}>
         <input name="id" type="hidden" value={id} />
         <input name="activar" type="hidden" value={String(!activo)} />
         <Button
+          className="btn-press min-h-11 border-scouts-purple/20 text-scouts-purple hover:bg-scouts-purple/8"
           disabled={pendiente || bloqueado}
           size="sm"
           title={
@@ -40,10 +41,7 @@ export function FormularioDocumento({
         </Button>
       </form>
       {estado.error && (
-        <p
-          className="max-w-56 text-right text-destructive text-xs"
-          role="alert"
-        >
+        <p className="max-w-56 text-right text-scouts-red text-xs" role="alert">
           {estado.error}
         </p>
       )}

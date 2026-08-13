@@ -47,9 +47,6 @@ importers:
       next:
         specifier: 16.2.0
         version: 16.2.0(@opentelemetry/api@1.9.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.0.1(react@19.0.1))(react@19.0.1)
-      next-themes:
-        specifier: ^0.3.0
-        version: 0.3.0(react-dom@19.0.1(react@19.0.1))(react@19.0.1)
       radix-ui:
         specifier: ^1.4.3
         version: 1.4.3(@types/react-dom@18.3.5(@types/react@18.3.18))(@types/react@18.3.18)(react-dom@19.0.1(react@19.0.1))(react@19.0.1)
@@ -2143,12 +2140,6 @@ packages:
     resolution: {integrity: sha512-SppoicMGpZvbF1l3z4x7No3OlIjP7QJvC9XR7AhZr1kL133KHnKPztkKDc+Ir4aJ/1VhTySrtKhrsycmrMQfvg==}
     engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
     hasBin: true
-
-  next-themes@0.3.0:
-    resolution: {integrity: sha512-/QHIrsYpd6Kfk7xakK4svpDI5mmXP0gfvCoJdGpZQ2TOrQZmsW0QxjaiLn8wbIKjtm4BTSqLoix4lxYYOnLJ/w==}
-    peerDependencies:
-      react: ^16.8 || ^17 || ^18
-      react-dom: ^16.8 || ^17 || ^18
 
   next@16.2.0:
     resolution: {integrity: sha512-NLBVrJy1pbV1Yn00L5sU4vFyAHt5XuSjzrNyFnxo6Com0M0KrL6hHM5B99dbqXb2bE9pm4Ow3Zl1xp6HVY9edQ==}
@@ -4577,11 +4568,6 @@ snapshots:
   nanoid@3.3.11: {}
 
   nanoid@3.3.9: {}
-
-  next-themes@0.3.0(react-dom@19.0.1(react@19.0.1))(react@19.0.1):
-    dependencies:
-      react: 19.0.1
-      react-dom: 19.0.1(react@19.0.1)
 
   next@16.2.0(@opentelemetry/api@1.9.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.0.1(react@19.0.1))(react@19.0.1):
     dependencies:

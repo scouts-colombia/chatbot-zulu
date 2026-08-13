@@ -13,8 +13,8 @@ export default function PaginaLogin({
   return (
     <Suspense
       fallback={
-        <main className="auth-hero flex min-h-dvh items-center justify-center px-4">
-          <p className="auth-card-surface rounded-xl px-5 py-3 text-sm text-white/80">
+        <main className="pnpj-fondo flex min-h-dvh items-center justify-center px-4">
+          <p className="auth-card-surface rounded-2xl px-5 py-3 text-sm text-scouts-purple/70">
             Preparando el inicio de sesión...
           </p>
         </main>

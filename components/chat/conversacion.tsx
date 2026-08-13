@@ -76,12 +76,10 @@ function TextoTypewriter({
   texto,
   animar,
   onTerminado,
-  superficieMarca,
 }: {
   texto: string;
   animar: boolean;
   onTerminado: () => void;
-  superficieMarca: boolean;
 }) {
   const reducirMovimiento = useSyncExternalStore(
     suscribirMovimientoReducido,
@@ -123,13 +121,7 @@ function TextoTypewriter({
   }, [animar, debeAnimar, texto, onTerminado]);
 
   return (
-    <div
-      className={
-        superficieMarca
-          ? "prose prose-sm max-w-none"
-          : "prose prose-sm dark:prose-invert max-w-none"
-      }
-    >
+    <div className="prose prose-sm max-w-none">
       {/* Sin <img>: la respuesta del asistente puede incluir `![](url)` y
       cargar recursos de terceros al renderizar. */}
       <Markdown disallowedElements={["img"]} remarkPlugins={[remarkGfm]}>
@@ -145,26 +137,17 @@ function Burbuja({
   onTerminado,
   onOpcion,
   deshabilitado,
-  superficieMarca,
 }: {
   mensaje: MensajeUI;
   animar: boolean;
   onTerminado: () => void;
   onOpcion: (opcion: string) => void;
   deshabilitado: boolean;
-  superficieMarca: boolean;
 }) {
   if (mensaje.sender === "usuario") {
     return (
       <div className="message-fade-in flex justify-end">
-        <div
-          className={[
-            "max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-sm px-4 py-2.5 text-sm shadow-md",
-            superficieMarca
-              ? "bg-scouts-yellow text-scouts-purple"
-              : "bg-primary text-primary-foreground",
-          ].join(" ")}
-        >
+        <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-sm bg-scouts-yellow px-4 py-2.5 text-scouts-purple text-sm shadow-md">
           {mensaje.content}
         </div>
       </div>
@@ -176,14 +159,7 @@ function Burbuja({
 
   return (
     <div className="message-fade-in flex justify-start">
-      <div
-        className={[
-          "max-w-[85%] space-y-2 rounded-2xl rounded-bl-sm border px-4 py-3 text-sm shadow-[var(--shadow-card)]",
-          superficieMarca
-            ? "border-white/70 bg-white/92 text-scouts-purple backdrop-blur-md"
-            : "bg-card",
-        ].join(" ")}
-      >
+      <div className="max-w-[85%] space-y-2 rounded-2xl rounded-bl-sm border border-white/70 bg-white/92 px-4 py-3 text-scouts-purple text-sm shadow-[var(--shadow-card)] backdrop-blur-md">
         {etiqueta && (
           <span className="inline-block rounded-full bg-muted px-2 py-0.5 text-muted-foreground text-xs">
             {etiqueta}
@@ -192,7 +168,6 @@ function Burbuja({
         <TextoTypewriter
           animar={animar}
           onTerminado={onTerminado}
-          superficieMarca={superficieMarca}
           texto={mensaje.content}
         />
         {mostrarAdjuntos && mensaje.citas.length > 0 && (
@@ -235,7 +210,7 @@ function Burbuja({
 function IndicadorEscribiendo() {
   return (
     <div className="flex justify-start">
-      <div className="flex items-center gap-1 rounded-2xl rounded-bl-sm border bg-card px-4 py-3">
+      <div className="flex items-center gap-1 rounded-2xl rounded-bl-sm border border-white/70 bg-white/92 px-4 py-3 shadow-md backdrop-blur-md">
         <span className="thinking-dot size-1.5 rounded-full bg-muted-foreground" />
         <span className="thinking-dot size-1.5 rounded-full bg-muted-foreground [animation-delay:0.2s]" />
         <span className="thinking-dot size-1.5 rounded-full bg-muted-foreground [animation-delay:0.4s]" />
@@ -636,20 +611,22 @@ export function Conversacion({
     }
   }
 
+  const sinMensajes = mensajes.length === 0;
+
   return (
-    <div
-      className={[
-        "flex h-full min-h-0 flex-col",
-        esInvitado ? "chat-invitado" : "",
-      ].join(" ")}
-    >
+    <div className="flex h-full min-h-0 flex-col">
       <div
-        className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-6 sm:px-6"
+        className={
+          sinMensajes
+            ? "min-h-0 flex-1 space-y-4 overflow-y-auto px-4 pt-[clamp(2rem,10vh,6rem)] sm:px-6"
+            : "min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-6 sm:px-6"
+        }
         ref={mensajesRef}
       >
         {masAntiguos && (
           <div className="flex justify-center">
             <Button
+              className="text-scouts-purple hover:bg-white/50 hover:text-scouts-purple"
               disabled={cargandoAntiguos}
               onClick={verAnteriores}
               size="sm"
@@ -660,22 +637,12 @@ export function Conversacion({
             </Button>
           </div>
         )}
-        {mensajes.length === 0 && (
-          <div
-            className={[
-              "mx-auto flex max-w-xl flex-col items-center pt-10 text-center",
-              esInvitado ? "text-white" : "text-foreground",
-            ].join(" ")}
-          >
+        {sinMensajes && (
+          <div className="mx-auto flex max-w-xl flex-col items-center text-center text-pnpj-morado">
             <h2 className="text-balance font-semibold text-2xl tracking-[-0.03em] sm:text-3xl">
               ¿Qué quieres descubrir hoy?
             </h2>
-            <p
-              className={[
-                "mt-3 max-w-md text-pretty text-sm sm:text-base",
-                esInvitado ? "text-white/78" : "text-muted-foreground",
-              ].join(" ")}
-            >
+            <p className="mt-3 max-w-md text-pretty text-sm text-pnpj-tinta/68 sm:text-base">
               Pregunta sobre los manuales oficiales de Scouts Colombia. Zulú te
               responderá con las fuentes que respaldan la respuesta.
             </p>
@@ -689,25 +656,28 @@ export function Conversacion({
             mensaje={mensaje}
             onOpcion={enviar}
             onTerminado={() => setAnimandoId(null)}
-            superficieMarca={esInvitado}
           />
         ))}
         {enviando && <IndicadorEscribiendo />}
       </div>
 
       {aviso && (
-        <p className="px-4 pb-2 text-destructive text-sm" role="alert">
+        <p className="brand-alert mx-4 mb-2" role="alert">
           {aviso}
         </p>
       )}
 
       {archivada ? (
-        <p className="border-t px-4 py-4 text-center text-muted-foreground text-sm">
+        <p className="border-scouts-purple/10 border-t px-4 py-4 text-center text-pnpj-tinta/65 text-sm">
           Esta conversación está archivada: es de solo lectura.
         </p>
       ) : (
         <form
-          className="mx-auto w-full max-w-3xl px-4 pb-4 sm:px-6 sm:pb-6"
+          className={
+            sinMensajes
+              ? "mx-auto w-full max-w-3xl shrink-0 px-4 pt-4 [@media(max-height:30rem)]:pt-1 sm:px-6"
+              : "mx-auto w-full max-w-3xl px-4 pb-4 sm:px-6 sm:pb-6"
+          }
           onSubmit={(evento) => {
             evento.preventDefault();
             enviar(borrador);
@@ -716,7 +686,7 @@ export function Conversacion({
           <div className="chat-composer-surface">
             <Textarea
               aria-label="Pregunta para Zulú"
-              className="max-h-40 min-h-12 flex-1 resize-none border-0 bg-transparent px-4 py-3 text-base shadow-none placeholder:text-scouts-purple/55 focus-visible:ring-0 dark:bg-transparent"
+              className="max-h-40 min-h-12 flex-1 resize-none border-0 bg-transparent px-4 py-3 text-base shadow-none placeholder:text-scouts-purple/55 focus-visible:ring-0"
               maxLength={2000}
               onChange={(evento) => setBorrador(evento.target.value)}
               onKeyDown={(evento) => {
@@ -742,7 +712,7 @@ export function Conversacion({
             </Button>
           </div>
           {esInvitado && requiereConsentimiento && !limiteInvitado && (
-            <label className="mt-3 flex cursor-pointer items-start gap-2.5 text-white/86 text-xs leading-5">
+            <label className="mt-3 flex cursor-pointer items-start gap-2.5 text-pnpj-tinta/75 text-xs leading-5 [@media(max-height:30rem)]:mt-2 [@media(max-height:30rem)]:leading-[1.125rem]">
               <span className="relative mt-0.5 flex size-5 shrink-0 items-center justify-center">
                 <input
                   aria-label={`Acepto la política de privacidad, versión ${versionPoliticaActual ?? "vigente"}`}
@@ -753,7 +723,7 @@ export function Conversacion({
                   }
                   type="checkbox"
                 />
-                <span className="size-5 rounded-md border border-white/55 bg-white/12 shadow-inner transition peer-focus-visible:outline-2 peer-focus-visible:outline-white peer-focus-visible:outline-offset-2 peer-checked:border-scouts-yellow peer-checked:bg-scouts-yellow" />
+                <span className="size-5 rounded-md border border-scouts-purple/35 bg-white/55 shadow-inner transition peer-focus-visible:outline-2 peer-focus-visible:outline-scouts-purple peer-focus-visible:outline-offset-2 peer-checked:border-scouts-purple peer-checked:bg-scouts-yellow" />
                 <Check
                   aria-hidden="true"
                   className="pointer-events-none absolute size-3.5 text-scouts-purple opacity-0 peer-checked:opacity-100"
@@ -763,7 +733,7 @@ export function Conversacion({
               <span>
                 Leí y acepto la{" "}
                 <a
-                  className="font-medium text-white underline decoration-white/55 underline-offset-4 hover:decoration-white"
+                  className="font-medium text-scouts-purple underline decoration-scouts-purple/35 underline-offset-4 hover:decoration-scouts-purple"
                   href={URL_POLITICA_PRIVACIDAD}
                   rel="noreferrer"
                   target="_blank"
@@ -779,6 +749,8 @@ export function Conversacion({
           )}
         </form>
       )}
+
+      {sinMensajes && <div aria-hidden="true" className="min-h-6 flex-1" />}
 
       <Dialog onOpenChange={setMostrarRegistro} open={mostrarRegistro}>
         <DialogContent className="auth-card-surface max-w-md border-white/70">

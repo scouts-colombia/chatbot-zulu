@@ -11,8 +11,8 @@ mantener la misma sensación en chat, autenticación y administración.
 - Azul: `#003087`.
 - Rojo: `#c40f2f`.
 - Naranja: `#ff8308`.
-- Fondo de producto: degradado radial morado que termina en `#2c1039`, con
-  halos amarillo y azul de baja opacidad.
+- Fondo de producto: crema `#fff8eb`, igual a Ruta `/diseno/componentes`, con
+  lavados radiales amarillo y durazno de baja opacidad y textura sutil.
 - Nombre visible: **Zulú**. El búho se incorporará en una fase posterior.
 
 ## Tipografía
@@ -43,8 +43,9 @@ mantener la misma sensación en chat, autenticación y administración.
 
 ## Accesibilidad y movimiento
 
-- Foco visible blanco o morado, con separación suficiente del componente.
-- Contraste de texto validado sobre el fondo morado y las superficies claras.
+- Foco visible morado, con separación suficiente del componente.
+- Contraste de texto validado sobre el fondo crema y las superficies claras.
 - Errores usan `role="alert"`; mensajes de éxito usan un elemento `output`.
 - `prefers-reduced-motion` elimina transiciones y animaciones no esenciales.
 - Los fallbacks sin `backdrop-filter` mantienen fondo opaco y legible.
+- No existe modo oscuro, selector de tema ni adaptación automática al sistema.
