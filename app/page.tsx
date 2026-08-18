@@ -11,6 +11,7 @@ import { Suspense } from "react";
 import { ChatPublico } from "@/components/chat/chat-publico";
 import { LimpiezaBorradoresPendientes } from "@/components/chat/limpieza-borradores-pendientes";
 import { FondoMarca } from "@/components/marca/fondo-marca";
+import { ZuluMascota } from "@/components/marca/zulu-mascota";
 import { Button } from "@/components/ui/button";
 import { esIdTraspasoBorradorValido } from "@/lib/invitados/borrador";
 import {
@@ -171,14 +172,23 @@ async function ContenidoPrincipal({
     <FondoMarca>
       <div className="mx-auto flex min-h-dvh w-full max-w-6xl flex-col px-4 sm:px-6 lg:px-8">
         <header className="app-shell-header mt-3 flex min-h-16 items-center justify-between gap-3 rounded-2xl px-4 py-2.5 sm:mt-5 sm:px-5">
-          <div className="min-w-0">
-            <h1 className="font-semibold text-xl tracking-[-0.03em] text-scouts-purple">
-              Zulú
-            </h1>
-            <p className="truncate text-sm text-pnpj-tinta/60">
-              {perfil?.nombre ?? perfil?.email ?? user.email}
-              {perfil?.role === "admin" && " · admin"}
-            </p>
+          <div className="flex min-w-0 items-center gap-2.5">
+            <ZuluMascota
+              className="size-12"
+              movimiento="quieto"
+              pose="marca"
+              priority
+              sizes="48px"
+            />
+            <div className="min-w-0">
+              <h1 className="font-semibold text-xl tracking-[-0.03em] text-scouts-purple">
+                Zulú
+              </h1>
+              <p className="truncate text-sm text-pnpj-tinta/60">
+                {perfil?.nombre ?? perfil?.email ?? user.email}
+                {perfil?.role === "admin" && " · admin"}
+              </p>
+            </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             {perfil?.role === "admin" && (

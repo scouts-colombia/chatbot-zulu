@@ -1,6 +1,6 @@
 /**
  * Spike Fase 1 — Gate de contratos de integración de Gemini File Search.
- * Criterios de verde: ROADMAP.md (Fase 1) y docs/notes/gemini-file-search-validacion.md.
+ * Criterios y resultado: ROADMAP.md (Fase 1) y docs/notes/spike-file-search-resultado.md.
  *
  * Spike #1: una sola llamada con File Search + structured output devuelve
  *           JSON válido según schema Y groundingMetadata utilizable.

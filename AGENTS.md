@@ -2,6 +2,15 @@
 
 Guía de entrada para agentes de código. La fuente operativa completa es `CLAUDE.md` (misma carpeta): stack, reglas no negociables, comandos, estructura y convenciones. Léelo antes de tocar código.
 
+## Skills del proyecto
+
+Las skills compartidas viven en `.agents/skills/`; son parte de Zulu, no de la configuración personal de un agente. Antes de actuar, lee completo el `SKILL.md` que el usuario nombre o cuya descripción coincida con la tarea.
+
+- `ponytail`: usar en cualquier tarea de código para buscar la solución mínima correcta.
+- `thermo-nuclear-code-quality-review`: usar solo cuando el usuario pida explícitamente una revisión termo-nuclear, una auditoría profunda o una revisión especialmente estricta.
+
+Si el host no descubre `.agents/skills/` automáticamente, consulta esas rutas de forma manual. No dependas de una instalación global en Codex, Claude, Cursor, Grok u otro host.
+
 Reglas mínimas si solo lees este archivo:
 
 - **Alcance de build:** `docs/pilot-scope-v0.3.1.md` (con su nota de erratas) es la única autoridad. `docs/srs-v0.2.md` es visión, no alcance. `docs/archive/` es historia.

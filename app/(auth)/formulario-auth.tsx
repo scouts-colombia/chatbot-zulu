@@ -2,6 +2,11 @@
 
 import Link from "next/link";
 import { useActionState, useEffect } from "react";
+import {
+  type MovimientoZulu,
+  type PoseZulu,
+  ZuluMascota,
+} from "@/components/marca/zulu-mascota";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -38,6 +43,18 @@ export function FormularioAuth({
   const errorVisible = estado.mensaje ? null : (estado.error ?? errorInicial);
   const esRegistro = modo === "registro";
   const esFinalizar = modo === "finalizar";
+  const poseZulu: PoseZulu = pendiente
+    ? "pensando"
+    : errorVisible
+      ? "error"
+      : estado.mensaje
+        ? "listo"
+        : "bienvenida";
+  const movimientoZulu: MovimientoZulu = estado.mensaje
+    ? "celebra"
+    : pendiente
+      ? "piensa"
+      : "respira";
 
   return (
     <div
@@ -53,6 +70,14 @@ export function FormularioAuth({
       </Link>
       <div className="auth-card-enter auth-card-surface relative z-10 w-full max-w-sm space-y-6 rounded-3xl p-6 sm:p-8">
         <div className="space-y-1 text-center">
+          <ZuluMascota
+            className="mx-auto -mt-16 mb-1 size-28 sm:size-32"
+            key={poseZulu}
+            movimiento={movimientoZulu}
+            pose={poseZulu}
+            priority
+            sizes="128px"
+          />
           <h1 className="font-semibold text-2xl text-scouts-purple">Zulú</h1>
           <p className="text-muted-foreground text-sm">
             {esFinalizar

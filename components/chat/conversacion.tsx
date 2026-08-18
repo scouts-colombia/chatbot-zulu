@@ -2,10 +2,11 @@
 
 import { ArrowUp, Check } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { cargarMensajesAnteriores } from "@/app/chat/acciones";
+import { ZuluMascota } from "@/components/marca/zulu-mascota";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -31,6 +32,12 @@ import {
 } from "@/lib/invitados/coordinacion";
 import { marcarTurnoInvitadoEnCurso } from "@/lib/invitados/turno-en-curso";
 import { URL_POLITICA_PRIVACIDAD } from "@/lib/privacidad";
+import {
+  IndicadorEscribiendo,
+  MascotaBienvenidaChat,
+  poseParaMensaje,
+  useMovimientoReducido,
+} from "./personalidad-zulu";
 import type { MensajeUI } from "./tipos";
 
 /**
@@ -40,7 +47,6 @@ import type { MensajeUI } from "./tipos";
  * recuperar el foco el texto se pone al día de inmediato.
  */
 const CARACTERES_POR_SEGUNDO = 220;
-const CONSULTA_MOVIMIENTO_REDUCIDO = "(prefers-reduced-motion: reduce)";
 
 function rutaAuthConBorrador(
   ruta: "/login" | "/registro",
@@ -58,20 +64,6 @@ function rutaAuthConBorrador(
   return query ? `${ruta}?${query}` : ruta;
 }
 
-function suscribirMovimientoReducido(onStoreChange: () => void) {
-  const media = window.matchMedia(CONSULTA_MOVIMIENTO_REDUCIDO);
-  media.addEventListener("change", onStoreChange);
-  return () => media.removeEventListener("change", onStoreChange);
-}
-
-function obtenerMovimientoReducido() {
-  return window.matchMedia(CONSULTA_MOVIMIENTO_REDUCIDO).matches;
-}
-
-function obtenerMovimientoReducidoServidor() {
-  return false;
-}
-
 function TextoTypewriter({
   texto,
   animar,
@@ -81,11 +73,7 @@ function TextoTypewriter({
   animar: boolean;
   onTerminado: () => void;
 }) {
-  const reducirMovimiento = useSyncExternalStore(
-    suscribirMovimientoReducido,
-    obtenerMovimientoReducido,
-    obtenerMovimientoReducidoServidor
-  );
+  const reducirMovimiento = useMovimientoReducido();
   const debeAnimar = animar && !reducirMovimiento;
   const [visible, setVisible] = useState(debeAnimar ? 0 : texto.length);
   const terminadoRef = useRef(false);
@@ -122,11 +110,14 @@ function TextoTypewriter({
 
   return (
     <div className="prose prose-sm max-w-none">
-      {/* Sin <img>: la respuesta del asistente puede incluir `![](url)` y
-      cargar recursos de terceros al renderizar. */}
-      <Markdown disallowedElements={["img"]} remarkPlugins={[remarkGfm]}>
-        {texto.slice(0, visible)}
-      </Markdown>
+      {debeAnimar && <span className="sr-only">{texto}</span>}
+      {/* Sin imágenes Markdown: la respuesta del asistente puede incluir una
+      URL de imagen y cargar recursos de terceros al renderizar. */}
+      <div aria-hidden={debeAnimar}>
+        <Markdown disallowedElements={["img"]} remarkPlugins={[remarkGfm]}>
+          {texto.slice(0, visible)}
+        </Markdown>
+      </div>
     </div>
   );
 }
@@ -156,64 +147,62 @@ function Burbuja({
 
   const etiqueta = mensaje.estado ? ETIQUETAS_ESTADO[mensaje.estado] : null;
   const mostrarAdjuntos = !animar;
+  const poseZulu = poseParaMensaje(mensaje);
 
   return (
     <div className="message-fade-in flex justify-start">
-      <div className="max-w-[85%] space-y-2 rounded-2xl rounded-bl-sm border border-white/70 bg-white/92 px-4 py-3 text-scouts-purple text-sm shadow-[var(--shadow-card)] backdrop-blur-md">
-        {etiqueta && (
-          <span className="inline-block rounded-full bg-muted px-2 py-0.5 text-muted-foreground text-xs">
-            {etiqueta}
-          </span>
-        )}
-        <TextoTypewriter
-          animar={animar}
-          onTerminado={onTerminado}
-          texto={mensaje.content}
+      <div className="flex w-full items-end gap-2 sm:gap-3">
+        <ZuluMascota
+          className="size-12 sm:size-14"
+          key={`${mensaje.id}-${poseZulu}`}
+          movimiento={animar ? "explora" : "quieto"}
+          pose={poseZulu}
+          sizes="56px"
         />
-        {mostrarAdjuntos && mensaje.citas.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 border-t pt-2">
-            {mensaje.citas.map((cita) => (
-              <span
-                className="rounded-full bg-secondary px-2 py-0.5 text-secondary-foreground text-xs"
-                key={`${mensaje.id}-${cita.titulo}-${cita.pagina ?? "sp"}`}
-              >
-                {cita.titulo}
-                {cita.pagina ? ` · p. ${cita.pagina}` : ""}
-              </span>
-            ))}
-          </div>
-        )}
-        {mostrarAdjuntos && mensaje.preguntaGuiada && (
-          <div className="space-y-2 border-t pt-2">
-            <p className="font-medium">{mensaje.preguntaGuiada.texto}</p>
-            <div className="flex flex-wrap gap-2">
-              {mensaje.preguntaGuiada.opciones.map((opcion) => (
-                <Button
-                  disabled={deshabilitado}
-                  key={opcion}
-                  onClick={() => onOpcion(opcion)}
-                  size="sm"
-                  type="button"
-                  variant="outline"
+        <div className="max-w-[calc(100%_-_3.5rem)] space-y-2 rounded-2xl rounded-bl-sm border border-white/70 bg-white/92 px-4 py-3 text-scouts-purple text-sm shadow-[var(--shadow-card)] backdrop-blur-md sm:max-w-[85%]">
+          {etiqueta && (
+            <span className="inline-block rounded-full bg-muted px-2 py-0.5 text-muted-foreground text-xs">
+              {etiqueta}
+            </span>
+          )}
+          <TextoTypewriter
+            animar={animar}
+            onTerminado={onTerminado}
+            texto={mensaje.content}
+          />
+          {mostrarAdjuntos && mensaje.citas.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 border-t pt-2">
+              {mensaje.citas.map((cita) => (
+                <span
+                  className="rounded-full bg-secondary px-2 py-0.5 text-secondary-foreground text-xs"
+                  key={`${mensaje.id}-${cita.titulo}-${cita.pagina ?? "sp"}`}
                 >
-                  {opcion}
-                </Button>
+                  {cita.titulo}
+                  {cita.pagina ? ` · p. ${cita.pagina}` : ""}
+                </span>
               ))}
             </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function IndicadorEscribiendo() {
-  return (
-    <div className="flex justify-start">
-      <div className="flex items-center gap-1 rounded-2xl rounded-bl-sm border border-white/70 bg-white/92 px-4 py-3 shadow-md backdrop-blur-md">
-        <span className="thinking-dot size-1.5 rounded-full bg-muted-foreground" />
-        <span className="thinking-dot size-1.5 rounded-full bg-muted-foreground [animation-delay:0.2s]" />
-        <span className="thinking-dot size-1.5 rounded-full bg-muted-foreground [animation-delay:0.4s]" />
+          )}
+          {mostrarAdjuntos && mensaje.preguntaGuiada && (
+            <div className="space-y-2 border-t pt-2">
+              <p className="font-medium">{mensaje.preguntaGuiada.texto}</p>
+              <div className="flex flex-wrap gap-2">
+                {mensaje.preguntaGuiada.opciones.map((opcion) => (
+                  <Button
+                    disabled={deshabilitado}
+                    key={opcion}
+                    onClick={() => onOpcion(opcion)}
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                  >
+                    {opcion}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -268,6 +257,7 @@ export function Conversacion({
   const [aceptaPolitica, setAceptaPolitica] = useState(false);
   const [versionPoliticaActual, setVersionPoliticaActual] =
     useState(versionPolitica);
+  const reducirMovimiento = useMovimientoReducido();
   useEffect(() => {
     const purgar = () => limpiarBorradoresPendientesExpirados(localStorage);
     purgar();
@@ -359,10 +349,10 @@ export function Conversacion({
     }
     const contenedor = mensajesRef.current;
     contenedor?.scrollTo({
-      behavior: "smooth",
+      behavior: reducirMovimiento ? "auto" : "smooth",
       top: contenedor.scrollHeight,
     });
-  }, [mensajes.length, enviando]);
+  }, [mensajes.length, enviando, reducirMovimiento]);
 
   async function verAnteriores() {
     if (cargandoAntiguos || !cursor.current || !conversationIdActual) {
@@ -615,10 +605,17 @@ export function Conversacion({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
+      <output aria-atomic="true" aria-live="polite" className="sr-only">
+        {enviando
+          ? "Zulú está preparando tu respuesta."
+          : animandoId
+            ? "La respuesta de Zulú está lista."
+            : ""}
+      </output>
       <div
         className={
           sinMensajes
-            ? "min-h-0 flex-1 space-y-4 overflow-y-auto px-4 pt-[clamp(2rem,10vh,6rem)] sm:px-6"
+            ? "min-h-0 flex-1 space-y-4 overflow-y-auto px-4 pt-[clamp(1rem,4vh,2.5rem)] sm:px-6"
             : "min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-6 sm:px-6"
         }
         ref={mensajesRef}
@@ -639,6 +636,7 @@ export function Conversacion({
         )}
         {sinMensajes && (
           <div className="mx-auto flex max-w-xl flex-col items-center text-center text-pnpj-morado">
+            <MascotaBienvenidaChat />
             <h2 className="text-balance font-semibold text-2xl tracking-[-0.03em] sm:text-3xl">
               ¿Qué quieres descubrir hoy?
             </h2>
@@ -662,15 +660,30 @@ export function Conversacion({
       </div>
 
       {aviso && (
-        <p className="brand-alert mx-4 mb-2" role="alert">
-          {aviso}
-        </p>
+        <div
+          className="brand-alert mx-4 mb-2 flex items-center gap-3"
+          role="alert"
+        >
+          <ZuluMascota
+            className="size-14 shrink-0"
+            movimiento="respira"
+            pose="error"
+            sizes="56px"
+          />
+          <p>{aviso}</p>
+        </div>
       )}
 
       {archivada ? (
-        <p className="border-scouts-purple/10 border-t px-4 py-4 text-center text-pnpj-tinta/65 text-sm">
-          Esta conversación está archivada: es de solo lectura.
-        </p>
+        <div className="flex items-center justify-center gap-3 border-scouts-purple/10 border-t px-4 py-3 text-center text-pnpj-tinta/65 text-sm">
+          <ZuluMascota
+            className="size-14 shrink-0"
+            movimiento="respira"
+            pose="archivado"
+            sizes="56px"
+          />
+          <p>Esta conversación está archivada: es de solo lectura.</p>
+        </div>
       ) : (
         <form
           className={
@@ -753,8 +766,14 @@ export function Conversacion({
       {sinMensajes && <div aria-hidden="true" className="min-h-6 flex-1" />}
 
       <Dialog onOpenChange={setMostrarRegistro} open={mostrarRegistro}>
-        <DialogContent className="auth-card-surface max-w-md border-white/70">
+        <DialogContent className="auth-card-surface max-h-[calc(100dvh-2rem)] max-w-md overflow-y-auto border-white/70">
           <DialogHeader>
+            <ZuluMascota
+              className="mx-auto mb-1 size-24"
+              movimiento="respira"
+              pose="bienvenida"
+              sizes="96px"
+            />
             <DialogTitle className="text-scouts-purple text-xl">
               Continúa con una cuenta
             </DialogTitle>

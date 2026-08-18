@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import { Conversacion } from "@/components/chat/conversacion";
 import { FondoMarca } from "@/components/marca/fondo-marca";
+import { ZuluMascota } from "@/components/marca/zulu-mascota";
 import { cargarTramo } from "@/lib/chat/transcripcion";
 import { esIdTraspasoBorradorValido } from "@/lib/invitados/borrador";
 import { crearClienteServidor } from "@/lib/supabase/server";
@@ -101,18 +102,31 @@ async function ContenidoConversacion({
       <div className="mx-auto flex h-dvh w-full max-w-4xl flex-col px-3 sm:px-6">
         <header className="app-shell-header mt-3 flex min-h-16 items-center gap-3 rounded-2xl px-4 py-2.5 sm:mt-5">
           <Link
-            className="focus-ring shrink-0 rounded-lg px-2 py-2 text-sm text-scouts-purple/75 hover:text-scouts-purple"
+            aria-label="Zulú, volver a conversaciones"
+            className="focus-ring flex shrink-0 items-center gap-1.5 rounded-lg py-1 pr-1.5 text-scouts-purple"
             href="/"
           >
-            ← Conversaciones
+            <ZuluMascota
+              className="size-10"
+              movimiento="quieto"
+              pose="marca"
+              priority
+              sizes="40px"
+            />
+            <span className="font-semibold text-sm tracking-[-0.02em]">
+              Zulú
+            </span>
           </Link>
           <h1 className="min-w-0 flex-1 truncate font-medium text-sm text-pnpj-morado">
             {conversacion.title}
           </h1>
           {conversacion.archived && (
-            <span className="flex items-center gap-1 rounded-full bg-scouts-yellow px-2.5 py-1 font-medium text-scouts-purple text-xs">
+            <span className="flex items-center gap-1 rounded-full bg-scouts-yellow px-2 py-1 font-medium text-scouts-purple text-xs sm:px-2.5">
               <Archive aria-hidden="true" className="size-3" />
-              Archivada
+              <span className="sr-only">Conversación archivada</span>
+              <span aria-hidden="true" className="hidden sm:inline">
+                Archivada
+              </span>
             </span>
           )}
         </header>
@@ -135,6 +149,13 @@ function AvisoPantalla({ children }: { children: React.ReactNode }) {
   return (
     <FondoMarca className="flex items-center justify-center px-4">
       <div className="auth-card-surface flex w-full max-w-lg flex-col items-center gap-4 rounded-3xl p-8">
+        <ZuluMascota
+          className="size-24"
+          movimiento="respira"
+          pose="error"
+          priority
+          sizes="96px"
+        />
         <p className="text-center text-scouts-red text-sm" role="alert">
           {children}
         </p>
