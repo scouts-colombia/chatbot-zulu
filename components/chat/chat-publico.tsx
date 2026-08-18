@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ZuluMascota } from "@/components/marca/zulu-mascota";
 import { cargarTramo } from "@/lib/chat/transcripcion";
 import { VERSION_POLITICA_PRIVACIDAD } from "@/lib/privacidad";
 import { crearClienteServidor } from "@/lib/supabase/server";
@@ -76,13 +77,22 @@ export async function ChatPublico({ userId }: { userId: string | null }) {
 function ErrorChatPublico() {
   return (
     <MarcoChatPublico>
-      <p
-        className="auth-card-surface mx-auto max-w-md rounded-2xl p-6 text-center text-destructive text-sm"
+      <div
+        className="auth-card-surface mx-auto flex max-w-md flex-col items-center gap-3 rounded-2xl p-6 text-center text-destructive text-sm"
         role="alert"
       >
-        No pudimos recuperar tu conversación en este momento. Recarga la página
-        o vuelve a intentarlo más tarde.
-      </p>
+        <ZuluMascota
+          className="size-24"
+          movimiento="respira"
+          pose="error"
+          priority
+          sizes="96px"
+        />
+        <p>
+          No pudimos recuperar tu conversación en este momento. Recarga la
+          página o vuelve a intentarlo más tarde.
+        </p>
+      </div>
     </MarcoChatPublico>
   );
 }
@@ -96,12 +106,23 @@ function MarcoChatPublico({ children }: { children: React.ReactNode }) {
     >
       <header className="relative z-10 flex min-h-16 items-center justify-between gap-3 border-scouts-purple/10 border-b px-4 sm:px-6">
         <Link
-          className="focus-ring rounded-lg py-2 font-semibold text-xl tracking-[-0.03em] text-scouts-purple"
+          className="focus-ring flex min-w-0 items-center gap-2 rounded-lg py-1 text-scouts-purple"
           href="/"
         >
-          Zulú
-          <span className="ml-2 hidden font-normal text-sm text-pnpj-tinta/65 sm:inline">
-            Asistente Scout
+          <ZuluMascota
+            className="size-12"
+            movimiento="quieto"
+            pose="marca"
+            priority
+            sizes="48px"
+          />
+          <span className="min-w-0">
+            <span className="block font-semibold text-xl tracking-[-0.03em]">
+              Zulú
+            </span>
+            <span className="hidden font-normal text-pnpj-tinta/65 text-xs sm:block">
+              Asistente Scout
+            </span>
           </span>
         </Link>
         <NavegacionCuentaPublica />

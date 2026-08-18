@@ -13,7 +13,7 @@ mantener la misma sensación en chat, autenticación y administración.
 - Naranja: `#ff8308`.
 - Fondo de producto: crema `#fff8eb`, igual a Ruta `/diseno/componentes`, con
   lavados radiales amarillo y durazno de baja opacidad y textura sutil.
-- Nombre visible: **Zulú**. El búho se incorporará en una fase posterior.
+- Nombre visible: **Zulú**. `zulu-marca.png` acompaña el nombre en los encabezados. La biblioteca de 21 poses transparentes de `public/images/zulu/estados/` expresa bienvenida, búsqueda, lectura, respuesta, aclaración, ausencia de fuente, protección, error y archivo mediante `ZuluMascota`; todas son decorativas para lectores de pantalla y el texto conserva el significado completo.
 
 ## Tipografía
 

@@ -8,6 +8,9 @@ export const metadata: Metadata = {
   title: "Zulú",
   description:
     "Asistente para consultar los manuales oficiales de la organización Scout, con citas verificables.",
+  appleWebApp: {
+    title: "Zulú",
+  },
 };
 
 export const viewport: Viewport = {

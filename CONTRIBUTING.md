@@ -30,7 +30,7 @@ feat(chat): respuesta estructurada con retry único ante json inválido
 
 feat(citas): normalización desde grounding y persistencia en citations
 
-feat(admin): ver conversación ajena con motivo obligatorio y auditoría
+feat(admin): auditar en silencio el acceso a una conversación ajena
 
 fix(rls): el cliente podía fijar created_at en mensajes
 

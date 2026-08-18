@@ -2,6 +2,13 @@
 
 Asistente de IA donde miembros de una organización Scout consultan manuales oficiales y reciben respuestas con citas. Hay usuarios menores de edad (desde 15 años). Trátese con el cuidado correspondiente.
 
+## Skills del proyecto
+
+Las skills compartidas y versionadas viven en `.agents/skills/`. Antes de actuar, lee completo el `SKILL.md` que el usuario nombre o cuya descripción coincida con la tarea; no dependas de una instalación global del host.
+
+- Para cualquier tarea de código: `@.agents/skills/ponytail/SKILL.md`.
+- Solo ante una petición explícita de revisión termo-nuclear, auditoría profunda o revisión especialmente estricta: `@.agents/skills/thermo-nuclear-code-quality-review/SKILL.md`.
+
 ## Estilo de escritura
 
 Antes de entregar cualquier análisis, documento o respuesta larga, invoca el skill `stop-slop` (`/anthropic-skills:stop-slop`) y aplica sus instrucciones.

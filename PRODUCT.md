@@ -39,7 +39,7 @@ Zulú responde sobre el marco documental oficial de Scouts Colombia mediante Gem
 ## Brand Commitments
 
 - El producto se llama **Zulú**.
-- Zulú está representado por un búho, pero crear o incorporar el personaje queda fuera de esta fase.
+- Zulú está representado por un búho ilustrado que acompaña la marca y hace legibles los momentos de bienvenida, búsqueda, respuesta y recuperación sin sustituir el contenido escrito.
 - La identidad visual debe compartir el mismo lenguaje de Ruta: paleta viva de Scouts Colombia, tipografía, degradados, radios, superficies translúcidas y estándares de interacción del repositorio `D:/dev/ruta-dnpj/ruta`.
 - La interfaz y las respuestas se escriben en español.
 
@@ -48,7 +48,7 @@ Zulú responde sobre el marco documental oficial de Scouts Colombia mediante Gem
 - Alcance operativo: `docs/pilot-scope-v0.3.1.md` y sus erratas.
 - Plan y decisiones confirmadas: `ROADMAP.md`.
 - Sistema visual de referencia: `D:/dev/ruta-dnpj/ruta/app/globals.css`, componentes y activos de `D:/dev/ruta-dnpj/ruta/public/brand` y `public/decor`.
-- No hay todavía un activo aprobado del búho de Zulú; no debe inventarse en esta fase.
+- Activos del búho de Zulú: marca y referencia en `public/images/zulu/`, más la biblioteca de estados transparentes en `public/images/zulu/estados/`. Su catálogo y receta de generación están en `docs/notes/zulu-visual-system.md`.
 
 ## Product Principles
 

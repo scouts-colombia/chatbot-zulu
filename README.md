@@ -1,71 +1,72 @@
-<a href="https://chatbot.ai-sdk.dev/demo">
-  <img alt="Chatbot" src="app/(chat)/opengraph-image.png">
-  <h1 align="center">Chatbot</h1>
-</a>
+# Zulú
 
-<p align="center">
-    Chatbot (formerly AI Chatbot) is a free, open-source template built with Next.js and the AI SDK that helps you quickly build powerful chatbot applications.
-</p>
+Zulú es un asistente web para consultar documentos oficiales de la Asociación Scouts de Colombia. Responde en español mediante Gemini File Search, valida una salida estructurada en el servidor y muestra citas vinculadas al inventario documental propio.
 
-<p align="center">
-  <a href="https://chatbot.ai-sdk.dev/docs"><strong>Read Docs</strong></a> ·
-  <a href="#features"><strong>Features</strong></a> ·
-  <a href="#model-providers"><strong>Model Providers</strong></a> ·
-  <a href="#deploy-your-own"><strong>Deploy Your Own</strong></a> ·
-  <a href="#running-locally"><strong>Running locally</strong></a>
-</p>
-<br/>
+El piloto admite personas desde los 15 años, una pregunta pública antes del registro, historial para cuentas activas y un panel administrativo con auditoría.
 
-## Features
+## Stack
 
-- [Next.js](https://nextjs.org) App Router
-  - Advanced routing for seamless navigation and performance
-  - React Server Components (RSCs) and Server Actions for server-side rendering and increased performance
-- [AI SDK](https://ai-sdk.dev/docs/introduction)
-  - Unified API for generating text, structured objects, and tool calls with LLMs
-  - Hooks for building dynamic chat and generative user interfaces
-  - Supports OpenAI, Anthropic, Google, xAI, and other model providers via AI Gateway
-- [shadcn/ui](https://ui.shadcn.com)
-  - Styling with [Tailwind CSS](https://tailwindcss.com)
-  - Component primitives from [Radix UI](https://radix-ui.com) for accessibility and flexibility
-- Data Persistence
-  - [Neon Serverless Postgres](https://vercel.com/marketplace/neon) for saving chat history and user data
-  - [Vercel Blob](https://vercel.com/storage/blob) for efficient file storage
-- [Auth.js](https://authjs.dev)
-  - Simple and secure authentication
+- Next.js 16, React 19 y TypeScript.
+- Supabase Auth y PostgreSQL como fuente de usuarios, conversaciones, mensajes, citas y auditoría.
+- Gemini Developer API con `gemini-3.5-flash` y File Search administrado.
+- Tailwind CSS, Radix UI y el sistema visual claro de Ruta DNPJ.
+- Vercel para previews y producción.
 
-## Model Providers
+No se usan NextAuth/Auth.js, Neon, AI Gateway, RAG manual, pgvector ni streaming de tokens del proveedor.
 
-This template uses the [Vercel AI Gateway](https://vercel.com/docs/ai-gateway) to access multiple AI models through a unified interface. Models are configured in `lib/ai/models.ts` with per-model provider routing. Included models: Mistral, Moonshot, DeepSeek, OpenAI, and xAI.
+## Puesta en marcha local
 
-### AI Gateway Authentication
-
-**For Vercel deployments**: Authentication is handled automatically via OIDC tokens.
-
-**For non-Vercel deployments**: You need to provide an AI Gateway API key by setting the `AI_GATEWAY_API_KEY` environment variable in your `.env.local` file.
-
-With the [AI SDK](https://ai-sdk.dev/docs/introduction), you can also switch to direct LLM providers like [OpenAI](https://openai.com), [Anthropic](https://anthropic.com), [Cohere](https://cohere.com/), and [many more](https://ai-sdk.dev/providers/ai-sdk-providers) with just a few lines of code.
-
-## Deploy Your Own
-
-You can deploy your own version of Chatbot to Vercel with one click:
-
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/templates/next.js/chatbot)
-
-## Running locally
-
-You will need to use the environment variables [defined in `.env.example`](.env.example) to run Chatbot. It's recommended you use [Vercel Environment Variables](https://vercel.com/docs/projects/environment-variables) for this, but a `.env` file is all that is necessary.
-
-> Note: You should not commit your `.env` file or it will expose secrets that will allow others to control access to your various AI and authentication provider accounts.
-
-1. Install Vercel CLI: `npm i -g vercel`
-2. Link local instance with Vercel and GitHub accounts (creates `.vercel` directory): `vercel link`
-3. Download your environment variables: `vercel env pull`
+Requisitos: Node.js compatible con Next.js 16 y `pnpm@10.32.1`.
 
 ```bash
 pnpm install
-pnpm db:migrate # Setup database or apply latest database changes
 pnpm dev
 ```
 
-Your app template should now be running on [localhost:3000](http://localhost:3000).
+Copia `.env.example` como `.env.local` y completa sus valores. Las variables principales son:
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SECRET_KEY`, solo en servidor
+- `GUEST_LIMIT_SECRET`, solo en servidor
+- `SITE_URL`
+- `GEMINI_API_KEY`, solo en servidor
+- `GEMINI_MODEL`
+- `GEMINI_THINKING_LEVEL`
+
+El proyecto Supabase debe tener habilitados Anonymous Sign-Ins y Manual Linking para el turno público y su conversión a cuenta.
+
+## Comandos
+
+```bash
+pnpm dev        # servidor de desarrollo
+pnpm check      # Ultracite/Biome
+pnpm test       # pruebas unitarias y de contrato
+pnpm typecheck  # TypeScript sin emitir archivos
+pnpm build      # compilación de producción
+pnpm verify:rls # verificación contra el proyecto Supabase real
+```
+
+`pnpm verify:rls` crea usuarios efímeros y escribe en el proyecto configurado. Úsalo solo cuando corresponda y con credenciales de un entorno autorizado.
+
+## Arquitectura y documentación
+
+- [AGENTS.md](AGENTS.md) y [CLAUDE.md](CLAUDE.md): reglas para agentes y decisiones no negociables.
+- [docs/pilot-scope-v0.3.1.md](docs/pilot-scope-v0.3.1.md): única autoridad del alcance del piloto.
+- [ROADMAP.md](ROADMAP.md): estado, fases y trabajo pendiente.
+- [PRODUCT.md](PRODUCT.md) y [DESIGN.md](DESIGN.md): producto y sistema visual.
+- [docs/notes/handoff-2026-08-18-personalidad-zulu.md](docs/notes/handoff-2026-08-18-personalidad-zulu.md): entrega operativa más reciente.
+- [docs/notes/zulu-visual-system.md](docs/notes/zulu-visual-system.md): biblioteca y uso de la mascota.
+- `supabase/migrations/`: fuente única del esquema y la RLS.
+
+`docs/srs-v0.2.md` describe la visión, no el alcance de construcción. `docs/archive/` conserva versiones históricas y no debe guiar implementaciones nuevas.
+
+## Seguridad y privacidad
+
+- Nunca publiques `.env.local`, llaves de Gemini ni la secret key de Supabase.
+- La secret key salta la RLS y solo se usa en código de servidor para operaciones que el cliente no puede forjar.
+- El camino normal del usuario accede a Supabase con su JWT y queda sujeto a RLS.
+- No se guarda la respuesta cruda del proveedor por defecto.
+- Hay menores de edad: minimiza datos y no improvises flujos de salvaguarda.
+
+Consulta [CONTRIBUTING.md](CONTRIBUTING.md) antes de crear una rama o PR. Los commits se escriben en español y no se hace push sin confirmación del propietario.
