@@ -33,7 +33,6 @@
   "theme_color": "#4d006e",
   "background_color": "#fff8eb",
   "display": "standalone",
-  "display_override": ["window-controls-overlay", "standalone"],
   "orientation": "any",
   "categories": ["education", "reference"]
 }

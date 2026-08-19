@@ -31,7 +31,9 @@ export function InstalarPwa() {
       return;
     }
 
-    const esIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    const esIos =
+      /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+      (/macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
     setTipoAyuda(esIos ? "ios" : "manual");
 
     const prepararInstalacion = (evento: Event) => {
@@ -63,11 +65,9 @@ export function InstalarPwa() {
       return;
     }
     await eventoInstalacion.prompt();
-    const eleccion = await eventoInstalacion.userChoice;
-    if (eleccion.outcome === "dismissed") {
-      localStorage.setItem(CLAVE_DESCARTADA, "1");
-    }
+    await eventoInstalacion.userChoice;
     setEventoInstalacion(null);
+    setTipoAyuda(null);
   };
 
   if (!(eventoInstalacion || tipoAyuda)) {
