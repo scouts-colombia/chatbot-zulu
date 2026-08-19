@@ -2,13 +2,13 @@
 
 Zulú es un asistente web para consultar documentos oficiales de la Asociación Scouts de Colombia. Responde en español mediante Gemini File Search, valida una salida estructurada en el servidor y muestra citas vinculadas al inventario documental propio.
 
-El piloto admite personas desde los 15 años, una pregunta pública antes del registro, historial para cuentas activas y un panel administrativo con auditoría.
+El piloto admite personas desde los 15 años, una cuota pública configurable antes del registro, historial para cuentas activas y un panel administrativo con auditoría.
 
 ## Stack
 
 - Next.js 16, React 19 y TypeScript.
 - Supabase Auth y PostgreSQL como fuente de usuarios, conversaciones, mensajes, citas y auditoría.
-- Gemini Developer API con `gemini-3.5-flash` y File Search administrado.
+- Gemini Developer API con `gemini-3.7-flash` y File Search administrado.
 - Tailwind CSS, Radix UI y el sistema visual claro de Ruta DNPJ.
 - Vercel para previews y producción.
 
@@ -31,10 +31,10 @@ Copia `.env.example` como `.env.local` y completa sus valores. Las variables pri
 - `GUEST_LIMIT_SECRET`, solo en servidor
 - `SITE_URL`
 - `GEMINI_API_KEY`, solo en servidor
-- `GEMINI_MODEL`
-- `GEMINI_THINKING_LEVEL`
 
 El proyecto Supabase debe tener habilitados Anonymous Sign-Ins y Manual Linking para el turno público y su conversión a cuenta.
+
+Un administrador puede cambiar modelo, esfuerzo de razonamiento y cuotas desde `/admin/configuracion`. Esa configuración vive exclusivamente en `app_settings`; las claves de Gemini y Supabase permanecen únicamente en variables de entorno.
 
 ## Comandos
 

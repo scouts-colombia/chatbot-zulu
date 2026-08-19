@@ -1,4 +1,10 @@
-import { FileText, MessagesSquare, ShieldCheck, Users } from "lucide-react";
+import {
+  FileText,
+  MessagesSquare,
+  Settings2,
+  ShieldCheck,
+  Users,
+} from "lucide-react";
 import { FondoMarca } from "@/components/marca/fondo-marca";
 import { ReauditarNavegacion } from "./reauditar-navegacion";
 
@@ -44,10 +50,7 @@ export default function LayoutAdmin({
             aria-label="Secciones administrativas"
             className="grid w-full grid-cols-2 gap-2 text-sm sm:flex sm:w-auto"
           >
-            <a
-              className="admin-nav-link col-span-2 sm:col-span-1"
-              href="/admin/conversaciones"
-            >
+            <a className="admin-nav-link" href="/admin/conversaciones">
               <MessagesSquare aria-hidden="true" className="size-4" />
               Conversaciones
             </a>
@@ -58,6 +61,10 @@ export default function LayoutAdmin({
             <a className="admin-nav-link" href="/admin/usuarios">
               <Users aria-hidden="true" className="size-4" />
               Usuarios
+            </a>
+            <a className="admin-nav-link" href="/admin/configuracion">
+              <Settings2 aria-hidden="true" className="size-4" />
+              Configuración
             </a>
           </nav>
         </header>

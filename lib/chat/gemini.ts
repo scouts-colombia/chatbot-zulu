@@ -4,6 +4,7 @@ import {
   GoogleGenAI,
   ThinkingLevel,
 } from "@google/genai";
+import type { NivelRazonamientoGemini } from "../configuracion/chat";
 import {
   type ModeloRespuesta,
   ModeloRespuestaSchema,
@@ -13,14 +14,7 @@ import { PROMPT_CORRECTIVO, SYSTEM_PROMPT } from "./prompt";
 
 export type TurnoHistorial = { role: "user" | "model"; texto: string };
 
-const NIVELES_RAZONAMIENTO = ["minimal", "low", "medium", "high"] as const;
-
-export type NivelRazonamientoGemini = (typeof NIVELES_RAZONAMIENTO)[number];
-
-export type ResolucionNivelRazonamiento = {
-  nivel: NivelRazonamientoGemini;
-  origen: "configurado" | "predeterminado" | "invalido";
-};
+export type { NivelRazonamientoGemini } from "../configuracion/chat";
 
 const NIVEL_SDK: Record<NivelRazonamientoGemini, ThinkingLevel> = {
   minimal: ThinkingLevel.MINIMAL,
@@ -28,28 +22,6 @@ const NIVEL_SDK: Record<NivelRazonamientoGemini, ThinkingLevel> = {
   medium: ThinkingLevel.MEDIUM,
   high: ThinkingLevel.HIGH,
 };
-
-/**
- * `medium` conserva el comportamiento por defecto documentado de
- * gemini-3.5-flash cuando la variable falta. Un valor inválido nunca se envía
- * al proveedor: también cae a `medium` y se marca para emitir un aviso de
- * configuración exclusivamente en servidor.
- */
-export function resolverNivelRazonamiento(
-  valor: string | undefined
-): ResolucionNivelRazonamiento {
-  const normalizado = valor?.trim().toLowerCase();
-  if (!normalizado) {
-    return { nivel: "medium", origen: "predeterminado" };
-  }
-  if (NIVELES_RAZONAMIENTO.includes(normalizado as NivelRazonamientoGemini)) {
-    return {
-      nivel: normalizado as NivelRazonamientoGemini,
-      origen: "configurado",
-    };
-  }
-  return { nivel: "medium", origen: "invalido" };
-}
 
 export type IntentoModelo = {
   attemptIndex: number;
@@ -97,7 +69,8 @@ type DependenciasLlamada = {
   generateContent?: (
     solicitud: SolicitudGenerateContent
   ) => Promise<GenerateContentResponse>;
-  thinkingLevelValue?: string;
+  modelValue: string;
+  thinkingLevelValue: NivelRazonamientoGemini;
 };
 
 function estaBloqueado(response: GenerateContentResponse) {
@@ -133,17 +106,10 @@ export async function llamarModelo(
      */
     metadataFilter?: string;
   },
-  dependencias: DependenciasLlamada = {}
+  dependencias: DependenciasLlamada
 ): Promise<ResultadoModelo> {
-  const model = process.env.GEMINI_MODEL ?? "gemini-3.5-flash";
-  const nivelResuelto = resolverNivelRazonamiento(
-    dependencias.thinkingLevelValue ?? process.env.GEMINI_THINKING_LEVEL
-  );
-  if (nivelResuelto.origen === "invalido") {
-    console.error(
-      "[gemini] GEMINI_THINKING_LEVEL inválido; se usará medium. Valores permitidos: minimal, low, medium, high."
-    );
-  }
+  const model = dependencias.modelValue;
+  const nivelRazonamiento = dependencias.thinkingLevelValue;
 
   let generateContent = dependencias.generateContent;
   if (!generateContent) {
@@ -176,7 +142,7 @@ export async function llamarModelo(
         config: {
           systemInstruction,
           thinkingConfig: {
-            thinkingLevel: NIVEL_SDK[nivelResuelto.nivel],
+            thinkingLevel: NIVEL_SDK[nivelRazonamiento],
           },
           tools: [
             {
@@ -196,7 +162,7 @@ export async function llamarModelo(
         latencyMs: Date.now() - inicio,
         status: "error",
         errorCode: `provider_error:${error instanceof Error ? error.message.slice(0, 120) : "desconocido"}`,
-        thinkingLevel: nivelResuelto.nivel,
+        thinkingLevel: nivelRazonamiento,
         groundingDisponible: false,
       });
       if (attemptIndex === 2) {
@@ -214,7 +180,7 @@ export async function llamarModelo(
       latencyMs,
       finishReason: response.candidates?.[0]?.finishReason,
       groundingDisponible: grounding,
-      thinkingLevel: nivelResuelto.nivel,
+      thinkingLevel: nivelRazonamiento,
       ...extraerUso(response),
     };
 

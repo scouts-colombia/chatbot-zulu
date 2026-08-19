@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { type GenerateContentResponse, ThinkingLevel } from "@google/genai";
-import { extraerUso, llamarModelo, resolverNivelRazonamiento } from "./gemini";
+import { extraerUso, llamarModelo } from "./gemini";
 
 const entrada = {
   historial: [],
@@ -28,6 +28,7 @@ for (const [nivel, nivelSdk] of [
   test(`envía thinkingLevel ${nivel}`, async () => {
     let recibido: unknown;
     const resultado = await llamarModelo(entrada, {
+      modelValue: "gemini-prueba",
       thinkingLevelValue: nivel,
       generateContent: (solicitud) => {
         recibido = solicitud.config?.thinkingConfig?.thinkingLevel;
@@ -40,28 +41,11 @@ for (const [nivel, nivelSdk] of [
   });
 }
 
-test("usa medium cuando la variable está ausente", () => {
-  assert.deepEqual(resolverNivelRazonamiento(undefined), {
-    nivel: "medium",
-    origen: "predeterminado",
-  });
-  assert.deepEqual(resolverNivelRazonamiento("   "), {
-    nivel: "medium",
-    origen: "predeterminado",
-  });
-});
-
-test("rechaza el valor inválido antes del proveedor y cae a medium", () => {
-  assert.deepEqual(resolverNivelRazonamiento("turbo"), {
-    nivel: "medium",
-    origen: "invalido",
-  });
-});
-
 test("el retry reutiliza exactamente el mismo nivel", async () => {
   const niveles: unknown[] = [];
   let llamadas = 0;
   const resultado = await llamarModelo(entrada, {
+    modelValue: "gemini-prueba",
     thinkingLevelValue: "low",
     generateContent: (solicitud) => {
       llamadas += 1;
@@ -82,6 +66,28 @@ test("el retry reutiliza exactamente el mismo nivel", async () => {
     resultado.intentos.map((intento) => intento.thinkingLevel),
     ["low", "low"]
   );
+});
+
+test("usa el modelo recibido desde la configuración operativa", async () => {
+  let modeloRecibido: string | undefined;
+
+  await llamarModelo(
+    {
+      historial: [],
+      pregunta: "Pregunta",
+      storeNames: ["stores/prueba"],
+    },
+    {
+      modelValue: "gemini-configurado",
+      thinkingLevelValue: "medium",
+      generateContent: (solicitud) => {
+        modeloRecibido = solicitud.model;
+        return Promise.resolve(respuestaValida());
+      },
+    }
+  );
+
+  assert.equal(modeloRecibido, "gemini-configurado");
 });
 
 test("extrae todos los contadores exactos de usageMetadata", () => {

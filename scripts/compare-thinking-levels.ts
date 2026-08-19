@@ -1,5 +1,5 @@
 /**
- * Smoke test controlado de niveles de razonamiento para gemini-3.5-flash.
+ * Smoke test controlado de niveles de razonamiento para el modelo operativo.
  *
  * Mantiene constantes la capa de producción, el prompt, el modelo, los stores,
  * el metadataFilter y las preguntas. No escribe mensajes, eventos ni respuestas
@@ -18,10 +18,13 @@ import {
   llamarModelo,
   type NivelRazonamientoGemini,
 } from "../lib/chat/gemini";
+import {
+  CLAVES_CONFIGURACION_CHAT,
+  resolverConfiguracionChat,
+} from "../lib/configuracion/chat";
 
 loadEnv({ path: ".env.local" });
 
-const MODELO_REQUERIDO = "gemini-3.5-flash";
 const NIVELES: NivelRazonamientoGemini[] = ["medium", "low", "minimal"];
 const CASOS = [
   {
@@ -74,19 +77,24 @@ async function main() {
     return;
   }
 
-  const model = process.env.GEMINI_MODEL ?? MODELO_REQUERIDO;
-  if (model !== MODELO_REQUERIDO) {
-    throw new Error(
-      `La comparación exige GEMINI_MODEL=${MODELO_REQUERIDO}; recibido ${model}`
-    );
-  }
-
   const supabase = createClient(
     exigirEnv("NEXT_PUBLIC_SUPABASE_URL"),
     exigirEnv("SUPABASE_SECRET_KEY"),
     { auth: { persistSession: false, autoRefreshToken: false } }
   );
   exigirEnv("GEMINI_API_KEY");
+
+  const { data: filasConfiguracion, error: errorConfiguracion } = await supabase
+    .from("app_settings")
+    .select("clave, valor")
+    .in("clave", [...CLAVES_CONFIGURACION_CHAT]);
+  const configuracion = resolverConfiguracionChat(filasConfiguracion ?? []);
+  if (errorConfiguracion || !configuracion) {
+    throw new Error(
+      "La configuración operativa está incompleta o no disponible"
+    );
+  }
+  const model = configuracion.modelo;
 
   const { data: documentos, error } = await supabase
     .from("knowledge_documents")
@@ -118,7 +126,7 @@ async function main() {
           storeNames,
           metadataFilter,
         },
-        { thinkingLevelValue: nivel }
+        { modelValue: model, thinkingLevelValue: nivel }
       );
 
       if (resultado.tipo !== "ok") {

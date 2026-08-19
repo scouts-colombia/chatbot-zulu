@@ -13,6 +13,7 @@ import {
   type TurnoHistorial,
 } from "@/lib/chat/gemini";
 import { construirFilasEventos } from "@/lib/chat/telemetria";
+import { cargarConfiguracionChat } from "@/lib/configuracion/servidor";
 import {
   COOKIE_DISPOSITIVO_INVITADO,
   COOKIE_PREFLIGHT_INVITADO,
@@ -46,9 +47,6 @@ const MENSAJE_BLOQUEADO =
   "No puedo ayudarte con ese tema desde este chat. Si necesitas apoyo, acude a un dirigente o adulto responsable de tu grupo.";
 const MENSAJE_ERROR =
   "Tuvimos un problema generando la respuesta. Vuelve a intentarlo en un momento.";
-const MENSAJE_ERROR_INVITADO =
-  "No pudimos generar la respuesta de prueba. Para volver a intentarlo, crea una cuenta o inicia sesión.";
-
 function ahora() {
   return new Date().toISOString();
 }
@@ -259,6 +257,19 @@ export async function POST(request: Request) {
         mensaje: "Tu cuenta no está habilitada para usar el chat.",
       },
       { status: 403 }
+    );
+  }
+
+  const { configuracion, error: errorConfiguracion } =
+    await cargarConfiguracionChat(supabase);
+  if (errorConfiguracion || !configuracion) {
+    return responderLiberandoPreflight(
+      {
+        codigo: "configuracion_no_disponible",
+        mensaje:
+          "El chat no está disponible en este momento. Intenta de nuevo.",
+      },
+      { status: 503 }
     );
   }
 
@@ -523,7 +534,7 @@ export async function POST(request: Request) {
         .update({ updated_at: ahora() })
         .eq("id", conversationId);
     }
-    const modelId = process.env.GEMINI_MODEL ?? "gemini-3.5-flash";
+    const modelId = configuracion.modelo;
     const requestId = crypto.randomUUID();
     const baseEventos = {
       userId: user.id,
@@ -612,12 +623,18 @@ export async function POST(request: Request) {
         texto: m.content.slice(0, 4000),
       }));
 
-    const resultado = await llamarModelo({
-      historial,
-      pregunta: cuerpo.mensaje,
-      storeNames,
-      metadataFilter,
-    });
+    const resultado = await llamarModelo(
+      {
+        historial,
+        pregunta: cuerpo.mensaje,
+        storeNames,
+        metadataFilter,
+      },
+      {
+        modelValue: modelId,
+        thinkingLevelValue: configuracion.nivelRazonamiento,
+      }
+    );
 
     if (resultado.tipo === "bloqueado") {
       // Bloqueo del proveedor: estado seguro de producto, no error (D-08).
@@ -656,12 +673,11 @@ export async function POST(request: Request) {
     }
 
     if (resultado.tipo === "json_invalido") {
-      const mensajeError = esInvitado ? MENSAJE_ERROR_INVITADO : MENSAJE_ERROR;
-      const respuestaJson = { estado: "error", respuesta: mensajeError };
+      const respuestaJson = { estado: "error", respuesta: MENSAJE_ERROR };
       const asistenteId = await guardarMensajeAsistente(
         admin,
         conversationId,
-        mensajeError,
+        MENSAJE_ERROR,
         respuestaJson
       );
       await registrarEventos(
@@ -671,7 +687,7 @@ export async function POST(request: Request) {
       );
       const respuesta: RespuestaAsistente = {
         estado: "error",
-        respuesta: mensajeError,
+        respuesta: MENSAJE_ERROR,
         citas: [],
         metadata: metadataDe(resultado.intentos, modelId, requestId),
       };
@@ -883,10 +899,10 @@ export async function POST(request: Request) {
     if (esInvitado) {
       return NextResponse.json(
         {
-          codigo: "registro_requerido",
+          codigo: "turno_invitado_consumido",
           conversationId,
           mensaje:
-            "Tu pregunta de prueba quedó registrada, pero no pudimos completar la respuesta. Crea una cuenta o inicia sesión para continuar.",
+            "Tu pregunta de prueba quedó registrada, pero no pudimos completar la respuesta. Puedes intentar una nueva pregunta si aún tienes cupo.",
         },
         { status: 503 }
       );

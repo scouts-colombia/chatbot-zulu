@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requerirAdmin } from "@/lib/admin/guard";
+import { ConfiguracionChatSchema } from "@/lib/configuracion/chat";
 import { crearClienteAdmin } from "@/lib/supabase/admin";
 
 export type EstadoAccion = { error: string | null };
@@ -20,6 +21,8 @@ const MENSAJES_ERROR: Record<string, string> = {
   perfil_no_encontrado: "No existe ese usuario.",
   estado_invalido: "Estado inválido.",
   auto_cambio_no_permitido: "No puedes cambiar tu propio estado.",
+  configuracion_invalida:
+    "Alguno de los valores está fuera del rango permitido.",
 };
 
 function mensajeDeError(error: { message: string }, contexto: string): string {
@@ -103,4 +106,57 @@ export async function cambiarEstadoCuenta(
 
   revalidatePath("/admin/usuarios");
   return { error: null };
+}
+
+export type EstadoConfiguracion = {
+  error: string | null;
+  guardado: boolean;
+};
+
+export async function guardarConfiguracionChat(
+  _estadoPrevio: EstadoConfiguracion,
+  formData: FormData
+): Promise<EstadoConfiguracion> {
+  const { user } = await requerirAdmin();
+  const resultado = ConfiguracionChatSchema.safeParse({
+    modelo: formData.get("modelo"),
+    nivelRazonamiento: formData.get("nivelRazonamiento"),
+    maxTurnosRegistradoPorDia: formData.get("maxTurnosRegistradoPorDia"),
+    maxTurnosInvitadoPorPersonaPorDia: formData.get(
+      "maxTurnosInvitadoPorPersonaPorDia"
+    ),
+    maxTurnosInvitadoPorRedPorDia: formData.get(
+      "maxTurnosInvitadoPorRedPorDia"
+    ),
+  });
+
+  if (!resultado.success) {
+    return {
+      error: "Revisa el modelo y los límites indicados.",
+      guardado: false,
+    };
+  }
+
+  const configuracion = resultado.data;
+  const { error } = await crearClienteAdmin().rpc(
+    "admin_actualizar_configuracion_chat",
+    {
+      p_admin_user_id: user.id,
+      p_gemini_model: configuracion.modelo,
+      p_gemini_thinking_level: configuracion.nivelRazonamiento,
+      p_max_registered_daily: configuracion.maxTurnosRegistradoPorDia,
+      p_max_guest_person_daily: configuracion.maxTurnosInvitadoPorPersonaPorDia,
+      p_max_guest_network_daily: configuracion.maxTurnosInvitadoPorRedPorDia,
+    }
+  );
+
+  if (error) {
+    return {
+      error: mensajeDeError(error, "guardarConfiguracionChat"),
+      guardado: false,
+    };
+  }
+
+  revalidatePath("/admin/configuracion");
+  return { error: null, guardado: true };
 }

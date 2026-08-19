@@ -27,5 +27,5 @@ export async function requerirAdmin() {
     redirect("/");
   }
 
-  return { user, perfil };
+  return { user, perfil, supabase };
 }

@@ -215,7 +215,6 @@ export function Conversacion({
   hayMasAntiguos = false,
   cursorInicial = null,
   esInvitado = false,
-  limiteConsumido = false,
   requiereConsentimiento = false,
   sesionInvitadaEstablecida = false,
   borradorTransferenciaId = null,
@@ -227,7 +226,6 @@ export function Conversacion({
   hayMasAntiguos?: boolean;
   cursorInicial?: string | null;
   esInvitado?: boolean;
-  limiteConsumido?: boolean;
   requiereConsentimiento?: boolean;
   sesionInvitadaEstablecida?: boolean;
   borradorTransferenciaId?: string | null;
@@ -243,7 +241,6 @@ export function Conversacion({
   const [aviso, setAviso] = useState<string | null>(null);
   const [masAntiguos, setMasAntiguos] = useState(hayMasAntiguos);
   const [cargandoAntiguos, setCargandoAntiguos] = useState(false);
-  const [limiteInvitado, setLimiteInvitado] = useState(limiteConsumido);
   const [sesionInvitadaLista, setSesionInvitadaLista] = useState(
     sesionInvitadaEstablecida
   );
@@ -387,13 +384,6 @@ export function Conversacion({
     if (!limpio || enviando) {
       return;
     }
-    if (esInvitado && limiteInvitado) {
-      abrirRegistro(
-        "Ya usaste tu pregunta de prueba. Crea una cuenta o inicia sesión para continuar.",
-        limpio
-      );
-      return;
-    }
     if (esInvitado && requiereConsentimiento && !aceptaPolitica) {
       setAviso(
         "Confirma que leíste y aceptas la política de privacidad antes de enviar."
@@ -494,6 +484,10 @@ export function Conversacion({
       const datos = await respuesta.json().catch(() => null);
 
       if (!respuesta.ok) {
+        if (esInvitado && datos?.codigo === "turno_invitado_consumido") {
+          setAviso(datos.mensaje);
+          return;
+        }
         revertir();
         if (actualizarPoliticaSiCambio(datos)) {
           return;
@@ -551,10 +545,6 @@ export function Conversacion({
         borradorTransferenciaId,
         localStorage
       );
-      if (esInvitado) {
-        setLimiteInvitado(true);
-      }
-
       const mensajeAsistente: MensajeUI = {
         id: datos.mensajeId ?? `asistente-${Date.now()}`,
         sender: "asistente",
@@ -724,7 +714,7 @@ export function Conversacion({
               />
             </Button>
           </div>
-          {esInvitado && requiereConsentimiento && !limiteInvitado && (
+          {esInvitado && requiereConsentimiento && (
             <label className="mt-3 flex cursor-pointer items-start gap-2.5 text-pnpj-tinta/75 text-xs leading-5 [@media(max-height:30rem)]:mt-2 [@media(max-height:30rem)]:leading-[1.125rem]">
               <span className="relative mt-0.5 flex size-5 shrink-0 items-center justify-center">
                 <input
@@ -756,7 +746,7 @@ export function Conversacion({
                 {versionPoliticaActual
                   ? ` (versión ${versionPoliticaActual})`
                   : ""}
-                . Mi primera pregunta quedará asociada si creo una cuenta.
+                . Mis preguntas de prueba quedarán asociadas si creo una cuenta.
               </span>
             </label>
           )}
