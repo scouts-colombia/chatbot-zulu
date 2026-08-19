@@ -15,7 +15,7 @@ interface EventoInstalacionPwa extends Event {
 export function InstalarPwa() {
   const [eventoInstalacion, setEventoInstalacion] =
     useState<EventoInstalacionPwa | null>(null);
-  const [tipoAyuda, setTipoAyuda] = useState<"ios" | "manual" | null>(null);
+  const [mostrarAyudaIos, setMostrarAyudaIos] = useState(false);
 
   useEffect(() => {
     if ("serviceWorker" in navigator) {
@@ -34,16 +34,17 @@ export function InstalarPwa() {
     const esIos =
       /iphone|ipad|ipod/i.test(navigator.userAgent) ||
       (/macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
-    setTipoAyuda(esIos ? "ios" : "manual");
+    setMostrarAyudaIos(esIos);
 
     const prepararInstalacion = (evento: Event) => {
       evento.preventDefault();
       setEventoInstalacion(evento as EventoInstalacionPwa);
-      setTipoAyuda(null);
+      setMostrarAyudaIos(false);
     };
     const ocultarAlInstalar = () => {
+      localStorage.setItem(CLAVE_DESCARTADA, "1");
       setEventoInstalacion(null);
-      setTipoAyuda(null);
+      setMostrarAyudaIos(false);
     };
 
     window.addEventListener("beforeinstallprompt", prepararInstalacion);
@@ -57,7 +58,7 @@ export function InstalarPwa() {
   const ocultar = () => {
     localStorage.setItem(CLAVE_DESCARTADA, "1");
     setEventoInstalacion(null);
-    setTipoAyuda(null);
+    setMostrarAyudaIos(false);
   };
 
   const instalar = async () => {
@@ -65,12 +66,15 @@ export function InstalarPwa() {
       return;
     }
     await eventoInstalacion.prompt();
-    await eventoInstalacion.userChoice;
+    const eleccion = await eventoInstalacion.userChoice;
+    if (eleccion.outcome === "accepted") {
+      localStorage.setItem(CLAVE_DESCARTADA, "1");
+    }
     setEventoInstalacion(null);
-    setTipoAyuda(null);
+    setMostrarAyudaIos(false);
   };
 
-  if (!(eventoInstalacion || tipoAyuda)) {
+  if (!(eventoInstalacion || mostrarAyudaIos)) {
     return null;
   }
 
@@ -89,11 +93,9 @@ export function InstalarPwa() {
       <div className="min-w-0 flex-1 pt-1">
         <p className="font-semibold text-scouts-purple">Lleva Zulú contigo</p>
         <p className="mt-1 text-pnpj-tinta/70 text-sm">
-          {tipoAyuda === "ios"
+          {mostrarAyudaIos
             ? "En iPhone o iPad, usa Compartir y luego Añadir a pantalla de inicio."
-            : tipoAyuda === "manual"
-              ? "Puedes instalarlo desde el menú de tu navegador para abrirlo como una app."
-              : "Instálalo en este dispositivo para abrirlo como una app."}
+            : "Instálalo en este dispositivo para abrirlo como una app."}
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
           {eventoInstalacion && (
@@ -106,16 +108,10 @@ export function InstalarPwa() {
               Instalar
             </Button>
           )}
-          {tipoAyuda === "ios" && (
+          {mostrarAyudaIos && (
             <span className="flex min-h-11 items-center gap-2 text-scouts-purple text-sm">
               <Share2 aria-hidden="true" className="size-4" />
               Compartir
-            </span>
-          )}
-          {tipoAyuda === "manual" && (
-            <span className="flex min-h-11 items-center gap-2 text-scouts-purple text-sm">
-              <Download aria-hidden="true" className="size-4" />
-              Menú · Instalar Zulú
             </span>
           )}
         </div>
