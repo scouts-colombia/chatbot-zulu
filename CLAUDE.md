@@ -23,7 +23,7 @@ Específicamente:
 
 - Next.js (App Router) + TypeScript. Base: plantilla Next.js AI Chatbot de Vercel, podada.
 - Supabase Auth + PostgreSQL. Fuente única de usuarios, conversaciones, mensajes, citas y auditoría. Se elimina NextAuth de la plantilla.
-- Gemini File Search como RAG administrado, vía Gemini Developer API (NO Vertex AI; el `customMetadata` del grounding no está soportado en Vertex). Modelo de chat: `gemini-3.5-flash`, validado contra disponibilidad de cuenta/región y versión del SDK.
+- Gemini File Search como RAG administrado, vía Gemini Developer API (NO Vertex AI; el `customMetadata` del grounding no está soportado en Vertex). Modelo de chat inicial: `gemini-3.7-flash`, configurable desde `app_settings`.
 - Despliegue en Vercel.
 - Idioma de UI y de respuestas: español.
 

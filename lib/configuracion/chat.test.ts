@@ -50,7 +50,8 @@ test("la migración reemplaza la unicidad por cuotas y audita el guardado", () =
     /where \(anonymous_user_id = p_user_id or device_hash = p_device_hash\)/
   );
   assert.match(migracion, /'update_chat_settings'/);
-  assert.match(migracion, /\('gemini_model', 'gemini-3\.5-flash'\)/);
+  assert.match(migracion, /\('gemini_model', 'gemini-3\.7-flash'\)/);
+  assert.match(migracion, /\('gemini_thinking_level', 'low'\)/);
   assert.match(
     migracion,
     /grant execute on function public\.admin_actualizar_configuracion_chat/

@@ -2,8 +2,8 @@ begin;
 
 insert into public.app_settings (clave, valor)
 values
-  ('gemini_model', 'gemini-3.5-flash'),
-  ('gemini_thinking_level', 'medium'),
+  ('gemini_model', 'gemini-3.7-flash'),
+  ('gemini_thinking_level', 'low'),
   ('max_chat_turns_per_user_per_day', '30'),
   ('max_guest_turns_per_person_per_day', '1'),
   ('max_guest_turns_per_network', '5')

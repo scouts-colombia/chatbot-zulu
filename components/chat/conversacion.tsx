@@ -215,10 +215,8 @@ export function Conversacion({
   hayMasAntiguos = false,
   cursorInicial = null,
   esInvitado = false,
-  maxTurnosInvitado = 1,
   requiereConsentimiento = false,
   sesionInvitadaEstablecida = false,
-  turnosInvitadoConsumidos = 0,
   borradorTransferenciaId = null,
   versionPolitica,
 }: {
@@ -228,10 +226,8 @@ export function Conversacion({
   hayMasAntiguos?: boolean;
   cursorInicial?: string | null;
   esInvitado?: boolean;
-  maxTurnosInvitado?: number;
   requiereConsentimiento?: boolean;
   sesionInvitadaEstablecida?: boolean;
-  turnosInvitadoConsumidos?: number;
   borradorTransferenciaId?: string | null;
   versionPolitica?: string;
 }) {
@@ -245,10 +241,6 @@ export function Conversacion({
   const [aviso, setAviso] = useState<string | null>(null);
   const [masAntiguos, setMasAntiguos] = useState(hayMasAntiguos);
   const [cargandoAntiguos, setCargandoAntiguos] = useState(false);
-  const [turnosInvitado, setTurnosInvitado] = useState(
-    turnosInvitadoConsumidos
-  );
-  const limiteInvitado = turnosInvitado >= maxTurnosInvitado;
   const [sesionInvitadaLista, setSesionInvitadaLista] = useState(
     sesionInvitadaEstablecida
   );
@@ -392,13 +384,6 @@ export function Conversacion({
     if (!limpio || enviando) {
       return;
     }
-    if (esInvitado && limiteInvitado) {
-      abrirRegistro(
-        "Ya alcanzaste el límite de preguntas de prueba. Crea una cuenta o inicia sesión para continuar.",
-        limpio
-      );
-      return;
-    }
     if (esInvitado && requiereConsentimiento && !aceptaPolitica) {
       setAviso(
         "Confirma que leíste y aceptas la política de privacidad antes de enviar."
@@ -500,19 +485,7 @@ export function Conversacion({
 
       if (!respuesta.ok) {
         if (esInvitado && datos?.codigo === "turno_invitado_consumido") {
-          const nuevosTurnos = turnosInvitado + 1;
-          setTurnosInvitado(nuevosTurnos);
-          if (nuevosTurnos >= maxTurnosInvitado) {
-            abrirRegistro(
-              `${datos.mensaje} Alcanzaste el límite de preguntas de prueba; crea una cuenta o inicia sesión para continuar.`,
-              "",
-              typeof datos.conversationId === "string"
-                ? datos.conversationId
-                : conversationIdSolicitud
-            );
-          } else {
-            setAviso(datos.mensaje);
-          }
+          setAviso(datos.mensaje);
           return;
         }
         revertir();
@@ -572,10 +545,6 @@ export function Conversacion({
         borradorTransferenciaId,
         localStorage
       );
-      if (esInvitado) {
-        setTurnosInvitado((cantidad) => cantidad + 1);
-      }
-
       const mensajeAsistente: MensajeUI = {
         id: datos.mensajeId ?? `asistente-${Date.now()}`,
         sender: "asistente",
@@ -745,7 +714,7 @@ export function Conversacion({
               />
             </Button>
           </div>
-          {esInvitado && requiereConsentimiento && !limiteInvitado && (
+          {esInvitado && requiereConsentimiento && (
             <label className="mt-3 flex cursor-pointer items-start gap-2.5 text-pnpj-tinta/75 text-xs leading-5 [@media(max-height:30rem)]:mt-2 [@media(max-height:30rem)]:leading-[1.125rem]">
               <span className="relative mt-0.5 flex size-5 shrink-0 items-center justify-center">
                 <input

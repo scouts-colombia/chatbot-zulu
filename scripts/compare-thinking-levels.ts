@@ -1,5 +1,5 @@
 /**
- * Smoke test controlado de niveles de razonamiento para gemini-3.5-flash.
+ * Smoke test controlado de niveles de razonamiento para el modelo operativo.
  *
  * Mantiene constantes la capa de producción, el prompt, el modelo, los stores,
  * el metadataFilter y las preguntas. No escribe mensajes, eventos ni respuestas

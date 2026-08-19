@@ -8,7 +8,7 @@ El piloto admite personas desde los 15 años, una cuota pública configurable an
 
 - Next.js 16, React 19 y TypeScript.
 - Supabase Auth y PostgreSQL como fuente de usuarios, conversaciones, mensajes, citas y auditoría.
-- Gemini Developer API con `gemini-3.5-flash` y File Search administrado.
+- Gemini Developer API con `gemini-3.7-flash` y File Search administrado.
 - Tailwind CSS, Radix UI y el sistema visual claro de Ruta DNPJ.
 - Vercel para previews y producción.
 

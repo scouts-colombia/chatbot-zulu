@@ -70,13 +70,9 @@ export async function ChatPublico({ userId }: { userId: string | null }) {
         cursorInicial={cursor}
         esInvitado
         hayMasAntiguos={hayMasAntiguos}
-        maxTurnosInvitado={configuracion.maxTurnosInvitadoPorPersonaPorDia}
         mensajesIniciales={mensajes}
         requiereConsentimiento={!consentimientoAceptado}
         sesionInvitadaEstablecida={Boolean(userId && conversationId)}
-        turnosInvitadoConsumidos={
-          mensajes.filter((mensaje) => mensaje.sender === "usuario").length
-        }
         versionPolitica={VERSION_POLITICA_PRIVACIDAD}
       />
     </MarcoChatPublico>
