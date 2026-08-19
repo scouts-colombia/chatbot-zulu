@@ -9,7 +9,7 @@
     "start": "next start",
     "check": "ultracite check",
     "fix": "ultracite fix",
-    "test": "tsx --test lib/auth/destino-seguro.test.ts lib/auth/sesion.test.ts lib/chat/citas.test.ts lib/chat/contrato.test.ts lib/chat/gemini.test.ts lib/chat/telemetria.test.ts lib/invitados/borrador.test.ts lib/invitados/coordinacion.test.ts lib/invitados/identidad.test.ts lib/invitados/limites.test.ts lib/invitados/limpieza.test.ts lib/invitados/registro.test.ts lib/privacidad.test.ts",
+    "test": "tsx --test lib/auth/destino-seguro.test.ts lib/auth/sesion.test.ts lib/chat/citas.test.ts lib/chat/contrato.test.ts lib/chat/gemini.test.ts lib/chat/telemetria.test.ts lib/configuracion/chat.test.ts lib/invitados/borrador.test.ts lib/invitados/coordinacion.test.ts lib/invitados/identidad.test.ts lib/invitados/limites.test.ts lib/invitados/limpieza.test.ts lib/invitados/registro.test.ts lib/privacidad.test.ts",
     "typecheck": "tsc --noEmit",
     "verify:rls": "node scripts/verify-rls.mjs",
     "spike:file-search": "tsx scripts/spike-file-search.ts"

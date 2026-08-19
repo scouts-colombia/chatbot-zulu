@@ -13,6 +13,7 @@ import {
   type TurnoHistorial,
 } from "@/lib/chat/gemini";
 import { construirFilasEventos } from "@/lib/chat/telemetria";
+import { cargarConfiguracionChat } from "@/lib/configuracion/servidor";
 import {
   COOKIE_DISPOSITIVO_INVITADO,
   COOKIE_PREFLIGHT_INVITADO,
@@ -523,7 +524,8 @@ export async function POST(request: Request) {
         .update({ updated_at: ahora() })
         .eq("id", conversationId);
     }
-    const modelId = process.env.GEMINI_MODEL ?? "gemini-3.5-flash";
+    const { configuracion } = await cargarConfiguracionChat();
+    const modelId = configuracion.modelo;
     const requestId = crypto.randomUUID();
     const baseEventos = {
       userId: user.id,
@@ -612,12 +614,18 @@ export async function POST(request: Request) {
         texto: m.content.slice(0, 4000),
       }));
 
-    const resultado = await llamarModelo({
-      historial,
-      pregunta: cuerpo.mensaje,
-      storeNames,
-      metadataFilter,
-    });
+    const resultado = await llamarModelo(
+      {
+        historial,
+        pregunta: cuerpo.mensaje,
+        storeNames,
+        metadataFilter,
+      },
+      {
+        modelValue: modelId,
+        thinkingLevelValue: configuracion.nivelRazonamiento,
+      }
+    );
 
     if (resultado.tipo === "bloqueado") {
       // Bloqueo del proveedor: estado seguro de producto, no error (D-08).
@@ -883,10 +891,10 @@ export async function POST(request: Request) {
     if (esInvitado) {
       return NextResponse.json(
         {
-          codigo: "registro_requerido",
+          codigo: "turno_invitado_consumido",
           conversationId,
           mensaje:
-            "Tu pregunta de prueba quedó registrada, pero no pudimos completar la respuesta. Crea una cuenta o inicia sesión para continuar.",
+            "Tu pregunta de prueba quedó registrada, pero no pudimos completar la respuesta. Puedes intentar una nueva pregunta si aún tienes cupo.",
         },
         { status: 503 }
       );

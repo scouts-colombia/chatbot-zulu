@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ZuluMascota } from "@/components/marca/zulu-mascota";
 import { cargarTramo } from "@/lib/chat/transcripcion";
+import { cargarConfiguracionChat } from "@/lib/configuracion/servidor";
 import { VERSION_POLITICA_PRIVACIDAD } from "@/lib/privacidad";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { Conversacion } from "./conversacion";
@@ -9,6 +10,7 @@ import type { MensajeUI } from "./tipos";
 
 export async function ChatPublico({ userId }: { userId: string | null }) {
   const supabase = await crearClienteServidor();
+  const { configuracion } = await cargarConfiguracionChat();
   let conversationId: string | null = null;
   let mensajes: MensajeUI[] = [];
   let hayMasAntiguos = false;
@@ -56,18 +58,21 @@ export async function ChatPublico({ userId }: { userId: string | null }) {
   }
 
   return (
-    <MarcoChatPublico>
+    <MarcoChatPublico
+      maxTurnosInvitado={configuracion.maxTurnosInvitadoPorPersonaPorDia}
+    >
       <Conversacion
         conversationId={conversationId}
         cursorInicial={cursor}
         esInvitado
         hayMasAntiguos={hayMasAntiguos}
-        limiteConsumido={mensajes.some(
-          (mensaje) => mensaje.sender === "usuario"
-        )}
+        maxTurnosInvitado={configuracion.maxTurnosInvitadoPorPersonaPorDia}
         mensajesIniciales={mensajes}
         requiereConsentimiento={!consentimientoAceptado}
         sesionInvitadaEstablecida={Boolean(userId && conversationId)}
+        turnosInvitadoConsumidos={
+          mensajes.filter((mensaje) => mensaje.sender === "usuario").length
+        }
         versionPolitica={VERSION_POLITICA_PRIVACIDAD}
       />
     </MarcoChatPublico>
@@ -97,7 +102,13 @@ function ErrorChatPublico() {
   );
 }
 
-function MarcoChatPublico({ children }: { children: React.ReactNode }) {
+function MarcoChatPublico({
+  children,
+  maxTurnosInvitado = 1,
+}: {
+  children: React.ReactNode;
+  maxTurnosInvitado?: number;
+}) {
   return (
     <div
       className="pnpj-fondo relative flex h-dvh flex-col overflow-hidden text-pnpj-tinta"
@@ -129,8 +140,10 @@ function MarcoChatPublico({ children }: { children: React.ReactNode }) {
       </header>
       <main className="relative z-10 min-h-0 flex-1">{children}</main>
       <p className="relative z-10 px-4 pb-3 text-center text-pnpj-tinta/70 text-xs">
-        Una pregunta de prueba por dispositivo. Las respuestas citan documentos
-        oficiales.
+        {maxTurnosInvitado === 1
+          ? "Una pregunta de prueba por dispositivo."
+          : `${maxTurnosInvitado} preguntas de prueba por dispositivo y día.`}{" "}
+        Las respuestas citan documentos oficiales.
       </p>
     </div>
   );

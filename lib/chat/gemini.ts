@@ -5,6 +5,10 @@ import {
   ThinkingLevel,
 } from "@google/genai";
 import {
+  NIVELES_RAZONAMIENTO,
+  type NivelRazonamientoGemini,
+} from "../configuracion/chat";
+import {
   type ModeloRespuesta,
   ModeloRespuestaSchema,
   responseJsonSchema,
@@ -13,9 +17,7 @@ import { PROMPT_CORRECTIVO, SYSTEM_PROMPT } from "./prompt";
 
 export type TurnoHistorial = { role: "user" | "model"; texto: string };
 
-const NIVELES_RAZONAMIENTO = ["minimal", "low", "medium", "high"] as const;
-
-export type NivelRazonamientoGemini = (typeof NIVELES_RAZONAMIENTO)[number];
+export type { NivelRazonamientoGemini } from "../configuracion/chat";
 
 export type ResolucionNivelRazonamiento = {
   nivel: NivelRazonamientoGemini;
@@ -97,6 +99,7 @@ type DependenciasLlamada = {
   generateContent?: (
     solicitud: SolicitudGenerateContent
   ) => Promise<GenerateContentResponse>;
+  modelValue?: string;
   thinkingLevelValue?: string;
 };
 
@@ -135,7 +138,8 @@ export async function llamarModelo(
   },
   dependencias: DependenciasLlamada = {}
 ): Promise<ResultadoModelo> {
-  const model = process.env.GEMINI_MODEL ?? "gemini-3.5-flash";
+  const model =
+    dependencias.modelValue ?? process.env.GEMINI_MODEL ?? "gemini-3.5-flash";
   const nivelResuelto = resolverNivelRazonamiento(
     dependencias.thinkingLevelValue ?? process.env.GEMINI_THINKING_LEVEL
   );

@@ -23,13 +23,13 @@ Zulú responde sobre el marco documental oficial de Scouts Colombia mediante Gem
 ## Operating Context
 
 - Uso web en escritorio y móvil, tanto individual como desde redes compartidas en espacios Scouts.
-- Primera visita abierta con una conversación de prueba; el segundo turno exige registro.
+- Primera visita abierta con una conversación de prueba; al agotar la cuota invitada se exige registro.
 - Las cuentas registradas conservan conversaciones, citas y preguntas guiadas.
 - Las cuentas del piloto se activan según allowlist o revisión administrativa.
 
 ## Capabilities and Constraints
 
-- Un invitado puede consumir exactamente un turno. El límite usa una sesión anónima de Supabase y una identidad seudónima derivada en servidor; no se guarda IP cruda ni fingerprint reversible.
+- El límite diario de un invitado se configura desde el panel y empieza en un turno. Usa una sesión anónima de Supabase y una identidad seudónima derivada en servidor; no se guarda IP cruda ni fingerprint reversible.
 - La conversación invitada se conserva al crear una cuenta y queda asociada a ella cuando completa registro, consentimiento y activación.
 - Usuarios registrados tienen una cuota diaria independiente del turno invitado.
 - No se guarda la respuesta cruda del proveedor, no hay streaming del proveedor y no se implementa RAG manual ni caché.

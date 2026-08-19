@@ -84,6 +84,27 @@ test("el retry reutiliza exactamente el mismo nivel", async () => {
   );
 });
 
+test("usa el modelo recibido desde la configuración operativa", async () => {
+  let modeloRecibido: string | undefined;
+
+  await llamarModelo(
+    {
+      historial: [],
+      pregunta: "Pregunta",
+      storeNames: ["stores/prueba"],
+    },
+    {
+      modelValue: "gemini-configurado",
+      generateContent: (solicitud) => {
+        modeloRecibido = solicitud.model;
+        return Promise.resolve(respuestaValida());
+      },
+    }
+  );
+
+  assert.equal(modeloRecibido, "gemini-configurado");
+});
+
 test("extrae todos los contadores exactos de usageMetadata", () => {
   assert.deepEqual(
     extraerUso(

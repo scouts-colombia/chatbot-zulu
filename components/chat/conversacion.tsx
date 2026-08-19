@@ -215,9 +215,10 @@ export function Conversacion({
   hayMasAntiguos = false,
   cursorInicial = null,
   esInvitado = false,
-  limiteConsumido = false,
+  maxTurnosInvitado = 1,
   requiereConsentimiento = false,
   sesionInvitadaEstablecida = false,
+  turnosInvitadoConsumidos = 0,
   borradorTransferenciaId = null,
   versionPolitica,
 }: {
@@ -227,9 +228,10 @@ export function Conversacion({
   hayMasAntiguos?: boolean;
   cursorInicial?: string | null;
   esInvitado?: boolean;
-  limiteConsumido?: boolean;
+  maxTurnosInvitado?: number;
   requiereConsentimiento?: boolean;
   sesionInvitadaEstablecida?: boolean;
+  turnosInvitadoConsumidos?: number;
   borradorTransferenciaId?: string | null;
   versionPolitica?: string;
 }) {
@@ -243,7 +245,10 @@ export function Conversacion({
   const [aviso, setAviso] = useState<string | null>(null);
   const [masAntiguos, setMasAntiguos] = useState(hayMasAntiguos);
   const [cargandoAntiguos, setCargandoAntiguos] = useState(false);
-  const [limiteInvitado, setLimiteInvitado] = useState(limiteConsumido);
+  const [turnosInvitado, setTurnosInvitado] = useState(
+    turnosInvitadoConsumidos
+  );
+  const limiteInvitado = turnosInvitado >= maxTurnosInvitado;
   const [sesionInvitadaLista, setSesionInvitadaLista] = useState(
     sesionInvitadaEstablecida
   );
@@ -389,7 +394,7 @@ export function Conversacion({
     }
     if (esInvitado && limiteInvitado) {
       abrirRegistro(
-        "Ya usaste tu pregunta de prueba. Crea una cuenta o inicia sesión para continuar.",
+        "Ya alcanzaste el límite de preguntas de prueba. Crea una cuenta o inicia sesión para continuar.",
         limpio
       );
       return;
@@ -494,6 +499,22 @@ export function Conversacion({
       const datos = await respuesta.json().catch(() => null);
 
       if (!respuesta.ok) {
+        if (esInvitado && datos?.codigo === "turno_invitado_consumido") {
+          const nuevosTurnos = turnosInvitado + 1;
+          setTurnosInvitado(nuevosTurnos);
+          if (nuevosTurnos >= maxTurnosInvitado) {
+            abrirRegistro(
+              `${datos.mensaje} Alcanzaste el límite de preguntas de prueba; crea una cuenta o inicia sesión para continuar.`,
+              "",
+              typeof datos.conversationId === "string"
+                ? datos.conversationId
+                : conversationIdSolicitud
+            );
+          } else {
+            setAviso(datos.mensaje);
+          }
+          return;
+        }
         revertir();
         if (actualizarPoliticaSiCambio(datos)) {
           return;
@@ -552,7 +573,7 @@ export function Conversacion({
         localStorage
       );
       if (esInvitado) {
-        setLimiteInvitado(true);
+        setTurnosInvitado((cantidad) => cantidad + 1);
       }
 
       const mensajeAsistente: MensajeUI = {
@@ -756,7 +777,7 @@ export function Conversacion({
                 {versionPoliticaActual
                   ? ` (versión ${versionPoliticaActual})`
                   : ""}
-                . Mi primera pregunta quedará asociada si creo una cuenta.
+                . Mis preguntas de prueba quedarán asociadas si creo una cuenta.
               </span>
             </label>
           )}
