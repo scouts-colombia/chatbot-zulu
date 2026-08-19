@@ -6,6 +6,7 @@
     "dev": "next dev --turbo",
     "build": "next build",
     "compare:thinking": "tsx scripts/compare-thinking-levels.ts",
+    "smoke:model": "tsx scripts/smoke-modelo-operativo.ts",
     "start": "next start",
     "check": "ultracite check",
     "fix": "ultracite fix",

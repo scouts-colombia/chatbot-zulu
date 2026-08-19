@@ -47,9 +47,6 @@ const MENSAJE_BLOQUEADO =
   "No puedo ayudarte con ese tema desde este chat. Si necesitas apoyo, acude a un dirigente o adulto responsable de tu grupo.";
 const MENSAJE_ERROR =
   "Tuvimos un problema generando la respuesta. Vuelve a intentarlo en un momento.";
-const MENSAJE_ERROR_INVITADO =
-  "No pudimos generar la respuesta de prueba. Para volver a intentarlo, crea una cuenta o inicia sesión.";
-
 function ahora() {
   return new Date().toISOString();
 }
@@ -264,7 +261,7 @@ export async function POST(request: Request) {
   }
 
   const { configuracion, error: errorConfiguracion } =
-    await cargarConfiguracionChat();
+    await cargarConfiguracionChat(supabase);
   if (errorConfiguracion || !configuracion) {
     return responderLiberandoPreflight(
       {
@@ -676,12 +673,11 @@ export async function POST(request: Request) {
     }
 
     if (resultado.tipo === "json_invalido") {
-      const mensajeError = esInvitado ? MENSAJE_ERROR_INVITADO : MENSAJE_ERROR;
-      const respuestaJson = { estado: "error", respuesta: mensajeError };
+      const respuestaJson = { estado: "error", respuesta: MENSAJE_ERROR };
       const asistenteId = await guardarMensajeAsistente(
         admin,
         conversationId,
-        mensajeError,
+        MENSAJE_ERROR,
         respuestaJson
       );
       await registrarEventos(
@@ -691,7 +687,7 @@ export async function POST(request: Request) {
       );
       const respuesta: RespuestaAsistente = {
         estado: "error",
-        respuesta: mensajeError,
+        respuesta: MENSAJE_ERROR,
         citas: [],
         metadata: metadataDe(resultado.intentos, modelId, requestId),
       };

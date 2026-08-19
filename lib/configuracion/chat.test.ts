@@ -57,3 +57,27 @@ test("la migración reemplaza la unicidad por cuotas y audita el guardado", () =
     /grant execute on function public\.admin_actualizar_configuracion_chat/
   );
 });
+
+test("la revisión limita privilegios y retiene solo reservas recientes", () => {
+  const migracion = readFileSync(
+    "supabase/migrations/20260819210222_atender_revision_configuracion_operativa.sql",
+    "utf8"
+  );
+  const servidor = readFileSync("lib/configuracion/servidor.ts", "utf8");
+  const ruta = readFileSync("app/api/chat/route.ts", "utf8");
+
+  assert.match(migracion, /leer_configuracion_chat_publica/);
+  assert.match(
+    migracion,
+    /revoke select on table public\.app_settings from anon/
+  );
+  assert.doesNotMatch(
+    migracion,
+    /grant select on table public\.app_settings to anon/
+  );
+  assert.match(migracion, /completed_at < now\(\) - interval '2 days'/);
+  assert.match(migracion, /for each statement/);
+  assert.doesNotMatch(servidor, /crearClienteAdmin/);
+  assert.match(ruta, /cargarConfiguracionChat\(supabase\)/);
+  assert.doesNotMatch(ruta, /Para volver a intentarlo, crea una cuenta/);
+});

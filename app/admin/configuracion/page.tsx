@@ -19,8 +19,8 @@ export default function PaginaConfiguracionAdmin() {
 }
 
 async function ConfiguracionAdmin() {
-  await requerirAdmin();
-  const { configuracion, error } = await cargarConfiguracionChat();
+  const { supabase } = await requerirAdmin();
+  const { configuracion, error } = await cargarConfiguracionChat(supabase);
 
   if (error || !configuracion) {
     return (

@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { ZuluMascota } from "@/components/marca/zulu-mascota";
 import { cargarTramo } from "@/lib/chat/transcripcion";
-import { cargarConfiguracionChat } from "@/lib/configuracion/servidor";
+import {
+  cargarConfiguracionChat,
+  cargarConfiguracionChatPublica,
+} from "@/lib/configuracion/servidor";
 import { VERSION_POLITICA_PRIVACIDAD } from "@/lib/privacidad";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { Conversacion } from "./conversacion";
@@ -10,8 +13,9 @@ import type { MensajeUI } from "./tipos";
 
 export async function ChatPublico({ userId }: { userId: string | null }) {
   const supabase = await crearClienteServidor();
-  const { configuracion, error: errorConfiguracion } =
-    await cargarConfiguracionChat();
+  const { configuracion, error: errorConfiguracion } = await (userId
+    ? cargarConfiguracionChat(supabase)
+    : cargarConfiguracionChatPublica(supabase));
   if (errorConfiguracion || !configuracion) {
     return <ErrorChatPublico />;
   }
