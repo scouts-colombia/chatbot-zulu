@@ -1,21 +1,38 @@
 {
   "name": "Zulú",
   "short_name": "Zulú",
+  "description": "Asistente para consultar manuales oficiales de Scouts Colombia con fuentes verificables.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "lang": "es-CO",
+  "dir": "ltr",
   "icons": [
     {
       "src": "/web-app-manifest-192x192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "maskable"
+      "purpose": "any maskable"
     },
     {
       "src": "/web-app-manifest-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "maskable"
+      "purpose": "any maskable"
     }
   ],
-  "theme_color": "#603222",
-  "background_color": "#603222",
-  "display": "standalone"
+  "screenshots": [
+    {
+      "src": "/opengraph-image.png",
+      "sizes": "1200x630",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Conversación con Zulú"
+    }
+  ],
+  "theme_color": "#4d006e",
+  "background_color": "#fff8eb",
+  "display": "standalone",
+  "orientation": "any",
+  "categories": ["education", "reference"]
 }
