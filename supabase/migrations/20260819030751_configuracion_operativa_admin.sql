@@ -1,7 +1,12 @@
 begin;
 
 insert into public.app_settings (clave, valor)
-values ('max_guest_turns_per_person_per_day', '1')
+values
+  ('gemini_model', 'gemini-3.5-flash'),
+  ('gemini_thinking_level', 'medium'),
+  ('max_chat_turns_per_user_per_day', '30'),
+  ('max_guest_turns_per_person_per_day', '1'),
+  ('max_guest_turns_per_network', '5')
 on conflict (clave) do nothing;
 
 -- Una reserva representa un turno, no una identidad completa. Las restricciones

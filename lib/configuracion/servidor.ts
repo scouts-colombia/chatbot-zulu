@@ -1,8 +1,16 @@
 import "server-only";
 import { crearClienteAdmin } from "../supabase/admin";
-import { CLAVES_CONFIGURACION_CHAT, resolverConfiguracionChat } from "./chat";
+import {
+  CLAVES_CONFIGURACION_CHAT,
+  type ConfiguracionChat,
+  resolverConfiguracionChat,
+} from "./chat";
 
-export async function cargarConfiguracionChat() {
+type ResultadoConfiguracion =
+  | { configuracion: ConfiguracionChat; error: null }
+  | { configuracion: null; error: string };
+
+export async function cargarConfiguracionChat(): Promise<ResultadoConfiguracion> {
   const { data, error } = await crearClienteAdmin()
     .from("app_settings")
     .select("clave, valor")
@@ -10,10 +18,22 @@ export async function cargarConfiguracionChat() {
 
   if (error) {
     console.error("[configuracion] No se pudo cargar app_settings:", error);
+    return {
+      configuracion: null,
+      error: "No se pudo cargar la configuración operativa.",
+    };
   }
 
-  return {
-    configuracion: resolverConfiguracionChat(data ?? []),
-    error: error ? "No se pudo cargar la configuración operativa." : null,
-  };
+  const configuracion = resolverConfiguracionChat(data ?? []);
+  if (!configuracion) {
+    console.error(
+      "[configuracion] app_settings está incompleta o es inválida."
+    );
+    return {
+      configuracion: null,
+      error: "La configuración operativa está incompleta o es inválida.",
+    };
+  }
+
+  return { configuracion, error: null };
 }

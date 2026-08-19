@@ -263,6 +263,19 @@ export async function POST(request: Request) {
     );
   }
 
+  const { configuracion, error: errorConfiguracion } =
+    await cargarConfiguracionChat();
+  if (errorConfiguracion || !configuracion) {
+    return responderLiberandoPreflight(
+      {
+        codigo: "configuracion_no_disponible",
+        mensaje:
+          "El chat no está disponible en este momento. Intenta de nuevo.",
+      },
+      { status: 503 }
+    );
+  }
+
   // Gate de consentimiento (P-RF-04). Se activa fijando PRIVACY_POLICY_VERSION
   // cuando la organización publique el texto de la política; hasta entonces no
   // hay versión que aceptar.
@@ -524,7 +537,6 @@ export async function POST(request: Request) {
         .update({ updated_at: ahora() })
         .eq("id", conversationId);
     }
-    const { configuracion } = await cargarConfiguracionChat();
     const modelId = configuracion.modelo;
     const requestId = crypto.randomUUID();
     const baseEventos = {

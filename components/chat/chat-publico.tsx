@@ -10,7 +10,11 @@ import type { MensajeUI } from "./tipos";
 
 export async function ChatPublico({ userId }: { userId: string | null }) {
   const supabase = await crearClienteServidor();
-  const { configuracion } = await cargarConfiguracionChat();
+  const { configuracion, error: errorConfiguracion } =
+    await cargarConfiguracionChat();
+  if (errorConfiguracion || !configuracion) {
+    return <ErrorChatPublico />;
+  }
   let conversationId: string | null = null;
   let mensajes: MensajeUI[] = [];
   let hayMasAntiguos = false;

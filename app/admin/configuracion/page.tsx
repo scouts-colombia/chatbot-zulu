@@ -22,7 +22,7 @@ async function ConfiguracionAdmin() {
   await requerirAdmin();
   const { configuracion, error } = await cargarConfiguracionChat();
 
-  if (error) {
+  if (error || !configuracion) {
     return (
       <p
         className="rounded-2xl bg-scouts-red/8 p-4 text-scouts-red text-sm"

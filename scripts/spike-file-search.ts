@@ -19,7 +19,7 @@ import { z } from "zod";
 loadEnv({ path: ".env.local" });
 
 const API_KEY = process.env.GEMINI_API_KEY;
-const MODEL = process.env.GEMINI_MODEL ?? "gemini-3.5-flash";
+const MODEL = "gemini-3.5-flash";
 const PDF_PATH = resolve("data/pdfs/reglamento-red-de-jovenes.pdf");
 const STORE_DISPLAY_NAME = "spike-scouts";
 // UUID de prueba fijo: simula knowledge_documents.id del piloto.
