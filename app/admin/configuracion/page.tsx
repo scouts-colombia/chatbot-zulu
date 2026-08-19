@@ -52,12 +52,6 @@ async function ConfiguracionAdmin() {
         />
       </header>
 
-      <p className="rounded-2xl border border-scouts-blue/10 bg-scouts-blue/5 p-4 text-foreground/70 text-sm leading-6">
-        Las claves de Gemini y Supabase siguen siendo secretos del servidor y no
-        aparecen aquí. Cada guardado queda asociado a tu usuario en la auditoría
-        administrativa.
-      </p>
-
       <FormularioConfiguracion configuracion={configuracion} />
     </div>
   );

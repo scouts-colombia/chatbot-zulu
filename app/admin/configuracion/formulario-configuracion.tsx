@@ -2,6 +2,13 @@
 
 import { useActionState } from "react";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { ConfiguracionChat } from "@/lib/configuracion/chat";
 import {
   type EstadoConfiguracion,
@@ -28,7 +35,20 @@ export function FormularioConfiguracion({
         </legend>
         <div className="grid gap-5 sm:grid-cols-2">
           <Campo
-            descripcion="Identificador exacto aceptado por Gemini Developer API."
+            descripcion={
+              <>
+                Identificador exacto aceptado por la{" "}
+                <a
+                  className="font-medium text-scouts-purple underline decoration-scouts-purple/30 underline-offset-4 hover:decoration-scouts-purple"
+                  href="https://ai.google.dev/gemini-api/docs/models"
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  Gemini Developer API
+                </a>
+                .
+              </>
+            }
             etiqueta="Modelo"
             htmlFor="modelo"
           >
@@ -48,17 +68,23 @@ export function FormularioConfiguracion({
             etiqueta="Esfuerzo de razonamiento"
             htmlFor="nivelRazonamiento"
           >
-            <select
-              className="min-h-11 w-full rounded-xl border border-scouts-purple/15 bg-white/75 px-3 text-sm text-scouts-purple outline-none focus:border-scouts-purple focus:ring-2 focus:ring-scouts-purple/15"
+            <Select
               defaultValue={configuracion.nivelRazonamiento}
-              id="nivelRazonamiento"
               name="nivelRazonamiento"
             >
-              <option value="minimal">Mínimo</option>
-              <option value="low">Bajo</option>
-              <option value="medium">Medio</option>
-              <option value="high">Alto</option>
-            </select>
+              <SelectTrigger
+                className="min-h-11 w-full rounded-xl border-scouts-purple/15 bg-white/75 px-3 text-scouts-purple focus-visible:border-scouts-purple focus-visible:ring-2 focus-visible:ring-scouts-purple/15"
+                id="nivelRazonamiento"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent align="start" position="popper">
+                <SelectItem value="minimal">Mínimo</SelectItem>
+                <SelectItem value="low">Bajo</SelectItem>
+                <SelectItem value="medium">Medio</SelectItem>
+                <SelectItem value="high">Alto</SelectItem>
+              </SelectContent>
+            </Select>
           </Campo>
         </div>
       </fieldset>
@@ -137,7 +163,7 @@ function Campo({
   htmlFor,
 }: {
   children: React.ReactNode;
-  descripcion: string;
+  descripcion: React.ReactNode;
   etiqueta: string;
   htmlFor: string;
 }) {
