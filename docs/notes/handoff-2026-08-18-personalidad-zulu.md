@@ -47,7 +47,7 @@ Dar personalidad visible a Zulú sin cambiar el contrato funcional del chat:
 
 ### Documentación de producto
 
-- `PRODUCT.md`, `DESIGN.md` y `.impeccable/surfaces/app-page-tsx.md` ya reconocen al búho como parte aprobada de la identidad.
+- `PRODUCT.md`, `DESIGN.md` y `docs/notes/superficie-chat-publico.md` ya reconocen al búho como parte aprobada de la identidad.
 - Este handoff sustituye los handoffs del 6 y 12 de agosto.
 - `README.md` dejó de describir la plantilla de Vercel y ahora documenta Zulú, su stack y su puesta en marcha.
 

@@ -29,7 +29,7 @@ Específicamente:
 
 ## Documentos de referencia (autoridad)
 
-- @docs/pilot-scope-v0.3.1.md → FUENTE DE VERDAD del alcance. Construir SOLO contra esto. Ver "Erratas y decisiones (2026-06-02)" al inicio del documento.
+- @docs/pilot-scope-v0.3.1.md → FUENTE DE VERDAD del alcance. Construir SOLO contra esto. Las decisiones posteriores a la publicación están integradas en el cuerpo: si una sección lo dice, es lo vigente.
 - @docs/srs-v0.2.md → Visión y norte de producto. NO es alcance de build. No implementar de aquí nada que el piloto no incluya. §22.3 (delimitadores de contexto) queda derogada por D-01/D-02.
 - @supabase/migrations/0001_schema_rls.sql → modelo de datos y RLS vigentes. El SQL es dueño del esquema.
 - `docs/archive/` → v0.3 y v0.1 solo como historia. Ignorarlas.
