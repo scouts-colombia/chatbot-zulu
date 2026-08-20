@@ -15,19 +15,23 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  construirMensajeAsistente,
+  decidirFallo,
+  decidirPreparacionInvitada,
+  decidirTurno,
+  MOTIVOS_REGISTRO,
+  type ResultadoDecision,
+} from "@/lib/chat/decisiones-turno";
+import {
   crearIdTraspasoBorrador,
   eliminarClaveGlobalAnterior,
   guardarBorradorInvitado,
   limpiarBorradorInvitado,
   restaurarBorradorInvitado,
 } from "@/lib/invitados/borrador";
-import {
-  coordinarPreparacionInvitada,
-  ERROR_COORDINACION_INVITADA,
-} from "@/lib/invitados/coordinacion";
+import { coordinarPreparacionInvitada } from "@/lib/invitados/coordinacion";
 import { marcarTurnoInvitadoEnCurso } from "@/lib/invitados/turno-en-curso";
 import { URL_POLITICA_PRIVACIDAD } from "@/lib/privacidad";
-import { esUuid } from "@/lib/uuid";
 import { Burbuja } from "./burbuja";
 import {
   IndicadorEscribiendo,
@@ -35,24 +39,6 @@ import {
   useMovimientoReducido,
 } from "./personalidad-zulu";
 import type { MensajeUI } from "./tipos";
-
-/**
- * Motivos con los que el chat abre la puerta de registro. Todos prometen lo
- * mismo —que el borrador escrito no se pierde— porque el flujo de traspaso lo
- * garantiza; escritos suelto uno por uno, una variante podía dejar de
- * prometerlo sin que nada lo delatara.
- */
-const MOTIVOS_REGISTRO = {
-  cupoAgotado: "Crea una cuenta o inicia sesión para continuar usando el chat.",
-  respuestaSinConfirmar:
-    "No pudimos confirmar la respuesta de prueba. Crea una cuenta o inicia sesión para continuar sin perder tu pregunta.",
-  sinCoordinacion:
-    "Tu navegador no permite coordinar de forma segura la prueba entre pestañas. Crea una cuenta o inicia sesión para continuar sin perder tu pregunta.",
-  conexionPerdida:
-    "Se perdió la conexión mientras procesábamos tu pregunta de prueba. Crea una cuenta o inicia sesión para continuar sin perderla.",
-  turnoUsado:
-    "Tu pregunta de prueba ya fue usada. Crea una cuenta o inicia sesión para continuar.",
-} as const;
 
 function rutaAuthConBorrador(
   ruta: "/login" | "/registro",
@@ -135,7 +121,9 @@ export function Conversacion({
   }, [borradorTransferenciaId, conversationIdActual]);
 
   const abrirRegistro = (
-    mensaje: string,
+    // Sin motivo, el diálogo usa MOTIVOS_REGISTRO.turnoUsado: el servidor no
+    // siempre explica por qué cerró el turno de prueba.
+    mensaje: string | undefined,
     texto = borrador,
     conversationIdDestino = conversationIdActual
   ) => {
@@ -158,28 +146,8 @@ export function Conversacion({
     setBorrador(texto);
     setConversationIdTransferencia(conversationIdDestino);
     setTraspasoBorradorId(traspasoId);
-    setMotivoRegistro(mensaje);
+    setMotivoRegistro(mensaje ?? null);
     setMostrarRegistro(true);
-  };
-  const actualizarPoliticaSiCambio = (
-    datos: {
-      codigo?: string;
-      mensaje?: string;
-      versionPolitica?: unknown;
-    } | null
-  ) => {
-    if (datos?.codigo !== "politica_actualizada") {
-      return false;
-    }
-    if (typeof datos.versionPolitica === "string") {
-      setVersionPoliticaActual(datos.versionPolitica);
-    }
-    setAceptaPolitica(false);
-    setAviso(
-      datos.mensaje ??
-        "La política de privacidad cambió. Revísala y vuelve a aceptarla."
-    );
-    return true;
   };
   const mensajesRef = useRef<HTMLDivElement>(null);
   // Cursor del mensaje más antiguo cargado. Un contador se desfasaría en cuanto
@@ -258,22 +226,50 @@ export function Conversacion({
       { id: idLocal, sender: "usuario", content: limpio, citas: [] },
     ]);
 
-    // Si el servidor rechaza el turno, la burbuja optimista se retira y el
-    // texto vuelve al composer para no fingir un mensaje que no existe.
-    const revertir = () => {
-      setMensajes((previos) => previos.filter((m) => m.id !== idLocal));
-      setBorrador(limpio);
-    };
     let conversationIdSolicitud = conversationIdActual;
-    const exigirRegistroTrasEnvio = (
-      mensaje: string,
-      conversationIdDestino?: string
-    ) => {
-      abrirRegistro(
-        mensaje,
-        limpio,
-        conversationIdDestino ?? conversationIdSolicitud
-      );
+
+    /**
+     * Ejecuta la decisión que tomó `lib/chat/decisiones-turno`. Retirar la
+     * burbuja optimista devuelve el texto al composer: no se finge un mensaje
+     * que el servidor no aceptó. Quién continúa y quién corta lo decide el
+     * llamador mirando `decision.tipo`.
+     */
+    const aplicar = ({ decision, revertir }: ResultadoDecision) => {
+      if (revertir) {
+        setMensajes((previos) => previos.filter((m) => m.id !== idLocal));
+        setBorrador(limpio);
+      }
+      switch (decision.tipo) {
+        case "politica_actualizada":
+          if (decision.versionPolitica) {
+            setVersionPoliticaActual(decision.versionPolitica);
+          }
+          setAceptaPolitica(false);
+          setAviso(decision.mensaje);
+          break;
+        case "registro":
+          abrirRegistro(
+            decision.mensaje,
+            limpio,
+            decision.conversationId ?? conversationIdSolicitud
+          );
+          break;
+        case "reintentar_sesion_invitada":
+          setSesionInvitadaLista(false);
+          setAviso(decision.mensaje);
+          break;
+        case "aviso":
+          setAviso(decision.mensaje);
+          break;
+        case "sesion_invitada_lista":
+          conversationIdSolicitud = decision.conversationId;
+          setConversationIdActual(decision.conversationId);
+          setConversationIdTransferencia(decision.conversationId);
+          setSesionInvitadaLista(true);
+          break;
+        default:
+          break;
+      }
     };
 
     let solicitudPrincipalIniciada = false;
@@ -289,33 +285,14 @@ export function Conversacion({
             }),
           })
         );
-        const datosPreparacion = await preparacion.json().catch(() => null);
-        if (!preparacion.ok || !datosPreparacion) {
-          revertir();
-          if (actualizarPoliticaSiCambio(datosPreparacion)) {
-            return;
-          }
-          if (datosPreparacion?.codigo === "registro_requerido") {
-            exigirRegistroTrasEnvio(datosPreparacion.mensaje);
-            return;
-          }
-          setAviso(
-            datosPreparacion?.mensaje ??
-              "No pudimos preparar tu sesión de prueba. Inténtalo de nuevo."
-          );
+        const resultado = decidirPreparacionInvitada(
+          preparacion.ok,
+          await preparacion.json().catch(() => null)
+        );
+        aplicar(resultado);
+        if (resultado.decision.tipo !== "sesion_invitada_lista") {
           return;
         }
-        if (!esUuid(datosPreparacion.conversationId)) {
-          revertir();
-          setAviso(
-            "No pudimos preparar tu conversación de prueba. Inténtalo de nuevo."
-          );
-          return;
-        }
-        conversationIdSolicitud = datosPreparacion.conversationId;
-        setConversationIdActual(conversationIdSolicitud);
-        setConversationIdTransferencia(conversationIdSolicitud);
-        setSesionInvitadaLista(true);
       }
 
       solicitudPrincipalIniciada = true;
@@ -337,58 +314,23 @@ export function Conversacion({
       // 500 sin cuerpo o un 504 del gateway devuelven HTML, y parsear primero
       // mandaba ese caso al catch, que dice "no hay conexión" cuando sí hubo
       // servidor y el turno ya se consumió.
-      const datos = await respuesta.json().catch(() => null);
-
-      if (!respuesta.ok) {
-        if (esInvitado && datos?.codigo === "turno_invitado_consumido") {
-          setAviso(datos.mensaje);
-          return;
-        }
-        revertir();
-        if (actualizarPoliticaSiCambio(datos)) {
-          return;
-        }
-        if (datos?.codigo === "registro_requerido") {
-          exigirRegistroTrasEnvio(
-            datos.mensaje ?? MOTIVOS_REGISTRO.cupoAgotado,
-            typeof datos.conversationId === "string"
-              ? datos.conversationId
-              : undefined
-          );
-          return;
-        }
-        if (esInvitado && datos?.codigo === "sesion_invitada_requerida") {
-          setSesionInvitadaLista(false);
-          setAviso(
-            "No pudimos establecer tu sesión de prueba. Inténtalo de nuevo."
-          );
-          return;
-        }
-        if (esInvitado && !datos) {
-          exigirRegistroTrasEnvio(MOTIVOS_REGISTRO.respuestaSinConfirmar);
-          return;
-        }
-        setAviso(
-          datos?.mensaje ??
-            "No se pudo enviar el mensaje. Inténtalo de nuevo en un momento."
-        );
+      const resultado = decidirTurno({
+        ok: respuesta.ok,
+        cuerpo: await respuesta.json().catch(() => null),
+        esInvitado,
+      });
+      aplicar(resultado);
+      if (resultado.decision.tipo !== "respuesta") {
         return;
       }
 
-      if (!datos) {
-        revertir();
-        if (esInvitado) {
-          exigirRegistroTrasEnvio(MOTIVOS_REGISTRO.respuestaSinConfirmar);
-          return;
-        }
-        setAviso("No se pudo leer la respuesta. Inténtalo de nuevo.");
-        return;
-      }
-
+      const { cuerpo } = resultado.decision;
       const idConversacionRespuesta =
-        datos.conversationId ?? conversationIdActual;
-      if (datos.conversationId) {
-        setConversationIdActual(datos.conversationId);
+        typeof cuerpo.conversationId === "string"
+          ? cuerpo.conversationId
+          : conversationIdActual;
+      if (typeof cuerpo.conversationId === "string") {
+        setConversationIdActual(cuerpo.conversationId);
       }
       limpiarBorradorInvitado(
         sessionStorage,
@@ -396,40 +338,14 @@ export function Conversacion({
         borradorTransferenciaId,
         localStorage
       );
-      const mensajeAsistente: MensajeUI = {
-        id: datos.mensajeId ?? `asistente-${Date.now()}`,
-        sender: "asistente",
-        content: datos.respuesta,
-        estado: datos.estado === "respondido" ? undefined : datos.estado,
-        citas: (datos.citas ?? []).map(
-          (cita: { documentTitleSnapshot: string; pageNumber?: number }) => ({
-            titulo: cita.documentTitleSnapshot,
-            pagina: cita.pageNumber,
-          })
-        ),
-        preguntaGuiada: datos.preguntaGuiada
-          ? {
-              texto: datos.preguntaGuiada.texto,
-              opciones: datos.preguntaGuiada.opciones,
-            }
-          : undefined,
-      };
+      const mensajeAsistente = construirMensajeAsistente(
+        cuerpo,
+        `asistente-${Date.now()}`
+      );
       setMensajes((previos) => [...previos, mensajeAsistente]);
       setAnimandoId(mensajeAsistente.id);
     } catch (error) {
-      revertir();
-      if (
-        error instanceof Error &&
-        error.message === ERROR_COORDINACION_INVITADA
-      ) {
-        exigirRegistroTrasEnvio(MOTIVOS_REGISTRO.sinCoordinacion);
-        return;
-      }
-      if (esInvitado && solicitudPrincipalIniciada) {
-        exigirRegistroTrasEnvio(MOTIVOS_REGISTRO.conexionPerdida);
-        return;
-      }
-      setAviso("No hay conexión con el servidor. Inténtalo de nuevo.");
+      aplicar(decidirFallo({ error, esInvitado, solicitudPrincipalIniciada }));
     } finally {
       if (esInvitado) {
         marcarTurnoInvitadoEnCurso(false);

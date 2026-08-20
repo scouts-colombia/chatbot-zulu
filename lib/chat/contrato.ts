@@ -104,15 +104,36 @@ export type RespuestaAsistente = {
   metadata: MetadataServidor;
 };
 
+/** Estados que sí llevan etiqueta: `respondido` es el caso normal y no la lleva. */
+export type EstadoConEtiqueta = Exclude<
+  RespuestaAsistente["estado"],
+  "respondido"
+>;
+
 /**
- * Etiqueta visible por estado. `respondido` no lleva etiqueta: es el caso
- * normal. Vive aquí y no en el componente del chat porque el panel admin debe
- * mostrar exactamente la misma indicación que vio el Scout; si divergieran, un
- * revisor no podría distinguir una respuesta normal de una ruta de seguridad.
+ * Etiqueta visible por estado. Vive aquí y no en el componente del chat porque
+ * el panel admin debe mostrar exactamente la misma indicación que vio el Scout;
+ * si divergieran, un revisor no podría distinguir una respuesta normal de una
+ * ruta de seguridad. El `Record` va tipado por la unión a propósito: si mañana
+ * se agrega un estado al contrato, el compilador exige su etiqueta en vez de
+ * dejar la burbuja sin ninguna.
  */
-export const ETIQUETAS_ESTADO: Record<string, string> = {
+export const ETIQUETAS_ESTADO: Record<EstadoConEtiqueta, string> = {
   sin_fuente: "Sin fuente en los manuales",
   necesita_aclaracion: "Necesita aclaración",
   bloqueado_por_seguridad: "Tema bloqueado por seguridad",
   error: "Error",
 };
+
+/**
+ * Frontera de confianza del estado: llega desde `response_json` (jsonb, sin
+ * garantías) o por la red. Devuelve `undefined` para `respondido`, para un
+ * estado desconocido y para cualquier valor que no sea texto.
+ */
+export function estadoConEtiqueta(
+  valor: unknown
+): EstadoConEtiqueta | undefined {
+  return typeof valor === "string" && valor in ETIQUETAS_ESTADO
+    ? (valor as EstadoConEtiqueta)
+    : undefined;
+}
