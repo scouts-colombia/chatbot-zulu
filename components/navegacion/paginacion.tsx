@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
-export const TAMANO_PAGINA = 50;
+const TAMANO_PAGINA = 50;
 
 /** Lee `?pagina=` sin confiar en el valor: cualquier basura cae en la 1. */
 export function leerPagina(valor: string | undefined) {

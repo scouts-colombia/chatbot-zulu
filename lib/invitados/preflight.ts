@@ -104,6 +104,11 @@ export async function prepararPreflightInvitado(
   return { tipo: "listo", preflightId: preparacion.preflightId };
 }
 
+export async function olvidarPreflightInvitado() {
+  const cookieStore = await cookies();
+  cookieStore.delete(COOKIE_PREFLIGHT_INVITADO);
+}
+
 /**
  * Devuelve el cupo reservado y borra la cookie. Si la liberación falla, la
  * cookie se conserva a propósito: el cupo sigue reservado en la base y borrarla
@@ -115,6 +120,10 @@ export async function liberarPreflightInvitado(
   etiquetaLog: string
 ) {
   if (!preflightId) {
+    // Nada que devolver en la base, pero la cookie sí se limpia: puede ser un
+    // resto de una sesión de prueba anterior y dejarla haría que el siguiente
+    // intento se leyera como pendiente.
+    await olvidarPreflightInvitado();
     return true;
   }
   const { error } = await admin.rpc("liberar_preflight_turno_invitado", {
@@ -127,11 +136,6 @@ export async function liberarPreflightInvitado(
   const cookieStore = await cookies();
   cookieStore.delete(COOKIE_PREFLIGHT_INVITADO);
   return true;
-}
-
-export async function olvidarPreflightInvitado() {
-  const cookieStore = await cookies();
-  cookieStore.delete(COOKIE_PREFLIGHT_INVITADO);
 }
 
 /** Hilo único del visitante: se reutiliza para que el turno no cree otro. */
