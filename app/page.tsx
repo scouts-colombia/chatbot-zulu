@@ -13,12 +13,13 @@ import { LimpiezaBorradoresPendientes } from "@/components/chat/limpieza-borrado
 import { FondoMarca } from "@/components/marca/fondo-marca";
 import { ZuluMascota } from "@/components/marca/zulu-mascota";
 import { Button } from "@/components/ui/button";
-import { esIdTraspasoBorradorValido } from "@/lib/invitados/borrador";
+import { esFalloDeVerificacionDeSesion } from "@/lib/auth/sesion";
 import {
   URL_POLITICA_PRIVACIDAD,
   VERSION_POLITICA_PRIVACIDAD,
 } from "@/lib/privacidad";
 import { crearClienteServidor } from "@/lib/supabase/server";
+import { esUuid } from "@/lib/uuid";
 import { aceptarPoliticaPrivacidad, cerrarSesion } from "./(auth)/acciones";
 import { archivarConversacion, crearConversacion } from "./chat/acciones";
 
@@ -73,10 +74,8 @@ async function ContenidoPrincipal({
     conversacion,
     pagina: paginaParam,
   } = await searchParams;
-  const borradorTransferenciaId = esIdTraspasoBorradorValido(borrador)
-    ? borrador
-    : null;
-  const conversationIdTransferencia = esIdTraspasoBorradorValido(conversacion)
+  const borradorTransferenciaId = esUuid(borrador) ? borrador : null;
+  const conversationIdTransferencia = esUuid(conversacion)
     ? conversacion
     : null;
   const pagina = Math.max(1, Number.parseInt(paginaParam ?? "1", 10) || 1);
@@ -87,8 +86,7 @@ async function ContenidoPrincipal({
     error: errorAutenticacion,
   } = await supabase.auth.getUser();
 
-  const sesionAusente = errorAutenticacion?.name === "AuthSessionMissingError";
-  if (errorAutenticacion && !sesionAusente) {
+  if (esFalloDeVerificacionDeSesion(errorAutenticacion)) {
     console.error("[home] No se pudo verificar la sesión:", errorAutenticacion);
     return <ErrorAutenticacion />;
   }

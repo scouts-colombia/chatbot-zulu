@@ -3,8 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { cargarTramo } from "@/lib/chat/transcripcion";
-import { esIdTraspasoBorradorValido } from "@/lib/invitados/borrador";
 import { crearClienteServidor } from "@/lib/supabase/server";
+import { esUuid } from "@/lib/uuid";
 
 export async function crearConversacion(formData?: FormData) {
   const supabase = await crearClienteServidor();
@@ -26,7 +26,7 @@ export async function crearConversacion(formData?: FormData) {
   }
 
   const borrador = formData?.get("borrador");
-  const query = esIdTraspasoBorradorValido(borrador)
+  const query = esUuid(borrador)
     ? `?borrador=${encodeURIComponent(borrador)}`
     : "";
   redirect(`/chat/${data.id}${query}`);

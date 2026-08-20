@@ -1,12 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { esUuid } from "@/lib/uuid";
 import {
   construirHashesSolicitud,
   construirIdentidadInvitada,
   crearIdDispositivo,
   esHashInvitado,
-  esIdDispositivoValido,
-  esIdPreflightValido,
   leerPreparacionPreflightInvitado,
   obtenerIpCliente,
 } from "./identidad";
@@ -122,12 +121,7 @@ test("rechaza secretos cortos e identificadores de dispositivo invalidos", () =>
 });
 
 test("genera identificadores de dispositivo validos", () => {
-  assert.equal(esIdDispositivoValido(crearIdDispositivo()), true);
-});
-test("valida identificadores de preflight antes de confiar en la cookie", () => {
-  assert.equal(esIdPreflightValido(DEVICE_ID), true);
-  assert.equal(esIdPreflightValido("no-es-un-uuid"), false);
-  assert.equal(esIdPreflightValido(undefined), false);
+  assert.equal(esUuid(crearIdDispositivo()), true);
 });
 test("lee el TTL efectivo devuelto por PostgreSQL", () => {
   const preparacion = leerPreparacionPreflightInvitado([

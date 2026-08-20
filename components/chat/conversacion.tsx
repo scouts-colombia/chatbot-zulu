@@ -20,7 +20,6 @@ import { ETIQUETAS_ESTADO } from "@/lib/chat/contrato";
 import {
   crearIdTraspasoBorrador,
   eliminarClaveGlobalAnterior,
-  esIdTraspasoBorradorValido,
   guardarBorradorInvitado,
   limpiarBorradoresPendientesExpirados,
   limpiarBorradorInvitado,
@@ -32,6 +31,7 @@ import {
 } from "@/lib/invitados/coordinacion";
 import { marcarTurnoInvitadoEnCurso } from "@/lib/invitados/turno-en-curso";
 import { URL_POLITICA_PRIVACIDAD } from "@/lib/privacidad";
+import { esUuid } from "@/lib/uuid";
 import {
   IndicadorEscribiendo,
   MascotaBienvenidaChat,
@@ -449,7 +449,7 @@ export function Conversacion({
           );
           return;
         }
-        if (!esIdTraspasoBorradorValido(datosPreparacion.conversationId)) {
+        if (!esUuid(datosPreparacion.conversationId)) {
           revertir();
           setAviso(
             "No pudimos preparar tu conversación de prueba. Inténtalo de nuevo."

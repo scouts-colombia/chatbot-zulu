@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { esFalloDeVerificacionDeSesion } from "@/lib/auth/sesion";
 import { normalizarCitas } from "@/lib/chat/citas";
 import type {
   CitaNormalizada,
@@ -19,13 +20,10 @@ import {
   COOKIE_PREFLIGHT_INVITADO,
   construirIdentidadInvitada,
   crearIdDispositivo,
-  esIdDispositivoValido,
-  esIdPreflightValido,
   type IdentidadInvitada,
   leerPreparacionPreflightInvitado,
 } from "@/lib/invitados/identidad";
 import { respuestaRegistroPorLimite } from "@/lib/invitados/limites";
-
 import {
   esVersionPoliticaVigente,
   URL_POLITICA_PRIVACIDAD,
@@ -33,6 +31,7 @@ import {
 } from "@/lib/privacidad";
 import { crearClienteAdmin } from "@/lib/supabase/admin";
 import { crearClienteServidor } from "@/lib/supabase/server";
+import { esUuid } from "@/lib/uuid";
 
 export const maxDuration = 60;
 
@@ -57,7 +56,7 @@ async function obtenerIdentidadInvitada(request: Request) {
   const secret = process.env.GUEST_LIMIT_SECRET ?? "";
   const cookieStore = await cookies();
   const cookieActual = cookieStore.get(COOKIE_DISPOSITIVO_INVITADO)?.value;
-  const deviceId = esIdDispositivoValido(cookieActual)
+  const deviceId = esUuid(cookieActual)
     ? (cookieActual as string)
     : crearIdDispositivo();
 
@@ -187,8 +186,7 @@ export async function POST(request: Request) {
     data: { user },
     error: errorAutenticacion,
   } = await supabase.auth.getUser();
-  const sesionAusente = errorAutenticacion?.name === "AuthSessionMissingError";
-  if (errorAutenticacion && !sesionAusente) {
+  if (esFalloDeVerificacionDeSesion(errorAutenticacion)) {
     console.error("[chat] No se pudo verificar la sesión:", errorAutenticacion);
     return NextResponse.json(
       {
@@ -228,7 +226,7 @@ export async function POST(request: Request) {
   }
 
   const esInvitado = user.is_anonymous === true;
-  if (esInvitado && esIdPreflightValido(preflightCookie)) {
+  if (esInvitado && esUuid(preflightCookie)) {
     preflightId = preflightCookie as string;
   }
 

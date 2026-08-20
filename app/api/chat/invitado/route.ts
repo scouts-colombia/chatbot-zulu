@@ -1,13 +1,12 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { esFalloDeVerificacionDeSesion } from "@/lib/auth/sesion";
 import {
   COOKIE_DISPOSITIVO_INVITADO,
   COOKIE_PREFLIGHT_INVITADO,
   construirIdentidadInvitada,
   crearIdDispositivo,
-  esIdDispositivoValido,
-  esIdPreflightValido,
   type IdentidadInvitada,
   leerPreparacionPreflightInvitado,
 } from "@/lib/invitados/identidad";
@@ -19,6 +18,7 @@ import {
 } from "@/lib/privacidad";
 import { crearClienteAdmin } from "@/lib/supabase/admin";
 import { crearClienteServidor } from "@/lib/supabase/server";
+import { esUuid } from "@/lib/uuid";
 
 const CuerpoSchema = z.object({
   aceptaPolitica: z.literal(true),
@@ -47,7 +47,7 @@ async function obtenerIdentidadInvitada(request: Request) {
   const secret = process.env.GUEST_LIMIT_SECRET ?? "";
   const cookieStore = await cookies();
   const cookieActual = cookieStore.get(COOKIE_DISPOSITIVO_INVITADO)?.value;
-  const deviceId = esIdDispositivoValido(cookieActual)
+  const deviceId = esUuid(cookieActual)
     ? (cookieActual as string)
     : crearIdDispositivo();
 
@@ -98,9 +98,7 @@ export async function POST(request: Request) {
     data: { user },
     error: errorAutenticacion,
   } = await supabase.auth.getUser();
-  const sesionAusente = errorAutenticacion?.name === "AuthSessionMissingError";
-
-  if (errorAutenticacion && !sesionAusente) {
+  if (esFalloDeVerificacionDeSesion(errorAutenticacion)) {
     console.error(
       "[chat/invitado] No se pudo verificar la sesión:",
       errorAutenticacion
@@ -140,7 +138,7 @@ export async function POST(request: Request) {
   await limpiarIdentidadesInvitadasPendientes(admin, { limite: 1 });
 
   const preflightPendiente = cookieStore.get(COOKIE_PREFLIGHT_INVITADO)?.value;
-  if (esIdPreflightValido(preflightPendiente)) {
+  if (esUuid(preflightPendiente)) {
     return NextResponse.json(
       {
         codigo: "sesion_invitada_pendiente",

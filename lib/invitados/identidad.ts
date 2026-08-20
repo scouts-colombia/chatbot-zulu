@@ -1,11 +1,10 @@
 import { createHmac, randomUUID } from "node:crypto";
+import { esUuid } from "@/lib/uuid";
 
 export const COOKIE_DISPOSITIVO_INVITADO = "zulu_guest_device";
 export const COOKIE_PREFLIGHT_INVITADO = "zulu_guest_preflight";
 
 const HEX_64 = /^[0-9a-f]{64}$/;
-const UUID =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export type IdentidadInvitada = {
   deviceHash: string;
@@ -30,7 +29,7 @@ export function leerPreparacionPreflightInvitado(
   const ttlSeconds = fila.ttl_seconds;
   if (
     typeof preflightId !== "string" ||
-    !esIdPreflightValido(preflightId) ||
+    !esUuid(preflightId) ||
     typeof ttlSeconds !== "number" ||
     !Number.isInteger(ttlSeconds) ||
     ttlSeconds < 60 ||
@@ -39,14 +38,6 @@ export function leerPreparacionPreflightInvitado(
     return null;
   }
   return { preflightId, ttlSeconds };
-}
-
-export function esIdDispositivoValido(value: string | undefined) {
-  return Boolean(value && UUID.test(value));
-}
-
-export function esIdPreflightValido(value: string | undefined) {
-  return Boolean(value && UUID.test(value));
 }
 
 export function crearIdDispositivo() {
@@ -122,7 +113,7 @@ export function construirIdentidadInvitada({
   if (secret.length < 32) {
     throw new Error("guest_limit_secret_invalido");
   }
-  if (!esIdDispositivoValido(deviceId)) {
+  if (!esUuid(deviceId)) {
     throw new Error("device_id_invitado_invalido");
   }
 

@@ -1,5 +1,4 @@
-const UUID =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+import { esUuid } from "@/lib/uuid";
 
 type ErrorSupabase = { message: string } | null;
 type UsuarioAuthMinimo = { is_anonymous?: boolean } | null;
@@ -41,10 +40,7 @@ export async function limpiarIdentidadesInvitadasPendientes(
   opciones: OpcionesLimpieza = {}
 ): Promise<ResultadoLimpiezaInvitados> {
   const limite = Math.min(Math.max(Math.trunc(opciones.limite ?? 3), 1), 10);
-  const preferida =
-    opciones.preferida && UUID.test(opciones.preferida)
-      ? opciones.preferida
-      : null;
+  const preferida = esUuid(opciones.preferida) ? opciones.preferida : null;
 
   const { data, error } = await admin.rpc(
     "tomar_limpiezas_identidad_invitada",
@@ -68,8 +64,7 @@ export async function limpiarIdentidadesInvitadasPendientes(
           typeof fila === "object" &&
           fila !== null &&
           "guest_user_id" in fila &&
-          typeof fila.guest_user_id === "string" &&
-          UUID.test(fila.guest_user_id)
+          esUuid(fila.guest_user_id)
         ) {
           return [fila.guest_user_id];
         }

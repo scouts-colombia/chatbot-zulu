@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { esIdTraspasoBorradorValido } from "@/lib/invitados/borrador";
+import { esUuid } from "@/lib/uuid";
 import { iniciarSesion } from "../acciones";
 import { FormularioAuth } from "../formulario-auth";
 
@@ -42,12 +42,8 @@ async function ContenidoLogin({
   return (
     <FormularioAuth
       accion={iniciarSesion}
-      borradorTransferenciaId={
-        esIdTraspasoBorradorValido(borrador) ? borrador : null
-      }
-      conversationIdTransferencia={
-        esIdTraspasoBorradorValido(conversacion) ? conversacion : null
-      }
+      borradorTransferenciaId={esUuid(borrador) ? borrador : null}
+      conversationIdTransferencia={esUuid(conversacion) ? conversacion : null}
       modo="login"
     />
   );
