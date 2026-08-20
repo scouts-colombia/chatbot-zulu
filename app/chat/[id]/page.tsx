@@ -1,4 +1,5 @@
 import { Archive } from "lucide-react";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
@@ -9,7 +10,11 @@ import { cargarTramo } from "@/lib/chat/transcripcion";
 import { esIdTraspasoBorradorValido } from "@/lib/invitados/borrador";
 import { crearClienteServidor } from "@/lib/supabase/server";
 
-export const metadata = { title: "Conversación" };
+export const metadata: Metadata = {
+  title: "Conversación",
+  // Contenido privado del Scout: nunca indexable.
+  robots: { index: false, follow: false, nocache: true },
+};
 
 export default function PaginaConversacion({
   params,

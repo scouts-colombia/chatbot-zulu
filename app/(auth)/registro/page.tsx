@@ -1,10 +1,17 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
 import { esIdTraspasoBorradorValido } from "@/lib/invitados/borrador";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { finalizarRegistro, registrarse } from "../acciones";
 import { FormularioAuth } from "../formulario-auth";
 
-export const metadata = { title: "Crear cuenta" };
+export const metadata: Metadata = {
+  title: "Crear cuenta",
+  description:
+    "Crea tu cuenta de Zulú para consultar los manuales oficiales de Scouts de Colombia con citas verificables.",
+  alternates: { canonical: "/registro" },
+  robots: { index: false, follow: false },
+};
 
 export default function PaginaRegistro({
   searchParams,

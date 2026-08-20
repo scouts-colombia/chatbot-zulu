@@ -1,9 +1,17 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
 import { esIdTraspasoBorradorValido } from "@/lib/invitados/borrador";
 import { iniciarSesion } from "../acciones";
 import { FormularioAuth } from "../formulario-auth";
 
-export const metadata = { title: "Iniciar sesión" };
+export const metadata: Metadata = {
+  title: "Iniciar sesión",
+  description:
+    "Entra a Zulú con tu cuenta de Scouts de Colombia para retomar tus conversaciones sobre los manuales oficiales.",
+  alternates: { canonical: "/login" },
+  // Página utilitaria detrás de la sesión: sin valor en buscadores.
+  robots: { index: false, follow: false },
+};
 
 export default function PaginaLogin({
   searchParams,
