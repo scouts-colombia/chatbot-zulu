@@ -19,7 +19,7 @@ export const URL_SITIO = (origenConfigurado || "http://localhost:3000").replace(
 
 export const NOMBRE_SITIO = "Zulú";
 
-export const TITULO_INICIO = "Zulú | Asistente Scout de manuales oficiales";
+export const TITULO_INICIO = "Zulú | Asistente IA Scouts de Colombia";
 
 export const DESCRIPCION_SITIO =
   "Consulta los manuales oficiales de Scouts de Colombia en lenguaje natural y recibe respuestas con citas verificables al documento y la página.";
