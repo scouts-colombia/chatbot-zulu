@@ -297,9 +297,10 @@ export async function POST(request: Request) {
     );
   }
 
-  // Gate de consentimiento (P-RF-04). Se activa fijando PRIVACY_POLICY_VERSION
-  // cuando la organización publique el texto de la política; hasta entonces no
-  // hay versión que aceptar.
+  // Gate de consentimiento (P-RF-04), activo: la política canónica es el
+  // Acuerdo CSN 369 y es el valor por defecto, así que una cuenta sin
+  // aceptación registrada no puede usar el chat. PRIVACY_POLICY_VERSION solo
+  // hace falta para apuntar a una revisión posterior.
   const requiereConsentimiento =
     perfil.privacy_policy_version_accepted !== VERSION_POLITICA_PRIVACIDAD;
   const versionConsentidaValida = esVersionPoliticaVigente(
