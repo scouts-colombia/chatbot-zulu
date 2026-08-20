@@ -6,6 +6,9 @@
 > - §22.3 (defensa por delimitadores `<documento>`): derogada. El piloto usa File Search administrado; no se ensamblan ni envuelven chunks (D-01, D-02).
 > - El streaming descrito aquí queda diferido a P1: el piloto no usa streaming del proveedor (D-04).
 > - El contrato del modelo no incluye `confianza` ni `score` de cita (v0.3.1 §6, D-05).
+> - El motivo obligatorio para leer una conversación ajena (RF-48, §16, §21.4, §29.2,
+>   §35, §36) queda derogado desde el 2026-07-17: el admin abre directamente y cada
+>   apertura se audita sola, fail-closed. Ver v0.3.1 §12. No reintroducir el formulario.
 
 **Versión propuesta:** 0.2  
 **Tipo de documento:** Ajustes integrados sobre la especificación v0.1  

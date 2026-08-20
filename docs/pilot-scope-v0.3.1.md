@@ -1175,8 +1175,8 @@ La service role de Supabase no se expone al cliente.
 - Límite simple diario.
 - Eventos por request.
 - Panel admin básico.
-- Motivo obligatorio para ver conversación ajena.
-- Auditoría admin.
+- Acceso directo a conversación ajena, sin motivo (2026-07-17).
+- Auditoría admin automática y fail-closed.
 - Consentimiento/política versionada con evento append-only.
 - Estados de cuenta.
 
