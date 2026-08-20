@@ -29,21 +29,15 @@ export const metadata: Metadata = {
     title: "Zulú · Asistente Scout",
     description:
       "Consulta los manuales oficiales de Scouts Colombia y recibe respuestas con fuentes verificables.",
-    images: [
-      {
-        url: "/opengraph-image.png",
-        width: 1200,
-        height: 630,
-        alt: "Conversación de ejemplo con Zulú, el asistente Scout",
-      },
-    ],
+    // La imagen la genera la convención de archivo app/opengraph-image.png
+    // (+ app/opengraph-image.alt.txt). Declararla aquí también hace que
+    // Next fusione ambas y produzca una og:image rota.
   },
   twitter: {
     card: "summary_large_image",
     title: "Zulú · Asistente Scout",
     description:
       "Consulta los manuales oficiales de Scouts Colombia y recibe respuestas con fuentes verificables.",
-    images: ["/opengraph-image.png"],
   },
 };
 
