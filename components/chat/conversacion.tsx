@@ -21,7 +21,6 @@ import {
   crearIdTraspasoBorrador,
   eliminarClaveGlobalAnterior,
   guardarBorradorInvitado,
-  limpiarBorradoresPendientesExpirados,
   limpiarBorradorInvitado,
   restaurarBorradorInvitado,
 } from "@/lib/invitados/borrador";
@@ -255,12 +254,6 @@ export function Conversacion({
   const [versionPoliticaActual, setVersionPoliticaActual] =
     useState(versionPolitica);
   const reducirMovimiento = useMovimientoReducido();
-  useEffect(() => {
-    const purgar = () => limpiarBorradoresPendientesExpirados(localStorage);
-    purgar();
-    const intervalo = window.setInterval(purgar, 60_000);
-    return () => window.clearInterval(intervalo);
-  }, []);
 
   useEffect(() => {
     // Elimina la clave global de versiones anteriores para que un borrador

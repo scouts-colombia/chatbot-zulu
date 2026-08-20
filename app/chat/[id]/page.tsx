@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import { Conversacion } from "@/components/chat/conversacion";
+import { LimpiezaBorradoresPendientes } from "@/components/chat/limpieza-borradores-pendientes";
 import { FondoMarca } from "@/components/marca/fondo-marca";
 import { ZuluMascota } from "@/components/marca/zulu-mascota";
 import { cargarTramo } from "@/lib/chat/transcripcion";
@@ -133,6 +134,7 @@ async function ContenidoConversacion({
             </span>
           )}
         </header>
+        <LimpiezaBorradoresPendientes />
         <div className="min-h-0 flex-1">
           <Conversacion
             archivada={conversacion.archived}

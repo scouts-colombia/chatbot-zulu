@@ -1,14 +1,13 @@
 import { Users } from "lucide-react";
 import { Suspense } from "react";
+import {
+  leerPagina,
+  Paginacion,
+  rangoDePagina,
+} from "@/components/navegacion/paginacion";
 import { requerirAdmin } from "@/lib/admin/guard";
 import { crearClienteAdmin } from "@/lib/supabase/admin";
 import { FormularioEstado } from "./formulario-estado";
-
-// Paginado y no un tope fijo: con un `.limit()` a secas, pasar de ese número
-// deja los perfiles más antiguos inalcanzables desde el panel y sin señal de
-// que se recortó la lista, así que un admin no podría bloquear una cuenta que
-// no ve.
-const TAMANO_PAGINA = 50;
 
 export default function PaginaUsuariosAdmin({
   searchParams,
@@ -35,8 +34,8 @@ async function ListaUsuarios({
   const admin = crearClienteAdmin();
 
   const { pagina: paginaParam } = await searchParams;
-  const pagina = Math.max(1, Number.parseInt(paginaParam ?? "1", 10) || 1);
-  const inicio = (pagina - 1) * TAMANO_PAGINA;
+  const pagina = leerPagina(paginaParam);
+  const [desde, hasta] = rangoDePagina(pagina);
 
   const {
     data: perfiles,
@@ -49,7 +48,7 @@ async function ListaUsuarios({
     })
     .eq("is_guest", false)
     .order("created_at", { ascending: false })
-    .range(inicio, inicio + TAMANO_PAGINA - 1);
+    .range(desde, hasta);
 
   // Un fallo de la consulta dejaría la lista vacía como si no hubiera usuarios.
   if (errorPerfiles) {
@@ -120,66 +119,13 @@ async function ListaUsuarios({
 
       <Paginacion
         cantidadEnPagina={(perfiles ?? []).length}
+        enlaceDeDocumento
+        etiquetas={{ anterior: "← Anterior", siguiente: "Siguiente →" }}
+        etiquetaTotal="usuarios"
+        href={(destino) => `/admin/usuarios?pagina=${destino}`}
         pagina={pagina}
         total={count}
       />
     </div>
-  );
-}
-
-/**
- * Si no viene `count` no se finge un total: se ofrece "Siguiente" mientras la
- * página venga llena, en vez de ocultar la navegación y dar a entender que no
- * hay más perfiles.
- */
-function Paginacion({
-  pagina,
-  total,
-  cantidadEnPagina,
-}: {
-  pagina: number;
-  total: number | null;
-  cantidadEnPagina: number;
-}) {
-  const totalPaginas =
-    total == null ? null : Math.max(1, Math.ceil(total / TAMANO_PAGINA));
-  const haySiguiente =
-    totalPaginas === null
-      ? cantidadEnPagina === TAMANO_PAGINA
-      : pagina < totalPaginas;
-  const hayAnterior = pagina > 1;
-
-  if (!(hayAnterior || haySiguiente)) {
-    return null;
-  }
-
-  return (
-    <nav className="flex items-center justify-between pt-2 text-sm">
-      {hayAnterior ? (
-        <a
-          className="brand-page-link"
-          href={`/admin/usuarios?pagina=${pagina - 1}`}
-        >
-          ← Anterior
-        </a>
-      ) : (
-        <span />
-      )}
-      <span className="text-foreground/70 text-xs">
-        {totalPaginas === null
-          ? `Página ${pagina}`
-          : `Página ${pagina} de ${totalPaginas} · ${total} usuarios`}
-      </span>
-      {haySiguiente ? (
-        <a
-          className="brand-page-link"
-          href={`/admin/usuarios?pagina=${pagina + 1}`}
-        >
-          Siguiente →
-        </a>
-      ) : (
-        <span />
-      )}
-    </nav>
   );
 }

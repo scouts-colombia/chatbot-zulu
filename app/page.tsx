@@ -12,6 +12,11 @@ import { ChatPublico } from "@/components/chat/chat-publico";
 import { LimpiezaBorradoresPendientes } from "@/components/chat/limpieza-borradores-pendientes";
 import { FondoMarca } from "@/components/marca/fondo-marca";
 import { ZuluMascota } from "@/components/marca/zulu-mascota";
+import {
+  leerPagina,
+  Paginacion,
+  rangoDePagina,
+} from "@/components/navegacion/paginacion";
 import { Button } from "@/components/ui/button";
 import { esFalloDeVerificacionDeSesion } from "@/lib/auth/sesion";
 import {
@@ -29,8 +34,6 @@ const MENSAJES_ESTADO: Record<string, string> = {
   bloqueado:
     "Tu cuenta está bloqueada. Si crees que es un error, contacta a la organización.",
 };
-
-const TAMANO_PAGINA = 50;
 
 export default function PaginaPrincipal({
   searchParams,
@@ -78,7 +81,7 @@ async function ContenidoPrincipal({
   const conversationIdTransferencia = esUuid(conversacion)
     ? conversacion
     : null;
-  const pagina = Math.max(1, Number.parseInt(paginaParam ?? "1", 10) || 1);
+  const pagina = leerPagina(paginaParam);
   const supabase = await crearClienteServidor();
 
   const {
@@ -152,7 +155,7 @@ async function ContenidoPrincipal({
   // navegación dejaría las conversaciones antiguas inalcanzables, que el Scout
   // leería como que se perdieron. Un fallo tampoco debe leerse como "aún no
   // tienes conversaciones", que llevaría a crear un hilo duplicado.
-  const inicio = (pagina - 1) * TAMANO_PAGINA;
+  const [desde, hasta] = rangoDePagina(pagina);
   const {
     data: conversaciones,
     count: totalConversaciones,
@@ -164,7 +167,7 @@ async function ContenidoPrincipal({
         .select("id, title, updated_at", { count: "exact" })
         .eq("archived", false)
         .order("updated_at", { ascending: false })
-        .range(inicio, inicio + TAMANO_PAGINA - 1);
+        .range(desde, hasta);
 
   return (
     <FondoMarca>
@@ -390,8 +393,14 @@ async function ContenidoPrincipal({
                         </li>
                       ))}
                     </ul>
-                    <PaginacionConversaciones
+                    <Paginacion
                       cantidadEnPagina={conversaciones.length}
+                      className="px-2 pt-4"
+                      etiquetas={{
+                        anterior: "← Anteriores",
+                        siguiente: "Más antiguas →",
+                      }}
+                      href={(destino) => `/?pagina=${destino}`}
                       pagina={pagina}
                       total={totalConversaciones}
                     />
@@ -474,55 +483,5 @@ function ErrorAutenticacion() {
         </Button>
       </section>
     </main>
-  );
-}
-/**
- * Si no viene `count` no se finge un total: se ofrece "Siguiente" mientras la
- * página venga llena, en vez de ocultar la navegación y dar a entender que no
- * hay más conversaciones.
- */
-function PaginacionConversaciones({
-  pagina,
-  total,
-  cantidadEnPagina,
-}: {
-  pagina: number;
-  total: number | null;
-  cantidadEnPagina: number;
-}) {
-  const totalPaginas =
-    total == null ? null : Math.max(1, Math.ceil(total / TAMANO_PAGINA));
-  const haySiguiente =
-    totalPaginas === null
-      ? cantidadEnPagina === TAMANO_PAGINA
-      : pagina < totalPaginas;
-  const hayAnterior = pagina > 1;
-
-  if (!(hayAnterior || haySiguiente)) {
-    return null;
-  }
-
-  return (
-    <nav className="flex items-center justify-between px-2 pt-4 text-sm">
-      {hayAnterior ? (
-        <Link className="brand-page-link" href={`/?pagina=${pagina - 1}`}>
-          ← Anteriores
-        </Link>
-      ) : (
-        <span />
-      )}
-      <span className="text-foreground/70 text-xs">
-        {totalPaginas === null
-          ? `Página ${pagina}`
-          : `Página ${pagina} de ${totalPaginas}`}
-      </span>
-      {haySiguiente ? (
-        <Link className="brand-page-link" href={`/?pagina=${pagina + 1}`}>
-          Más antiguas →
-        </Link>
-      ) : (
-        <span />
-      )}
-    </nav>
   );
 }

@@ -1,5 +1,10 @@
 import { MessagesSquare } from "lucide-react";
 import { Suspense } from "react";
+import {
+  leerPagina,
+  Paginacion,
+  rangoDePagina,
+} from "@/components/navegacion/paginacion";
 import { requerirAdmin } from "@/lib/admin/guard";
 import { crearClienteAdmin } from "@/lib/supabase/admin";
 
@@ -21,8 +26,6 @@ export default function PaginaConversacionesAdmin({
   );
 }
 
-const TAMANO_PAGINA = 50;
-
 async function ListaConversaciones({
   searchParams,
 }: {
@@ -32,10 +35,7 @@ async function ListaConversaciones({
   const admin = crearClienteAdmin();
 
   const parametros = await searchParams;
-  const pagina = Math.max(
-    1,
-    Number.parseInt(parametros.pagina ?? "1", 10) || 1
-  );
+  const pagina = leerPagina(parametros.pagina);
 
   // Cada carga del listado deja su fila (acción list_user_conversations, §8.8):
   // los títulos derivan del primer mensaje del Scout, así que esto es acceso a
@@ -57,7 +57,7 @@ async function ListaConversaciones({
     return <ErrorAuditoria />;
   }
 
-  const inicio = (pagina - 1) * TAMANO_PAGINA;
+  const [desde, hasta] = rangoDePagina(pagina);
   const {
     data: conversaciones,
     count,
@@ -69,7 +69,7 @@ async function ListaConversaciones({
       { count: "exact" }
     )
     .order("updated_at", { ascending: false })
-    .range(inicio, inicio + TAMANO_PAGINA - 1);
+    .range(desde, hasta);
 
   // Un fallo de la consulta no se presenta como "no hay conversaciones": esta
   // es la vista de supervisión, y confundir una caída con vacío deja al admin
@@ -94,17 +94,6 @@ async function ListaConversaciones({
       </p>
     );
   }
-
-  // Si el conteo no viene, no fingimos un total (caería a 1 página y ocultaría
-  // la navegación, dando a entender que no hay más): se ofrece "Siguiente"
-  // mientras la página venga llena.
-  const totalPaginas =
-    count == null ? null : Math.max(1, Math.ceil(count / TAMANO_PAGINA));
-  const hayAnterior = pagina > 1;
-  const haySiguiente =
-    totalPaginas === null
-      ? conversaciones.length === TAMANO_PAGINA
-      : pagina < totalPaginas;
 
   return (
     <div className="space-y-5">
@@ -157,35 +146,15 @@ async function ListaConversaciones({
         })}
       </ul>
 
-      {(hayAnterior || haySiguiente) && (
-        <nav className="flex items-center justify-between pt-2 text-sm">
-          {hayAnterior ? (
-            <a
-              className="brand-page-link"
-              href={`/admin/conversaciones?pagina=${pagina - 1}`}
-            >
-              ← Anterior
-            </a>
-          ) : (
-            <span />
-          )}
-          <span className="text-foreground/70 text-xs">
-            {totalPaginas === null
-              ? `Página ${pagina} · total desconocido`
-              : `Página ${pagina} de ${totalPaginas} · ${count} conversaciones`}
-          </span>
-          {haySiguiente ? (
-            <a
-              className="brand-page-link"
-              href={`/admin/conversaciones?pagina=${pagina + 1}`}
-            >
-              Siguiente →
-            </a>
-          ) : (
-            <span />
-          )}
-        </nav>
-      )}
+      <Paginacion
+        cantidadEnPagina={conversaciones.length}
+        enlaceDeDocumento
+        etiquetas={{ anterior: "← Anterior", siguiente: "Siguiente →" }}
+        etiquetaTotal="conversaciones"
+        href={(destino) => `/admin/conversaciones?pagina=${destino}`}
+        pagina={pagina}
+        total={count}
+      />
     </div>
   );
 }
