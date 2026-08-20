@@ -49,7 +49,7 @@ Media:
 Baja:
 - No hay forma de desarchivar una conversación desde la UI, así que un archivado accidental es definitivo para el usuario.
 - Claves foráneas sin índice de cobertura en `citations.knowledge_document_id` y en los tres `*_message_id`/`conversation_id` de `model_request_events`, las tablas que más crecen. Con el `statement_timeout` de 8 s del rol `authenticated`, un scan secuencial no se vuelve lento: falla.
-- Poda de la plantilla incompleta: 16 componentes de `components/ui` sin ningún consumidor, más `hooks/use-mobile.ts` y `lib/constants.ts`. La Fase 6 decide qué se queda. No hay ningún TODO/FIXME en el código.
+- Poda de la plantilla hecha en `chore/limpieza-plantilla`: se eliminaron 12 componentes de `components/ui` sin consumidor, `hooks/use-mobile.ts`, `lib/constants.ts`, `lib/supabase/client.ts`, los estilos de los editores de artefactos y las dependencias `cmdk`, `sonner` y `@vercel/analytics`. No hay ningún TODO/FIXME en el código.
 - El indexador tiene más caminos donde la fila local y el estado del proveedor pueden divergir (auditoría del 2026-08-01): revertir a un PDF anterior lo salta por sha sin mirar `active`; un fallo tras la subida deja el documento en el store y la fila sin `metadata_synced_at`, y el panel no puede rescatarla porque `0010` exige `last_index_error is null`; el retiro de hermanos filtra por `display_name`, que es texto mutable; y el script fuerza `active = true` sobre documentos que un admin desactivó a propósito, sin dejar auditoría. Conviene un modo `--verify` que compare el store contra `knowledge_documents` en ambas direcciones.
 
 **Pendiente de gestión:**

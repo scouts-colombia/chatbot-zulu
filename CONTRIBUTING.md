@@ -56,16 +56,17 @@ feat(chat): preguntas guiadas con opciones e input libre
 ## Flujo de trabajo
 
 1. **Rama nueva por cambio** desde `master`: `feat/...`, `fix/...`, `docs/...`.
-2. **PR contra `master`**. El CI corre lint (`pnpm check`) y typecheck (`tsc --noEmit`); ambos deben quedar en verde.
+2. **PR contra `master`**. El CI corre lint (`pnpm check`), typecheck (`pnpm typecheck`) y pruebas (`pnpm test`); los tres deben quedar en verde.
 3. **Revisión de Codex**: responde cada comentario indicando el commit que lo corrige (o la razón técnica si no aplica), y resuelve el hilo. Se puede re-invocar con `@codex review`.
 4. **Squash and merge** con título en Conventional Commits. Los mensajes intermedios del PR no van en el squash.
 
 ### Verificación local antes del PR
 
 ```bash
-pnpm check              # lint/format (ultracite/Biome)
-pnpm exec tsc --noEmit  # typecheck
-node scripts/verify-rls.mjs   # si tocaste esquema, políticas o triggers
+pnpm check       # lint/format (ultracite/Biome)
+pnpm typecheck   # TypeScript sin emitir archivos
+pnpm test        # pruebas unitarias y de contrato
+pnpm verify:rls  # si tocaste esquema, políticas o triggers
 ```
 
 `verify-rls.mjs` corre contra el proyecto Supabase real con usuarios efímeros y limpieza automática; debe quedar VERDE completo.
