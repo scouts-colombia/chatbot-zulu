@@ -13,17 +13,28 @@ import {
   llamarModelo,
   type TurnoHistorial,
 } from "@/lib/chat/gemini";
-import { construirFilasEventos } from "@/lib/chat/telemetria";
-import { cargarConfiguracionChat } from "@/lib/configuracion/servidor";
 import {
-  COOKIE_DISPOSITIVO_INVITADO,
-  COOKIE_PREFLIGHT_INVITADO,
-  construirIdentidadInvitada,
-  crearIdDispositivo,
-  type IdentidadInvitada,
-  leerPreparacionPreflightInvitado,
-} from "@/lib/invitados/identidad";
+  ERROR_AUTENTICACION_NO_DISPONIBLE,
+  ERROR_CONSENTIMIENTO_REQUERIDO,
+  ERROR_CONVERSACION_NO_DISPONIBLE,
+  ERROR_INVITADO_NO_DISPONIBLE,
+  ERROR_POLITICA_ACTUALIZADA,
+} from "@/lib/chat/respuestas-error";
+import {
+  type BaseEventoModelo,
+  construirFilasEventos,
+} from "@/lib/chat/telemetria";
+import { cargarConfiguracionChat } from "@/lib/configuracion/servidor";
+import type { IdentidadInvitada } from "@/lib/invitados/identidad";
 import { respuestaRegistroPorLimite } from "@/lib/invitados/limites";
+import {
+  asegurarIdentidadInvitada,
+  leerPreflightPendiente,
+  liberarPreflightInvitado,
+  obtenerOCrearConversacionInvitada,
+  olvidarPreflightInvitado,
+  prepararPreflightInvitado,
+} from "@/lib/invitados/preflight";
 import {
   esVersionPoliticaVigente,
   URL_POLITICA_PRIVACIDAD,
@@ -31,7 +42,6 @@ import {
 } from "@/lib/privacidad";
 import { crearClienteAdmin } from "@/lib/supabase/admin";
 import { crearClienteServidor } from "@/lib/supabase/server";
-import { esUuid } from "@/lib/uuid";
 
 export const maxDuration = 60;
 
@@ -51,44 +61,6 @@ function ahora() {
 }
 
 type ClienteAdmin = ReturnType<typeof crearClienteAdmin>;
-
-async function obtenerIdentidadInvitada(request: Request) {
-  const secret = process.env.GUEST_LIMIT_SECRET ?? "";
-  const cookieStore = await cookies();
-  const cookieActual = cookieStore.get(COOKIE_DISPOSITIVO_INVITADO)?.value;
-  const deviceId = esUuid(cookieActual)
-    ? (cookieActual as string)
-    : crearIdDispositivo();
-
-  if (deviceId !== cookieActual) {
-    cookieStore.set(COOKIE_DISPOSITIVO_INVITADO, deviceId, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      maxAge: 60 * 60 * 24 * 365,
-    });
-  }
-
-  return construirIdentidadInvitada({ request, deviceId, secret });
-}
-
-async function liberarPreflight(
-  admin: ClienteAdmin,
-  preflightId: string | null
-) {
-  if (!preflightId) {
-    return true;
-  }
-  const { error } = await admin.rpc("liberar_preflight_turno_invitado", {
-    p_preflight_id: preflightId,
-  });
-  if (error) {
-    console.error("[chat] No se pudo liberar el preflight invitado:", error);
-    return false;
-  }
-  return true;
-}
 
 async function registrarEventos(
   admin: ClienteAdmin,
@@ -150,6 +122,66 @@ async function descartarRespuestaIncompleta(
   }
 }
 
+type ContextoRespuesta = {
+  admin: ClienteAdmin;
+  conversationId: string;
+  requestId: string;
+  baseEventos: BaseEventoModelo;
+};
+
+/**
+ * Respuesta terminal sin citas: sin documentos activos, bloqueo del proveedor
+ * (D-08), bloqueo emitido por el modelo (§15.1) y JSON inválido tras el
+ * reintento (D-09). Los cuatro caminos persisten y devuelven exactamente lo
+ * mismo —el texto en `content` y en `response_json`, citas vacías y la
+ * metadata que calcula el servidor (D-03)— así que existen una sola vez. Cuatro
+ * copias eran cuatro oportunidades de que un camino guardara algo distinto de
+ * lo que mostró en pantalla.
+ */
+async function responderSinCitas(
+  ctx: ContextoRespuesta,
+  {
+    estado,
+    texto,
+    intentos,
+    safetyBlockSource,
+  }: {
+    estado: RespuestaAsistente["estado"];
+    texto: string;
+    intentos: IntentoModelo[];
+    safetyBlockSource?: MetadataServidor["safetyBlockSource"];
+  }
+) {
+  const asistenteId = await guardarMensajeAsistente(
+    ctx.admin,
+    ctx.conversationId,
+    texto,
+    { estado, respuesta: texto }
+  );
+  await registrarEventos(
+    ctx.admin,
+    { ...ctx.baseEventos, assistantMessageId: asistenteId },
+    intentos,
+    safetyBlockSource ? { safetyBlockSource } : undefined
+  );
+  const respuesta: RespuestaAsistente = {
+    estado,
+    respuesta: texto,
+    citas: [],
+    metadata: metadataDe(
+      intentos,
+      ctx.baseEventos.modelId,
+      ctx.requestId,
+      safetyBlockSource
+    ),
+  };
+  return NextResponse.json({
+    ...respuesta,
+    mensajeId: asistenteId,
+    conversationId: ctx.conversationId,
+  });
+}
+
 function metadataDe(
   intentos: IntentoModelo[],
   modelId: string,
@@ -188,23 +220,17 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser();
   if (esFalloDeVerificacionDeSesion(errorAutenticacion)) {
     console.error("[chat] No se pudo verificar la sesión:", errorAutenticacion);
-    return NextResponse.json(
-      {
-        codigo: "autenticacion_no_disponible",
-        mensaje: "No pudimos verificar tu sesión. Intenta de nuevo.",
-      },
-      { status: 503 }
-    );
+    return NextResponse.json(ERROR_AUTENTICACION_NO_DISPONIBLE, {
+      status: 503,
+    });
   }
 
-  const preflightCookie = cookieStore.get(COOKIE_PREFLIGHT_INVITADO)?.value;
+  const preflightCookie = leerPreflightPendiente(cookieStore);
   let identidadInvitada: IdentidadInvitada | null = null;
   let preflightId: string | null = null;
   const limpiarPreparacionInvitada = async () => {
-    const liberado = await liberarPreflight(admin, preflightId);
-    if (liberado) {
+    if (await liberarPreflightInvitado(admin, preflightId, "[chat]")) {
       preflightId = null;
-      cookieStore.delete(COOKIE_PREFLIGHT_INVITADO);
     }
   };
   const responderLiberandoPreflight = async (
@@ -226,8 +252,8 @@ export async function POST(request: Request) {
   }
 
   const esInvitado = user.is_anonymous === true;
-  if (esInvitado && esUuid(preflightCookie)) {
-    preflightId = preflightCookie as string;
+  if (esInvitado) {
+    preflightId = preflightCookie;
   }
 
   // Estado de cuenta y consentimiento: lógica de API, no RLS (CLAUDE.md).
@@ -285,107 +311,63 @@ export async function POST(request: Request) {
     cuerpo.aceptaPolitica &&
     !versionConsentidaValida
   ) {
-    return responderLiberandoPreflight(
-      {
-        codigo: "politica_actualizada",
-        mensaje:
-          "La política de privacidad cambió. Revisa y acepta la versión vigente antes de enviar.",
-        versionPolitica: VERSION_POLITICA_PRIVACIDAD,
-      },
-      { status: 409 }
-    );
+    return responderLiberandoPreflight(ERROR_POLITICA_ACTUALIZADA, {
+      status: 409,
+    });
   }
   if (
     requiereConsentimiento &&
     !(esInvitado && cuerpo.aceptaPolitica && versionConsentidaValida)
   ) {
-    return responderLiberandoPreflight(
-      {
-        codigo: "consentimiento_requerido",
-        mensaje:
-          "Debes aceptar la política de privacidad vigente antes de usar el chat.",
-      },
-      { status: 403 }
-    );
+    return responderLiberandoPreflight(ERROR_CONSENTIMIENTO_REQUERIDO, {
+      status: 403,
+    });
   }
 
   // Conversación propia y activa (la RLS limita a lo propio).
   if (esInvitado && !identidadInvitada) {
     try {
-      identidadInvitada = await obtenerIdentidadInvitada(request);
+      identidadInvitada = await asegurarIdentidadInvitada(request);
     } catch (error) {
       console.error("[chat] Identidad invitada no disponible:", error);
-      return responderLiberandoPreflight(
-        {
-          codigo: "invitado_no_disponible",
-          mensaje:
-            "El turno de prueba no est\u00e1 disponible en este momento. Intenta de nuevo m\u00e1s tarde.",
-        },
-        { status: 503 }
-      );
+      return responderLiberandoPreflight(ERROR_INVITADO_NO_DISPONIBLE, {
+        status: 503,
+      });
     }
   }
 
   if (esInvitado && !preflightId && identidadInvitada) {
-    const preflight = await admin.rpc("preparar_turno_invitado_v2", {
-      p_device_hash: identidadInvitada.deviceHash,
-      p_environment_hash: identidadInvitada.environmentHash,
-      p_network_hash: identidadInvitada.networkHash,
-    });
-    const preparacion = leerPreparacionPreflightInvitado(preflight.data);
-    if (preflight.error || !preparacion) {
-      if (
-        /limite_invitado|limite_red_invitada/.test(
-          preflight.error?.message ?? ""
-        )
-      ) {
-        return responderLiberandoPreflight(
-          respuestaRegistroPorLimite(preflight.error?.message ?? ""),
-          { status: 429 }
-        );
-      }
-      console.error(
-        "[chat] No se pudo preparar el turno invitado:",
-        preflight.error
-      );
+    const preparacion = await prepararPreflightInvitado(
+      admin,
+      identidadInvitada,
+      "[chat]"
+    );
+    if (preparacion.tipo === "limite") {
       return responderLiberandoPreflight(
-        {
-          codigo: "invitado_no_disponible",
-          mensaje:
-            "El turno de prueba no est\u00e1 disponible en este momento. Intenta de nuevo m\u00e1s tarde.",
-        },
-        { status: 503 }
+        respuestaRegistroPorLimite(preparacion.mensajeError),
+        { status: 429 }
       );
     }
+    if (preparacion.tipo === "no_disponible") {
+      return responderLiberandoPreflight(ERROR_INVITADO_NO_DISPONIBLE, {
+        status: 503,
+      });
+    }
     preflightId = preparacion.preflightId;
-    cookieStore.set(COOKIE_PREFLIGHT_INVITADO, preflightId, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      maxAge: preparacion.ttlSeconds,
-    });
   }
   let conversationId = cuerpo.conversationId;
   if (!conversationId && esInvitado) {
-    const { data: preparada, error: errorPreparada } = await admin.rpc(
-      "obtener_o_crear_conversacion_invitada",
-      { p_user_id: user.id }
+    const preparada = await obtenerOCrearConversacionInvitada(
+      admin,
+      user.id,
+      "[chat]"
     );
-    if (errorPreparada || !preparada) {
-      console.error(
-        "[chat] No se pudo preparar la conversación invitada:",
-        errorPreparada
-      );
-      return responderLiberandoPreflight(
-        {
-          codigo: "conversacion_no_disponible",
-          mensaje: "No pudimos preparar tu conversación. Intenta de nuevo.",
-        },
-        { status: 503 }
-      );
+    if (!preparada) {
+      return responderLiberandoPreflight(ERROR_CONVERSACION_NO_DISPONIBLE, {
+        status: 503,
+      });
     }
-    conversationId = preparada as string;
+    conversationId = preparada;
   }
   if (!conversationId) {
     return responderLiberandoPreflight(
@@ -462,8 +444,10 @@ export async function POST(request: Request) {
     if (errorTurno || !idTurno) {
       await limpiarPreparacionInvitada();
     } else {
+      // La reserva ya consumió el cupo: la cookie no representa nada que
+      // liberar y conservarla haría leer el siguiente turno como pendiente.
       preflightId = null;
-      cookieStore.delete(COOKIE_PREFLIGHT_INVITADO);
+      await olvidarPreflightInvitado();
     }
   } else {
     const turno = await supabase.rpc("insertar_turno_usuario", {
@@ -540,6 +524,12 @@ export async function POST(request: Request) {
       userMessageId: mensajeUsuario.id as string,
       modelId,
     };
+    const contextoRespuesta: ContextoRespuesta = {
+      admin,
+      conversationId,
+      requestId,
+      baseEventos,
+    };
 
     // Store(s) y documentos ACTIVOS. File Search recupera a nivel de store,
     // así que además del nombre del store se construye un metadataFilter por
@@ -564,23 +554,11 @@ export async function POST(request: Request) {
       .join(" OR ");
 
     if (storeNames.length === 0) {
-      const respuesta: RespuestaAsistente = {
+      return responderSinCitas(contextoRespuesta, {
         estado: "error",
-        respuesta:
+        texto:
           "El chat aún no tiene documentos configurados. Contacta a la organización.",
-        citas: [],
-        metadata: metadataDe([], modelId, requestId, "servidor"),
-      };
-      const asistenteId = await guardarMensajeAsistente(
-        admin,
-        conversationId,
-        respuesta.respuesta,
-        { estado: "error", respuesta: respuesta.respuesta }
-      );
-      await registrarEventos(
-        admin,
-        { ...baseEventos, assistantMessageId: asistenteId },
-        [
+        intentos: [
           {
             attemptIndex: 1,
             latencyMs: 0,
@@ -588,12 +566,8 @@ export async function POST(request: Request) {
             errorCode: "sin_documentos_activos",
             groundingDisponible: false,
           },
-        ]
-      );
-      return NextResponse.json({
-        ...respuesta,
-        mensajeId: asistenteId,
-        conversationId,
+        ],
+        safetyBlockSource: "servidor",
       });
     }
 
@@ -636,63 +610,19 @@ export async function POST(request: Request) {
 
     if (resultado.tipo === "bloqueado") {
       // Bloqueo del proveedor: estado seguro de producto, no error (D-08).
-      const respuestaJson = {
+      return responderSinCitas(contextoRespuesta, {
         estado: "bloqueado_por_seguridad",
-        respuesta: MENSAJE_BLOQUEADO,
-      };
-      const asistenteId = await guardarMensajeAsistente(
-        admin,
-        conversationId,
-        MENSAJE_BLOQUEADO,
-        respuestaJson
-      );
-      await registrarEventos(
-        admin,
-        { ...baseEventos, assistantMessageId: asistenteId },
-        resultado.intentos,
-        { safetyBlockSource: "proveedor" }
-      );
-      const respuesta: RespuestaAsistente = {
-        estado: "bloqueado_por_seguridad",
-        respuesta: MENSAJE_BLOQUEADO,
-        citas: [],
-        metadata: metadataDe(
-          resultado.intentos,
-          modelId,
-          requestId,
-          "proveedor"
-        ),
-      };
-      return NextResponse.json({
-        ...respuesta,
-        mensajeId: asistenteId,
-        conversationId,
+        texto: MENSAJE_BLOQUEADO,
+        intentos: resultado.intentos,
+        safetyBlockSource: "proveedor",
       });
     }
 
     if (resultado.tipo === "json_invalido") {
-      const respuestaJson = { estado: "error", respuesta: MENSAJE_ERROR };
-      const asistenteId = await guardarMensajeAsistente(
-        admin,
-        conversationId,
-        MENSAJE_ERROR,
-        respuestaJson
-      );
-      await registrarEventos(
-        admin,
-        { ...baseEventos, assistantMessageId: asistenteId },
-        resultado.intentos
-      );
-      const respuesta: RespuestaAsistente = {
+      return responderSinCitas(contextoRespuesta, {
         estado: "error",
-        respuesta: MENSAJE_ERROR,
-        citas: [],
-        metadata: metadataDe(resultado.intentos, modelId, requestId),
-      };
-      return NextResponse.json({
-        ...respuesta,
-        mensajeId: asistenteId,
-        conversationId,
+        texto: MENSAJE_ERROR,
+        intentos: resultado.intentos,
       });
     }
 
@@ -703,32 +633,11 @@ export async function POST(request: Request) {
     // seguro y breve que el bloqueo del proveedor. No se persiste ni se
     // muestra el texto del modelo (minimización de datos con menores).
     if (modelo.estado === "bloqueado_por_seguridad") {
-      const respuestaJson = {
+      return responderSinCitas(contextoRespuesta, {
         estado: "bloqueado_por_seguridad",
-        respuesta: MENSAJE_BLOQUEADO,
-      };
-      const asistenteId = await guardarMensajeAsistente(
-        admin,
-        conversationId,
-        MENSAJE_BLOQUEADO,
-        respuestaJson
-      );
-      await registrarEventos(
-        admin,
-        { ...baseEventos, assistantMessageId: asistenteId },
-        resultado.intentos,
-        { safetyBlockSource: "modelo" }
-      );
-      const respuesta: RespuestaAsistente = {
-        estado: "bloqueado_por_seguridad",
-        respuesta: MENSAJE_BLOQUEADO,
-        citas: [],
-        metadata: metadataDe(resultado.intentos, modelId, requestId, "modelo"),
-      };
-      return NextResponse.json({
-        ...respuesta,
-        mensajeId: asistenteId,
-        conversationId,
+        texto: MENSAJE_BLOQUEADO,
+        intentos: resultado.intentos,
+        safetyBlockSource: "modelo",
       });
     }
 
