@@ -319,7 +319,7 @@ Regla P0:
 | Citas | Normalizadas desde grounding metadata usando `knowledge_document_id` en `custom_metadata`. |
 | Preguntas guiadas | Opciones 2-4 + input libre. |
 | Control de uso | Límite simple de chat turns por día. |
-| Documentos | 8 manuales iniciales indexados por script o tarea admin simple. |
+| Documentos | Los 6 manuales del corpus confirmado (2026-08-20), indexados por script o tarea admin simple. |
 | Admin | Ver conversaciones de otros usuarios, sin motivo obligatorio y con auditoría automática de cada apertura. |
 | Evaluación RAG | Set inicial de 30 casos. |
 | Logs | Eventos por request, no agregados mutables como única fuente; bloqueo de proveedor y JSON inválido tienen ruta propia. |
@@ -846,11 +846,13 @@ rag_eval_cases (
 
 ### 9.1 Piloto
 
-El piloto usa un único contador de cuota:
+El piloto usa un único contador de cuota, `max_chat_turns_per_user_per_day`.
+Su valor NO vive en el código: está en `app_settings` y se cambia desde el panel
+admin sin desplegar (2026-08-19). La semilla es 30, provisional: se calibra con
+el uso real del piloto.
 
-```txt
-MAX_CHAT_TURNS_PER_USER_PER_DAY = 30
-```
+El tope complementario del turno público es `max_guest_turns_per_person_per_day`
+(semilla 1) más `max_guest_turns_per_network` (semilla 5), en la misma tabla.
 
 Un `chat_turn` es cada mensaje de usuario que inicia el flujo de respuesta del asistente. Esto incluye:
 
@@ -1208,7 +1210,7 @@ El piloto está listo cuando:
 - El JSON inválido tiene retry único y fallback amable.
 - El admin puede listar conversaciones.
 - El admin abre una conversación ajena sin motivo y cada apertura queda auditada sola; si la auditoría falla, no se muestra contenido.
-- Los 8 documentos oficiales iniciales están indexados con `knowledge_document_id` en custom metadata.
+- Los 6 documentos oficiales del corpus confirmado están indexados con `knowledge_document_id` en custom metadata.
 - La normalización de citas recupera ese `knowledge_document_id` desde grounding.
 - Hay al menos 30 casos de evaluación.
 - No se guarda raw provider response por defecto.
