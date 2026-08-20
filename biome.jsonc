@@ -12,11 +12,13 @@
   "files": {
     "includes": [
       "**/*",
-      "!components/ai-elements",
-      "!components/elements",
+      "!.claude",
+      "!.codex",
+      "!.cursor",
       "!components/ui",
       "!lib/utils.ts",
-      "!hooks/use-mobile.ts"
+      "!mcp.json",
+      "!supabase/.temp"
     ]
   },
   "linter": {
