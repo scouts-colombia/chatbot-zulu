@@ -57,11 +57,7 @@ export function FormularioAuth({
       : "respira";
 
   return (
-    <div
-      className="pnpj-fondo relative flex min-h-dvh items-center justify-center overflow-hidden px-4 py-20"
-      data-design-direction="ruta-editorial-glass"
-      data-design-mode="operate"
-    >
+    <div className="pnpj-fondo relative flex min-h-dvh items-center justify-center overflow-hidden px-4 py-20">
       <Link
         className="focus-ring absolute top-4 left-4 rounded-lg px-3 py-2 text-scouts-purple/80 text-sm hover:text-scouts-purple sm:top-6 sm:left-6"
         href="/"

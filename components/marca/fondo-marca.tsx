@@ -8,10 +8,7 @@ export function FondoMarca({
   className?: string;
 }) {
   return (
-    <div
-      className="pnpj-fondo relative min-h-dvh overflow-hidden text-pnpj-tinta"
-      data-design-direction="ruta-editorial-glass"
-    >
+    <div className="pnpj-fondo relative min-h-dvh overflow-hidden text-pnpj-tinta">
       <div className={cn("relative z-10 min-h-dvh w-full", className)}>
         {children}
       </div>
