@@ -5,10 +5,14 @@ import {
   ShieldCheck,
   Users,
 } from "lucide-react";
+import type { Metadata } from "next";
 import { FondoMarca } from "@/components/marca/fondo-marca";
 import { ReauditarNavegacion } from "./reauditar-navegacion";
 
-export const metadata = { title: "Panel admin" };
+export const metadata: Metadata = {
+  title: "Panel de administración",
+  robots: { index: false, follow: false, nocache: true },
+};
 
 /**
  * Invariante del panel: ningún `next/link` dentro de /admin, ni para entrar ni
