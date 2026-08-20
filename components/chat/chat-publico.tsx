@@ -114,11 +114,7 @@ function MarcoChatPublico({
   maxTurnosInvitado?: number;
 }) {
   return (
-    <div
-      className="pnpj-fondo relative flex h-dvh flex-col overflow-hidden text-pnpj-tinta"
-      data-design-direction="ruta-editorial-glass"
-      data-design-mode="operate"
-    >
+    <div className="pnpj-fondo relative flex h-dvh flex-col overflow-hidden text-pnpj-tinta">
       <header className="relative z-10 flex min-h-16 items-center justify-between gap-3 border-scouts-purple/10 border-b px-4 sm:px-6">
         <Link
           className="focus-ring flex min-w-0 items-center gap-2 rounded-lg py-1 text-scouts-purple"

@@ -54,7 +54,7 @@ export function poseParaMensaje(mensaje: MensajeUI): PoseZulu {
     case "error":
       return "error";
     default:
-      if (mensaje.estado || mensaje.sender === "sistema") {
+      if (mensaje.sender === "sistema") {
         return "calma";
       }
       return mensaje.citas.length > 0 ? "citas" : "hallazgo";

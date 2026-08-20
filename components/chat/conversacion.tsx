@@ -3,8 +3,6 @@
 import { ArrowUp, Check } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import Markdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import { cargarMensajesAnteriores } from "@/app/chat/acciones";
 import { ZuluMascota } from "@/components/marca/zulu-mascota";
 import { Button } from "@/components/ui/button";
@@ -16,37 +14,31 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { ETIQUETAS_ESTADO } from "@/lib/chat/contrato";
+import {
+  construirMensajeAsistente,
+  decidirFallo,
+  decidirPreparacionInvitada,
+  decidirTurno,
+  MOTIVOS_REGISTRO,
+  type ResultadoDecision,
+} from "@/lib/chat/decisiones-turno";
 import {
   crearIdTraspasoBorrador,
   eliminarClaveGlobalAnterior,
-  esIdTraspasoBorradorValido,
   guardarBorradorInvitado,
-  limpiarBorradoresPendientesExpirados,
   limpiarBorradorInvitado,
   restaurarBorradorInvitado,
 } from "@/lib/invitados/borrador";
-import {
-  coordinarPreparacionInvitada,
-  ERROR_COORDINACION_INVITADA,
-} from "@/lib/invitados/coordinacion";
+import { coordinarPreparacionInvitada } from "@/lib/invitados/coordinacion";
 import { marcarTurnoInvitadoEnCurso } from "@/lib/invitados/turno-en-curso";
 import { URL_POLITICA_PRIVACIDAD } from "@/lib/privacidad";
+import { Burbuja } from "./burbuja";
 import {
   IndicadorEscribiendo,
   MascotaBienvenidaChat,
-  poseParaMensaje,
   useMovimientoReducido,
 } from "./personalidad-zulu";
 import type { MensajeUI } from "./tipos";
-
-/**
- * Revela texto ya completo y validado con efecto typewriter (D-04).
- * Lo visible se calcula por tiempo transcurrido (no por ticks): así el
- * throttling de pestañas en segundo plano no arrastra la animación y al
- * recuperar el foco el texto se pone al día de inmediato.
- */
-const CARACTERES_POR_SEGUNDO = 220;
 
 function rutaAuthConBorrador(
   ruta: "/login" | "/registro",
@@ -62,150 +54,6 @@ function rutaAuthConBorrador(
   }
   const query = parametros.toString();
   return query ? `${ruta}?${query}` : ruta;
-}
-
-function TextoTypewriter({
-  texto,
-  animar,
-  onTerminado,
-}: {
-  texto: string;
-  animar: boolean;
-  onTerminado: () => void;
-}) {
-  const reducirMovimiento = useMovimientoReducido();
-  const debeAnimar = animar && !reducirMovimiento;
-  const [visible, setVisible] = useState(debeAnimar ? 0 : texto.length);
-  const terminadoRef = useRef(false);
-
-  useEffect(() => {
-    if (!debeAnimar) {
-      setVisible(texto.length);
-      if (animar && !terminadoRef.current) {
-        terminadoRef.current = true;
-        setTimeout(onTerminado, 0);
-      }
-      return;
-    }
-
-    terminadoRef.current = false;
-    setVisible(0);
-    const inicio = Date.now();
-    const intervalo = setInterval(() => {
-      const transcurrido = (Date.now() - inicio) / 1000;
-      const siguiente = Math.min(
-        Math.round(transcurrido * CARACTERES_POR_SEGUNDO),
-        texto.length
-      );
-      setVisible(siguiente);
-      if (siguiente >= texto.length && !terminadoRef.current) {
-        terminadoRef.current = true;
-        clearInterval(intervalo);
-        // Fuera del render: avisa que la animación terminó.
-        setTimeout(onTerminado, 0);
-      }
-    }, 33);
-    return () => clearInterval(intervalo);
-  }, [animar, debeAnimar, texto, onTerminado]);
-
-  return (
-    <div className="prose prose-sm max-w-none">
-      {debeAnimar && <span className="sr-only">{texto}</span>}
-      {/* Sin imágenes Markdown: la respuesta del asistente puede incluir una
-      URL de imagen y cargar recursos de terceros al renderizar. */}
-      <div aria-hidden={debeAnimar}>
-        <Markdown disallowedElements={["img"]} remarkPlugins={[remarkGfm]}>
-          {texto.slice(0, visible)}
-        </Markdown>
-      </div>
-    </div>
-  );
-}
-
-function Burbuja({
-  mensaje,
-  animar,
-  onTerminado,
-  onOpcion,
-  deshabilitado,
-}: {
-  mensaje: MensajeUI;
-  animar: boolean;
-  onTerminado: () => void;
-  onOpcion: (opcion: string) => void;
-  deshabilitado: boolean;
-}) {
-  if (mensaje.sender === "usuario") {
-    return (
-      <div className="message-fade-in flex justify-end">
-        <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-sm bg-scouts-yellow px-4 py-2.5 text-scouts-purple text-sm shadow-md">
-          {mensaje.content}
-        </div>
-      </div>
-    );
-  }
-
-  const etiqueta = mensaje.estado ? ETIQUETAS_ESTADO[mensaje.estado] : null;
-  const mostrarAdjuntos = !animar;
-  const poseZulu = poseParaMensaje(mensaje);
-
-  return (
-    <div className="message-fade-in flex justify-start">
-      <div className="flex w-full items-end gap-2 sm:gap-3">
-        <ZuluMascota
-          className="size-12 sm:size-14"
-          key={`${mensaje.id}-${poseZulu}`}
-          movimiento={animar ? "explora" : "quieto"}
-          pose={poseZulu}
-          sizes="56px"
-        />
-        <div className="max-w-[calc(100%_-_3.5rem)] space-y-2 rounded-2xl rounded-bl-sm border border-white/70 bg-white/92 px-4 py-3 text-scouts-purple text-sm shadow-[var(--shadow-card)] backdrop-blur-md sm:max-w-[85%]">
-          {etiqueta && (
-            <span className="inline-block rounded-full bg-muted px-2 py-0.5 text-muted-foreground text-xs">
-              {etiqueta}
-            </span>
-          )}
-          <TextoTypewriter
-            animar={animar}
-            onTerminado={onTerminado}
-            texto={mensaje.content}
-          />
-          {mostrarAdjuntos && mensaje.citas.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 border-t pt-2">
-              {mensaje.citas.map((cita) => (
-                <span
-                  className="rounded-full bg-secondary px-2 py-0.5 text-secondary-foreground text-xs"
-                  key={`${mensaje.id}-${cita.titulo}-${cita.pagina ?? "sp"}`}
-                >
-                  {cita.titulo}
-                  {cita.pagina ? ` · p. ${cita.pagina}` : ""}
-                </span>
-              ))}
-            </div>
-          )}
-          {mostrarAdjuntos && mensaje.preguntaGuiada && (
-            <div className="space-y-2 border-t pt-2">
-              <p className="font-medium">{mensaje.preguntaGuiada.texto}</p>
-              <div className="flex flex-wrap gap-2">
-                {mensaje.preguntaGuiada.opciones.map((opcion) => (
-                  <Button
-                    disabled={deshabilitado}
-                    key={opcion}
-                    onClick={() => onOpcion(opcion)}
-                    size="sm"
-                    type="button"
-                    variant="outline"
-                  >
-                    {opcion}
-                  </Button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
 }
 
 export function Conversacion({
@@ -255,12 +103,6 @@ export function Conversacion({
   const [versionPoliticaActual, setVersionPoliticaActual] =
     useState(versionPolitica);
   const reducirMovimiento = useMovimientoReducido();
-  useEffect(() => {
-    const purgar = () => limpiarBorradoresPendientesExpirados(localStorage);
-    purgar();
-    const intervalo = window.setInterval(purgar, 60_000);
-    return () => window.clearInterval(intervalo);
-  }, []);
 
   useEffect(() => {
     // Elimina la clave global de versiones anteriores para que un borrador
@@ -279,7 +121,9 @@ export function Conversacion({
   }, [borradorTransferenciaId, conversationIdActual]);
 
   const abrirRegistro = (
-    mensaje: string,
+    // Sin motivo, el diálogo usa MOTIVOS_REGISTRO.turnoUsado: el servidor no
+    // siempre explica por qué cerró el turno de prueba.
+    mensaje: string | undefined,
     texto = borrador,
     conversationIdDestino = conversationIdActual
   ) => {
@@ -302,28 +146,8 @@ export function Conversacion({
     setBorrador(texto);
     setConversationIdTransferencia(conversationIdDestino);
     setTraspasoBorradorId(traspasoId);
-    setMotivoRegistro(mensaje);
+    setMotivoRegistro(mensaje ?? null);
     setMostrarRegistro(true);
-  };
-  const actualizarPoliticaSiCambio = (
-    datos: {
-      codigo?: string;
-      mensaje?: string;
-      versionPolitica?: unknown;
-    } | null
-  ) => {
-    if (datos?.codigo !== "politica_actualizada") {
-      return false;
-    }
-    if (typeof datos.versionPolitica === "string") {
-      setVersionPoliticaActual(datos.versionPolitica);
-    }
-    setAceptaPolitica(false);
-    setAviso(
-      datos.mensaje ??
-        "La política de privacidad cambió. Revísala y vuelve a aceptarla."
-    );
-    return true;
   };
   const mensajesRef = useRef<HTMLDivElement>(null);
   // Cursor del mensaje más antiguo cargado. Un contador se desfasaría en cuanto
@@ -402,22 +226,50 @@ export function Conversacion({
       { id: idLocal, sender: "usuario", content: limpio, citas: [] },
     ]);
 
-    // Si el servidor rechaza el turno, la burbuja optimista se retira y el
-    // texto vuelve al composer para no fingir un mensaje que no existe.
-    const revertir = () => {
-      setMensajes((previos) => previos.filter((m) => m.id !== idLocal));
-      setBorrador(limpio);
-    };
     let conversationIdSolicitud = conversationIdActual;
-    const exigirRegistroTrasEnvio = (
-      mensaje: string,
-      conversationIdDestino?: string
-    ) => {
-      abrirRegistro(
-        mensaje,
-        limpio,
-        conversationIdDestino ?? conversationIdSolicitud
-      );
+
+    /**
+     * Ejecuta la decisión que tomó `lib/chat/decisiones-turno`. Retirar la
+     * burbuja optimista devuelve el texto al composer: no se finge un mensaje
+     * que el servidor no aceptó. Quién continúa y quién corta lo decide el
+     * llamador mirando `decision.tipo`.
+     */
+    const aplicar = ({ decision, revertir }: ResultadoDecision) => {
+      if (revertir) {
+        setMensajes((previos) => previos.filter((m) => m.id !== idLocal));
+        setBorrador(limpio);
+      }
+      switch (decision.tipo) {
+        case "politica_actualizada":
+          if (decision.versionPolitica) {
+            setVersionPoliticaActual(decision.versionPolitica);
+          }
+          setAceptaPolitica(false);
+          setAviso(decision.mensaje);
+          break;
+        case "registro":
+          abrirRegistro(
+            decision.mensaje,
+            limpio,
+            decision.conversationId ?? conversationIdSolicitud
+          );
+          break;
+        case "reintentar_sesion_invitada":
+          setSesionInvitadaLista(false);
+          setAviso(decision.mensaje);
+          break;
+        case "aviso":
+          setAviso(decision.mensaje);
+          break;
+        case "sesion_invitada_lista":
+          conversationIdSolicitud = decision.conversationId;
+          setConversationIdActual(decision.conversationId);
+          setConversationIdTransferencia(decision.conversationId);
+          setSesionInvitadaLista(true);
+          break;
+        default:
+          break;
+      }
     };
 
     let solicitudPrincipalIniciada = false;
@@ -433,33 +285,14 @@ export function Conversacion({
             }),
           })
         );
-        const datosPreparacion = await preparacion.json().catch(() => null);
-        if (!preparacion.ok || !datosPreparacion) {
-          revertir();
-          if (actualizarPoliticaSiCambio(datosPreparacion)) {
-            return;
-          }
-          if (datosPreparacion?.codigo === "registro_requerido") {
-            exigirRegistroTrasEnvio(datosPreparacion.mensaje);
-            return;
-          }
-          setAviso(
-            datosPreparacion?.mensaje ??
-              "No pudimos preparar tu sesión de prueba. Inténtalo de nuevo."
-          );
+        const resultado = decidirPreparacionInvitada(
+          preparacion.ok,
+          await preparacion.json().catch(() => null)
+        );
+        aplicar(resultado);
+        if (resultado.decision.tipo !== "sesion_invitada_lista") {
           return;
         }
-        if (!esIdTraspasoBorradorValido(datosPreparacion.conversationId)) {
-          revertir();
-          setAviso(
-            "No pudimos preparar tu conversación de prueba. Inténtalo de nuevo."
-          );
-          return;
-        }
-        conversationIdSolicitud = datosPreparacion.conversationId;
-        setConversationIdActual(conversationIdSolicitud);
-        setConversationIdTransferencia(conversationIdSolicitud);
-        setSesionInvitadaLista(true);
       }
 
       solicitudPrincipalIniciada = true;
@@ -481,63 +314,23 @@ export function Conversacion({
       // 500 sin cuerpo o un 504 del gateway devuelven HTML, y parsear primero
       // mandaba ese caso al catch, que dice "no hay conexión" cuando sí hubo
       // servidor y el turno ya se consumió.
-      const datos = await respuesta.json().catch(() => null);
-
-      if (!respuesta.ok) {
-        if (esInvitado && datos?.codigo === "turno_invitado_consumido") {
-          setAviso(datos.mensaje);
-          return;
-        }
-        revertir();
-        if (actualizarPoliticaSiCambio(datos)) {
-          return;
-        }
-        if (datos?.codigo === "registro_requerido") {
-          exigirRegistroTrasEnvio(
-            datos.mensaje ??
-              "Crea una cuenta o inicia sesión para continuar usando el chat.",
-            typeof datos.conversationId === "string"
-              ? datos.conversationId
-              : undefined
-          );
-          return;
-        }
-        if (esInvitado && datos?.codigo === "sesion_invitada_requerida") {
-          setSesionInvitadaLista(false);
-          setAviso(
-            "No pudimos establecer tu sesión de prueba. Inténtalo de nuevo."
-          );
-          return;
-        }
-        if (esInvitado && !datos) {
-          exigirRegistroTrasEnvio(
-            "No pudimos confirmar la respuesta de prueba. Crea una cuenta o inicia sesión para continuar sin perder tu pregunta."
-          );
-          return;
-        }
-        setAviso(
-          datos?.mensaje ??
-            "No se pudo enviar el mensaje. Inténtalo de nuevo en un momento."
-        );
+      const resultado = decidirTurno({
+        ok: respuesta.ok,
+        cuerpo: await respuesta.json().catch(() => null),
+        esInvitado,
+      });
+      aplicar(resultado);
+      if (resultado.decision.tipo !== "respuesta") {
         return;
       }
 
-      if (!datos) {
-        revertir();
-        if (esInvitado) {
-          exigirRegistroTrasEnvio(
-            "No pudimos confirmar la respuesta de prueba. Crea una cuenta o inicia sesión para continuar sin perder tu pregunta."
-          );
-          return;
-        }
-        setAviso("No se pudo leer la respuesta. Inténtalo de nuevo.");
-        return;
-      }
-
+      const { cuerpo } = resultado.decision;
       const idConversacionRespuesta =
-        datos.conversationId ?? conversationIdActual;
-      if (datos.conversationId) {
-        setConversationIdActual(datos.conversationId);
+        typeof cuerpo.conversationId === "string"
+          ? cuerpo.conversationId
+          : conversationIdActual;
+      if (typeof cuerpo.conversationId === "string") {
+        setConversationIdActual(cuerpo.conversationId);
       }
       limpiarBorradorInvitado(
         sessionStorage,
@@ -545,44 +338,14 @@ export function Conversacion({
         borradorTransferenciaId,
         localStorage
       );
-      const mensajeAsistente: MensajeUI = {
-        id: datos.mensajeId ?? `asistente-${Date.now()}`,
-        sender: "asistente",
-        content: datos.respuesta,
-        estado: datos.estado === "respondido" ? undefined : datos.estado,
-        citas: (datos.citas ?? []).map(
-          (cita: { documentTitleSnapshot: string; pageNumber?: number }) => ({
-            titulo: cita.documentTitleSnapshot,
-            pagina: cita.pageNumber,
-          })
-        ),
-        preguntaGuiada: datos.preguntaGuiada
-          ? {
-              texto: datos.preguntaGuiada.texto,
-              opciones: datos.preguntaGuiada.opciones,
-            }
-          : undefined,
-      };
+      const mensajeAsistente = construirMensajeAsistente(
+        cuerpo,
+        `asistente-${Date.now()}`
+      );
       setMensajes((previos) => [...previos, mensajeAsistente]);
       setAnimandoId(mensajeAsistente.id);
     } catch (error) {
-      revertir();
-      if (
-        error instanceof Error &&
-        error.message === ERROR_COORDINACION_INVITADA
-      ) {
-        exigirRegistroTrasEnvio(
-          "Tu navegador no permite coordinar de forma segura la prueba entre pestañas. Crea una cuenta o inicia sesión para continuar sin perder tu pregunta."
-        );
-        return;
-      }
-      if (esInvitado && solicitudPrincipalIniciada) {
-        exigirRegistroTrasEnvio(
-          "Se perdió la conexión mientras procesábamos tu pregunta de prueba. Crea una cuenta o inicia sesión para continuar sin perderla."
-        );
-        return;
-      }
-      setAviso("No hay conexión con el servidor. Inténtalo de nuevo.");
+      aplicar(decidirFallo({ error, esInvitado, solicitudPrincipalIniciada }));
     } finally {
       if (esInvitado) {
         marcarTurnoInvitadoEnCurso(false);
@@ -768,9 +531,8 @@ export function Conversacion({
               Continúa con una cuenta
             </DialogTitle>
             <DialogDescription className="text-foreground/70">
-              {motivoRegistro ??
-                "Tu pregunta de prueba ya fue usada. Crea una cuenta o inicia sesión para continuar."}{" "}
-              El texto que acabas de escribir seguirá aquí.
+              {motivoRegistro ?? MOTIVOS_REGISTRO.turnoUsado} El texto que
+              acabas de escribir seguirá aquí.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-3 pt-2 sm:grid-cols-2">

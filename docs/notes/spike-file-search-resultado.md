@@ -37,7 +37,7 @@ customMetadata: [
 ]
 ```
 
-Ambos pares volvieron intactos en `groundingChunks[*].retrievedContext.customMetadata`, como **arreglo** de `{ key, stringValue }`. El acceso correcto (ya documentado en las erratas del pilot-scope):
+Ambos pares volvieron intactos en `groundingChunks[*].retrievedContext.customMetadata`, como **arreglo** de `{ key, stringValue }`. El acceso correcto (ya documentado en §7.1 del pilot-scope):
 
 ```ts
 const docId = chunk.retrievedContext?.customMetadata
@@ -66,4 +66,4 @@ pageNumber       → presente (1, 2, ...) — las citas del piloto tendrán pág
 1. El contrato "modelo devuelve JSON + servidor lee grounding de la misma llamada" es viable tal como está diseñado. Sin rediseño a dos pasadas.
 2. El cruce de citas por `knowledge_document_id` funciona; el fallback `missing_knowledge_document_id` queda como red de seguridad, no como camino esperado.
 3. `scripts/spike-file-search.ts` evoluciona a `scripts/index-knowledge-documents.ts` en Fase 3: la parte de store + upload + customMetadata ya está probada.
-4. Fijar `config.responseJsonSchema` como el parámetro de structured output para `@google/genai` 2.x (resuelve la errata 6 del pilot-scope).
+4. Fijar `config.responseJsonSchema` como el parámetro de structured output para `@google/genai` 2.x (registrado en D-09 del pilot-scope).

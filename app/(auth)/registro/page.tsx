@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { esIdTraspasoBorradorValido } from "@/lib/invitados/borrador";
+import { esFalloDeVerificacionDeSesion } from "@/lib/auth/sesion";
 import { crearClienteServidor } from "@/lib/supabase/server";
+import { esUuid } from "@/lib/uuid";
 import { finalizarRegistro, registrarse } from "../acciones";
 import { FormularioAuth } from "../formulario-auth";
 
@@ -47,10 +48,8 @@ async function ContenidoRegistro({
   }>;
 }) {
   const { borrador, conversacion, error } = await searchParams;
-  const borradorTransferenciaId = esIdTraspasoBorradorValido(borrador)
-    ? borrador
-    : null;
-  const conversationIdTransferencia = esIdTraspasoBorradorValido(conversacion)
+  const borradorTransferenciaId = esUuid(borrador) ? borrador : null;
+  const conversationIdTransferencia = esUuid(conversacion)
     ? conversacion
     : null;
   const supabase = await crearClienteServidor();
@@ -58,8 +57,7 @@ async function ContenidoRegistro({
     data: { user },
     error: errorAutenticacion,
   } = await supabase.auth.getUser();
-  const sesionAusente = errorAutenticacion?.name === "AuthSessionMissingError";
-  if (errorAutenticacion && !sesionAusente) {
+  if (esFalloDeVerificacionDeSesion(errorAutenticacion)) {
     console.error(
       "[registro] No se pudo verificar la sesión:",
       errorAutenticacion

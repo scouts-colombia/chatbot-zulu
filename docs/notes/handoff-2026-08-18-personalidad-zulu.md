@@ -47,7 +47,7 @@ Dar personalidad visible a Zulú sin cambiar el contrato funcional del chat:
 
 ### Documentación de producto
 
-- `PRODUCT.md`, `DESIGN.md` y `.impeccable/surfaces/app-page-tsx.md` ya reconocen al búho como parte aprobada de la identidad.
+- `PRODUCT.md`, `DESIGN.md` y `docs/notes/superficie-chat-publico.md` ya reconocen al búho como parte aprobada de la identidad.
 - Este handoff sustituye los handoffs del 6 y 12 de agosto.
 - `README.md` dejó de describir la plantilla de Vercel y ahora documenta Zulú, su stack y su puesta en marcha.
 
@@ -88,7 +88,7 @@ Dar personalidad visible a Zulú sin cambiar el contrato funcional del chat:
 3. Revisar visualmente escritorio, móvil, viewport corto y `prefers-reduced-motion` con el servidor local existente.
 4. Ejecutar la verificación completa y corregir cualquier hallazgo de formato sin reescribir cambios ajenos.
 5. Crear un commit en español, sin `Co-Authored-By`. No hacer push sin confirmación.
-6. Después de esta entrega, retomar la Fase 5: criterios y runner de evaluación RAG, condicionados por la definición del corpus final.
+6. Después de esta entrega, retomar la Fase 5: criterios y runner de evaluación RAG. (El corpus quedó cerrado en 6 documentos el 2026-08-20, así que ya no los condiciona.)
 
 ## Archivos principales de esta entrega
 

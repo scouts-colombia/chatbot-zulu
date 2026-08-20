@@ -4,7 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { esIdTraspasoBorradorValido } from "@/lib/invitados/borrador";
+import { esFalloDeVerificacionDeSesion } from "@/lib/auth/sesion";
 import { construirHashesSolicitud } from "@/lib/invitados/identidad";
 import { limpiarIdentidadesInvitadasPendientes } from "@/lib/invitados/limpieza";
 import {
@@ -14,6 +14,7 @@ import {
 } from "@/lib/privacidad";
 import { crearClienteAdmin } from "@/lib/supabase/admin";
 import { crearClienteServidor } from "@/lib/supabase/server";
+import { esUuid } from "@/lib/uuid";
 
 export type EstadoFormulario = {
   error: string | null;
@@ -53,7 +54,7 @@ async function obtenerOrigen() {
 
 function obtenerIdBorrador(formData: FormData) {
   const value = formData.get("borrador");
-  return esIdTraspasoBorradorValido(value) ? value : null;
+  return esUuid(value) ? value : null;
 }
 
 function destinoInicio(formData: FormData, aviso?: string) {
@@ -65,7 +66,7 @@ function destinoInicio(formData: FormData, aviso?: string) {
   if (borradorId) {
     parametros.set("borrador", borradorId);
     const conversationId = formData.get("conversacion");
-    if (esIdTraspasoBorradorValido(conversationId)) {
+    if (esUuid(conversationId)) {
       parametros.set("conversacion", conversationId);
     }
   }
@@ -73,23 +74,17 @@ function destinoInicio(formData: FormData, aviso?: string) {
   return query ? `/?${query}` : "/";
 }
 
-function destinoDespuesDeAuth(formData: FormData) {
-  return destinoInicio(formData);
-}
-
 export async function iniciarSesion(
   _estadoPrevio: EstadoFormulario,
   formData: FormData
 ): Promise<EstadoFormulario> {
   const supabase = await crearClienteServidor();
-  const destino = destinoDespuesDeAuth(formData);
+  const destino = destinoInicio(formData);
   const {
     data: { user: usuarioAnterior },
     error: errorUsuarioAnterior,
   } = await supabase.auth.getUser();
-  const sesionAusente =
-    errorUsuarioAnterior?.name === "AuthSessionMissingError";
-  if (errorUsuarioAnterior && !sesionAusente) {
+  if (esFalloDeVerificacionDeSesion(errorUsuarioAnterior)) {
     console.error(
       "[auth] No se pudo verificar la sesión antes de iniciar sesión:",
       errorUsuarioAnterior
@@ -201,7 +196,7 @@ export async function registrarse(
   formData: FormData
 ): Promise<EstadoFormulario> {
   const supabase = await crearClienteServidor();
-  const destino = destinoDespuesDeAuth(formData);
+  const destino = destinoInicio(formData);
 
   const nombre = String(formData.get("nombre") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim();
@@ -218,8 +213,7 @@ export async function registrarse(
     data: { user: usuarioActual },
     error: errorUsuarioActual,
   } = await supabase.auth.getUser();
-  const sesionAusente = errorUsuarioActual?.name === "AuthSessionMissingError";
-  if (errorUsuarioActual && !sesionAusente) {
+  if (esFalloDeVerificacionDeSesion(errorUsuarioActual)) {
     console.error(
       "[auth] No se pudo verificar la sesión antes del registro:",
       errorUsuarioActual
@@ -316,7 +310,7 @@ export async function aceptarPoliticaPrivacidad(formData: FormData) {
     data: { user },
     error: errorUsuario,
   } = await supabase.auth.getUser();
-  if (errorUsuario && errorUsuario.name !== "AuthSessionMissingError") {
+  if (esFalloDeVerificacionDeSesion(errorUsuario)) {
     console.error(
       "[auth] No se pudo verificar la sesión para aceptar la política:",
       errorUsuario
@@ -378,7 +372,7 @@ export async function finalizarRegistro(
     data: { user },
     error: errorUsuario,
   } = await supabase.auth.getUser();
-  if (errorUsuario && errorUsuario.name !== "AuthSessionMissingError") {
+  if (esFalloDeVerificacionDeSesion(errorUsuario)) {
     console.error(
       "[auth] No se pudo verificar la sesión para finalizar el registro:",
       errorUsuario

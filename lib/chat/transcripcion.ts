@@ -1,5 +1,6 @@
 import "server-only";
 import type { MensajeUI } from "@/components/chat/tipos";
+import { estadoConEtiqueta } from "@/lib/chat/contrato";
 import { crearClienteServidor } from "@/lib/supabase/server";
 
 /**
@@ -116,13 +117,13 @@ export async function cargarTramo(
   }
 
   const mensajes: MensajeUI[] = filas.map((fila) => {
-    const estado = (fila.response_json as { estado?: string } | null)?.estado;
+    const estado = (fila.response_json as { estado?: unknown } | null)?.estado;
     const pregunta = (preguntas ?? []).find((p) => p.message_id === fila.id);
     return {
       id: fila.id,
       sender: fila.sender as MensajeUI["sender"],
       content: fila.content,
-      estado: estado === "respondido" ? undefined : estado,
+      estado: estadoConEtiqueta(estado),
       citas: (citas ?? [])
         .filter((cita) => cita.message_id === fila.id)
         .map((cita) => ({

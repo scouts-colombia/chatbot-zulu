@@ -56,16 +56,17 @@ feat(chat): preguntas guiadas con opciones e input libre
 ## Flujo de trabajo
 
 1. **Rama nueva por cambio** desde `master`: `feat/...`, `fix/...`, `docs/...`.
-2. **PR contra `master`**. El CI corre lint (`pnpm check`) y typecheck (`tsc --noEmit`); ambos deben quedar en verde.
+2. **PR contra `master`**. El CI corre lint (`pnpm check`), typecheck (`pnpm typecheck`) y pruebas (`pnpm test`); los tres deben quedar en verde.
 3. **Revisión de Codex**: responde cada comentario indicando el commit que lo corrige (o la razón técnica si no aplica), y resuelve el hilo. Se puede re-invocar con `@codex review`.
 4. **Squash and merge** con título en Conventional Commits. Los mensajes intermedios del PR no van en el squash.
 
 ### Verificación local antes del PR
 
 ```bash
-pnpm check              # lint/format (ultracite/Biome)
-pnpm exec tsc --noEmit  # typecheck
-node scripts/verify-rls.mjs   # si tocaste esquema, políticas o triggers
+pnpm check       # lint/format (ultracite/Biome)
+pnpm typecheck   # TypeScript sin emitir archivos
+pnpm test        # pruebas unitarias y de contrato
+pnpm verify:rls  # si tocaste esquema, políticas o triggers
 ```
 
 `verify-rls.mjs` corre contra el proyecto Supabase real con usuarios efímeros y limpieza automática; debe quedar VERDE completo.
@@ -80,7 +81,7 @@ node scripts/verify-rls.mjs   # si tocaste esquema, políticas o triggers
 
 - La primera línea del commit no debe exceder los 72 caracteres.
 - **Nunca commitear** `.env.local`, llaves (`sb_secret_`, API keys) ni datos reales de Scouts — hay menores de edad; ver `CLAUDE.md` § privacidad.
-- El alcance de build es `docs/pilot-scope-v0.3.1.md` (con sus erratas). La v0.2 es visión, no alcance. No reintroducir lo descartado: NextAuth, streaming del proveedor, RAG manual/pgvector, citas por título, Drizzle como esquema.
+- El alcance de build es `docs/pilot-scope-v0.3.1.md`. La v0.2 es visión, no alcance. No reintroducir lo descartado: NextAuth, streaming del proveedor, RAG manual/pgvector, citas por título, Drizzle como esquema.
 - La secret key de Supabase salta la RLS: solo se usa en servidor y solo para lo que el cliente no debe poder forjar.
 
 ## Estilo de código

@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from "next";
-import { Geist_Mono } from "next/font/google";
 import { InstalarPwa } from "@/components/pwa/instalar-pwa";
 import {
   DESCRIPCION_SITIO,
@@ -75,12 +74,6 @@ export const viewport: Viewport = {
   themeColor: "#4d006e",
 };
 
-const geistMono = Geist_Mono({
-  subsets: ["latin"],
-  display: "swap",
-  variable: "--font-geist-mono",
-});
-
 const datosEstructurados = {
   "@context": "https://schema.org",
   "@type": "WebApplication",
@@ -105,10 +98,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      className={`${futuraStd.variable} ${geistMono.variable}`}
-      lang="es-CO"
-    >
+    <html className={futuraStd.variable} lang="es-CO">
       <body className="antialiased">
         {children}
         <InstalarPwa />

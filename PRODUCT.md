@@ -45,7 +45,7 @@ Zulú responde sobre el marco documental oficial de Scouts Colombia mediante Gem
 
 ## Evidence on Hand
 
-- Alcance operativo: `docs/pilot-scope-v0.3.1.md` y sus erratas.
+- Alcance operativo: `docs/pilot-scope-v0.3.1.md`.
 - Plan y decisiones confirmadas: `ROADMAP.md`.
 - Sistema visual de referencia: `D:/dev/ruta-dnpj/ruta/app/globals.css`, componentes y activos de `D:/dev/ruta-dnpj/ruta/public/brand` y `public/decor`.
 - Activos del búho de Zulú: marca y referencia en `public/images/zulu/`, más la biblioteca de estados transparentes en `public/images/zulu/estados/`. Su catálogo y receta de generación están en `docs/notes/zulu-visual-system.md`.

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { resolverDestinoSeguro } from "@/lib/auth/destino-seguro";
-import { esIdTraspasoBorradorValido } from "@/lib/invitados/borrador";
 import { crearClienteServidor } from "@/lib/supabase/server";
+import { esUuid } from "@/lib/uuid";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -24,9 +24,9 @@ export async function GET(request: Request) {
 
   const errorUrl = new URL("/registro", url.origin);
   errorUrl.searchParams.set("error", "enlace_invalido");
-  if (esIdTraspasoBorradorValido(borrador)) {
+  if (esUuid(borrador)) {
     errorUrl.searchParams.set("borrador", borrador);
-    if (esIdTraspasoBorradorValido(conversationId)) {
+    if (esUuid(conversationId)) {
       errorUrl.searchParams.set("conversacion", conversationId);
     }
   }

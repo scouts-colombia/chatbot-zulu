@@ -1,9 +1,9 @@
+import { esUuid } from "@/lib/uuid";
+
 const BORRADOR_INVITADO_PREFIJO = "zulu:borrador-invitado";
 const BORRADOR_INVITADO_PENDIENTE_PREFIJO = `${BORRADOR_INVITADO_PREFIJO}:pendiente:`;
 const BORRADOR_INVITADO_PENDIENTE_ANTERIOR = `${BORRADOR_INVITADO_PREFIJO}:pendiente`;
 const VIGENCIA_BORRADOR_PENDIENTE_MS = 30 * 60 * 1000;
-const UUID_V4 =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 type AlmacenBorrador = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 type AlmacenBorradorEnumerable = AlmacenBorrador &
@@ -14,10 +14,6 @@ type BorradorPendiente = {
   guardadoEn: number;
   conversationIdDestino?: string;
 };
-
-export function esIdTraspasoBorradorValido(value: unknown): value is string {
-  return typeof value === "string" && UUID_V4.test(value);
-}
 
 export function crearIdTraspasoBorrador() {
   return crypto.randomUUID();
@@ -58,10 +54,10 @@ export function guardarBorradorInvitado({
     return true;
   }
   if (
-    !esIdTraspasoBorradorValido(traspasoId) ||
+    !esUuid(traspasoId) ||
     (conversationIdDestino !== null &&
       conversationIdDestino !== undefined &&
-      !esIdTraspasoBorradorValido(conversationIdDestino))
+      !esUuid(conversationIdDestino))
   ) {
     return false;
   }
@@ -92,7 +88,7 @@ function leerBorradorPendiente(
       typeof datos.guardadoEn === "number" ? ahora - datos.guardadoEn : -1;
     const destinoValido =
       datos.conversationIdDestino === undefined ||
-      esIdTraspasoBorradorValido(datos.conversationIdDestino);
+      esUuid(datos.conversationIdDestino);
     if (
       typeof datos.texto === "string" &&
       datos.texto.length > 0 &&
@@ -130,7 +126,7 @@ export function limpiarBorradoresPendientesExpirados(
 
   for (const clave of claves) {
     const traspasoId = clave.slice(BORRADOR_INVITADO_PENDIENTE_PREFIJO.length);
-    if (!esIdTraspasoBorradorValido(traspasoId)) {
+    if (!esUuid(traspasoId)) {
       almacen.removeItem(clave);
       continue;
     }
@@ -158,7 +154,7 @@ export function restaurarBorradorInvitado({
   }
 
   const clave = claveBorradorInvitado(conversationId);
-  if (esIdTraspasoBorradorValido(traspasoId)) {
+  if (esUuid(traspasoId)) {
     const pendiente = leerBorradorPendiente(
       almacenPendiente,
       traspasoId,
@@ -187,7 +183,7 @@ export function limpiarBorradorInvitado(
   if (conversationId) {
     almacen.removeItem(claveBorradorInvitado(conversationId));
   }
-  if (esIdTraspasoBorradorValido(traspasoId)) {
+  if (esUuid(traspasoId)) {
     almacenPendiente.removeItem(claveBorradorPendiente(traspasoId));
   }
 }

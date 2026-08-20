@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { requerirAdmin } from "@/lib/admin/guard";
-import { ETIQUETAS_ESTADO } from "@/lib/chat/contrato";
+import { ETIQUETAS_ESTADO, estadoConEtiqueta } from "@/lib/chat/contrato";
 import { crearClienteAdmin } from "@/lib/supabase/admin";
 
 /**
@@ -225,8 +225,9 @@ async function DetalleConversacion({
             (pregunta) => pregunta.message_id === mensaje.id
           );
           // Misma etiqueta que vio el Scout; `respondido` no lleva ninguna.
-          const estado = (mensaje.response_json as { estado?: string } | null)
-            ?.estado;
+          const estado = estadoConEtiqueta(
+            (mensaje.response_json as { estado?: unknown } | null)?.estado
+          );
           const etiquetaEstado = estado ? ETIQUETAS_ESTADO[estado] : null;
           return (
             <div

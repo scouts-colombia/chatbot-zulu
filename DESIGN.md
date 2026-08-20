@@ -18,7 +18,8 @@ mantener la misma sensación en chat, autenticación y administración.
 ## Tipografía
 
 - Interfaz y titulares: Futura Std local, pesos 300–700.
-- Datos técnicos o monoespaciados: Geist Mono.
+- Datos técnicos o monoespaciados: la pila monoespaciada del sistema. No se
+  carga una fuente web para esto mientras ninguna pantalla la use.
 - Titulares compactos, con tracking negativo moderado; el cuerpo conserva una
   altura de línea cómoda y nunca baja de 12 px.
 

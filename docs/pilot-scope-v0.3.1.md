@@ -1,27 +1,17 @@
 # Alcance del piloto: Chat con Documentos para Scouts
 
 > **FUENTE DE VERDAD del alcance.** Construir solo contra este documento. La v0.2 es SRS/norte; v0.3 y v0.1 son historia (`docs/archive/`).
-
-> ## Erratas y decisiones (2026-06-02)
 >
-> Decisiones tomadas después de publicar v0.3.1. Prevalecen sobre el cuerpo del documento donde haya conflicto.
->
-> 1. **Auth: Supabase Auth.** Se elimina NextAuth de la plantilla. El modelo de datos (`profiles.id references auth.users(id)`, RLS por `auth.uid()`) ya asumía esto. El camino del chat usa un cliente Supabase con el JWT del usuario; la service role salta la RLS y se reserva para auditoría admin, caché de consentimiento y el script de indexación.
-> 2. **Streaming (D-04, P-RNF-02): sin streaming del proveedor.** La UI revela la respuesta final con efecto typewriter: animación local sobre texto ya completo, validado y confirmado. No se anima JSON parcial ni se muestra contenido antes de validar `estado` y citas.
-> 3. **`customMetadata` es un arreglo, no un objeto.** El grounding devuelve `retrievedContext.customMetadata` como lista de pares `{ key, stringValue | numericValue }`. El acceso correcto es `customMetadata.find(m => m.key === "knowledge_document_id")?.stringValue`, no `customMetadata.knowledge_document_id`. Corrige D-07 paso 3, §6.2 y §7.1.
-> 4. **Gemini Developer API, no Vertex AI.** `customMetadata` en el grounding no está soportado en Vertex AI. File Search se usa por la Gemini Developer API.
-> 5. **Modelo:** `gemini-3.5-flash` como default firme (documentado con File Search + structured output, en Preview), validando disponibilidad de cuenta/región y versión del SDK.
-> 6. **Nombre del parámetro de schema (D-09):** no fijar `responseSchema`; usar el parámetro de structured output del SDK concreto (`response_format` / `responseFormat` / `generationConfig.responseFormat.text.schema`).
-> 7. **Acceso admin sin motivo obligatorio (2026-07-17).** El administrador abre conversaciones ajenas directamente, sin registrar motivo y sin ventana de acceso. Cada apertura se registra automáticamente en `admin_audit_events` como log silencioso (`view_user_conversation`, fail-closed: sin registro no se muestra contenido). Deroga P-RF-16 y el formulario de motivo de §12; P-RF-17 (todo acceso auditado) se mantiene vía registro automático. Ajusta la fila "Admin" de §2.1, el Definition of Done (§18) y el checklist (§19) donde exigen motivo.
-> 8. **Turno público antes del registro (2026-08-07, ajustado 2026-08-18).** La portada muestra directamente el chat y permite una cuota diaria configurable de preguntas de prueba antes de exigir registro o inicio de sesión; el valor inicial sigue siendo un turno. La identidad anónima de Supabase es un mecanismo interno: el visitante acepta la política antes de enviar, el límite se aplica por identidad seudónima con un tope diario complementario por red y no se almacenan IP ni user-agent crudos. Al superar la cuota se conserva el borrador y se presenta la puerta de autenticación; al convertir la sesión o iniciar sesión con una cuenta existente se conserva la conversación. Los turnos de prueba no reducen la cuota diaria de la cuenta permanente. Esta decisión amplía la superficie de autenticación de §2.1 y la secuencia de la Definition of Done (§18), que ahora comienza con estos turnos públicos opcionales.
-> 9. **Modelo operativo (2026-08-19):** `gemini-3.7-flash` reemplaza a `gemini-3.5-flash` como valor inicial y deja sin efecto la errata 5 y cualquier referencia posterior a 3.5 como decisión vigente. Es GA, admite File Search, salida estructurada y niveles de razonamiento configurables; Zulú inicia en `low`. La validación del SDK y del proyecto está en `docs/notes/smoke-gemini-3.7-flash.md`, sin reescribir la evidencia histórica del spike de 3.5.
->
-> Resultado empírico y criterios verificados: `docs/notes/spike-file-search-resultado.md` y `ROADMAP.md` (Fase 1).
+> Las decisiones tomadas después de publicar la v0.3.1 están integradas en el
+> cuerpo, no en un anexo de erratas: si una sección dice algo, eso es lo vigente.
+> Las fechas de cada decisión quedan anotadas donde aplican. Resultado empírico y
+> criterios verificados: `docs/notes/spike-file-search-resultado.md`,
+> `docs/notes/smoke-gemini-3.7-flash.md` y `ROADMAP.md` (Fase 1).
 
 **Versión:** 0.3.1-piloto  
 **Fecha:** 2026-06-01  
 **Tipo de documento:** Alcance ejecutable derivado del SRS v0.2  
-**Estado:** Listo para guiar implementación inicial, con afinaciones previas a código  
+**Estado:** Vigente. Incorpora las decisiones tomadas entre 2026-06-02 y 2026-08-19  
 **Documento padre:** Especificación ajustada v0.2  
 **Decisión central:** La v0.2 queda como SRS/norte del producto. Esta v0.3.1 define el piloto construible y corrige los últimos puntos técnicos antes de iniciar código.
 
@@ -63,6 +53,20 @@ Y difiere lo que no bloquea el piloto:
 
 ## 1. Decisiones incorporadas desde la revisión
 
+### D-00. Autenticación con Supabase Auth (2026-06-02)
+
+El piloto usa **Supabase Auth**; NextAuth se elimina de la plantilla base. El
+modelo de datos ya lo asumía: `profiles.id references auth.users(id)` y RLS por
+`auth.uid()`.
+
+El camino del chat usa un cliente Supabase con el JWT del usuario, así que la RLS
+aplica. La secret key (service role) SALTA la RLS y se reserva para lo que el
+cliente no debe poder forjar: mensajes del asistente y del sistema, citas,
+preguntas guiadas, `model_request_events`, auditoría admin, caché de
+consentimiento e indexación.
+
+---
+
 ### D-01. File Search administrado, no RAG manual
 
 El piloto usa **Gemini File Search** como herramienta administrada. Por tanto, el servidor **no ensambla chunks manualmente** ni envuelve contexto recuperado con delimitadores como:
@@ -81,6 +85,10 @@ Ese patrón corresponde a un RAG hecho a mano, donde la aplicación recupera chu
 - configuración de File Search con el store correspondiente.
 
 Gemini ejecuta la recuperación internamente y devuelve metadata de grounding cuando corresponde.
+
+File Search se consume por la **Gemini Developer API, no por Vertex AI**: el
+`customMetadata` del grounding no está soportado en Vertex, y sin él no hay cruce
+exacto cita-documento (D-07).
 
 **Consecuencia:** se eliminan o reemplazan las secciones de la v0.2 que tratan el contexto recuperado como si lo ensamblara la aplicación.
 
@@ -151,6 +159,10 @@ Para reducir complejidad, el piloto usa:
 
 **Salida estructurada sin streaming + indicador visual de “escribiendo”.**
 
+La UI revela la respuesta final con efecto **typewriter**: animación local sobre
+texto YA completo, validado y confirmado por el servidor. No se anima JSON
+parcial ni se muestra contenido antes de validar `estado` y citas.
+
 Motivo: el streaming de JSON estructurado es viable técnicamente, pero obliga a parsear JSON parcial o diseñar un canal doble: texto incremental por un lado y metadata/citas al final por otro. Para el piloto, eso no compensa.
 
 El SRS puede conservar streaming como P1. El piloto debe priorizar:
@@ -199,7 +211,13 @@ document_version = <version del documento>
 sha256 = <hash del PDF>
 ```
 
-3. Al normalizar el grounding, el backend lee `retrievedContext.customMetadata.knowledge_document_id`.
+3. Al normalizar el grounding, el backend lee el `knowledge_document_id` de
+   `retrievedContext.customMetadata`, que vuelve como **arreglo de pares**
+   `{ key, stringValue | numericValue }`, no como objeto plano:
+
+   ```ts
+   customMetadata?.find((m) => m.key === "knowledge_document_id")?.stringValue
+   ```
 4. El join con `knowledge_documents` se hace por ese UUID.
 5. `retrievedContext.title` se usa como snapshot visible y para diagnóstico, no como llave de negocio.
 
@@ -224,7 +242,10 @@ Esto importa especialmente porque el piloto contempla usuarios menores de edad.
 
 ### D-09. Ruta de fallo para JSON inválido
 
-Aunque `responseSchema` reduce el riesgo, el backend no debe asumir que la salida siempre será parseable.
+El parámetro de salida estructurada depende del SDK; en `@google/genai` 2.x es
+`config.responseJsonSchema` junto con `responseMimeType: "application/json"`
+(verificado en el spike). Aunque el schema reduce el riesgo, el backend no debe
+asumir que la salida siempre será parseable.
 
 Regla P0:
 
@@ -286,6 +307,7 @@ Regla P0:
 
 | Área | Incluido en piloto |
 |---|---|
+| Turno público | La portada muestra el chat y permite una cuota diaria configurable de preguntas de prueba antes de exigir cuenta (2026-08-07, ajustada 2026-08-18). |
 | Autenticación | Registro/login por correo. |
 | Roles | Scout y Administrador. |
 | Estado de cuenta | `activo`, `pendiente_autorizacion`, `bloqueado`. |
@@ -297,12 +319,31 @@ Regla P0:
 | Citas | Normalizadas desde grounding metadata usando `knowledge_document_id` en `custom_metadata`. |
 | Preguntas guiadas | Opciones 2-4 + input libre. |
 | Control de uso | Límite simple de chat turns por día. |
-| Documentos | 8 manuales iniciales indexados por script o tarea admin simple. |
-| Admin | Ver conversaciones con motivo obligatorio y auditoría. |
+| Documentos | Los 6 manuales del corpus confirmado (2026-08-20), indexados por script o tarea admin simple. |
+| Admin | Ver conversaciones de otros usuarios, sin motivo obligatorio y con auditoría automática de cada apertura. |
 | Evaluación RAG | Set inicial de 30 casos. |
 | Logs | Eventos por request, no agregados mutables como única fuente; bloqueo de proveedor y JSON inválido tienen ruta propia. |
 | Privacidad | No raw response por defecto. |
 | Seguridad | RLS, roles protegidos, secretos solo servidor. |
+
+---
+
+#### Turno público antes del registro (2026-08-07, ajustado 2026-08-18)
+
+La portada no es una landing: muestra directamente el chat y permite una cuota
+diaria configurable de preguntas de prueba antes de exigir registro o inicio de
+sesión. El valor inicial es un turno.
+
+La identidad anónima de Supabase es un mecanismo interno, no una cuenta:
+
+- El visitante acepta la política de privacidad **antes** de enviar.
+- El límite se aplica por identidad seudónima, con un tope diario complementario
+  por red. No se almacenan IP ni user-agent crudos, solo hashes HMAC.
+- Al superar la cuota se conserva el borrador escrito y se presenta la puerta de
+  autenticación.
+- Al convertir la sesión o iniciar sesión con una cuenta existente se conserva la
+  conversación.
+- Los turnos de prueba **no** reducen la cuota diaria de la cuenta permanente.
 
 ---
 
@@ -370,7 +411,7 @@ Regla P0:
 | P-RF-13 | El asistente puede incluir pregunta guiada con 2-4 opciones e input libre. | P0 |
 | P-RF-14 | El sistema aplica un límite simple de `chat_turns` por usuario por día; una opción guiada cuenta como mensaje normal. | P0 |
 | P-RF-15 | El administrador puede ver lista de conversaciones de usuarios. | P0 |
-| P-RF-16 | Para abrir una conversación ajena, el administrador debe registrar un motivo. | P0 |
+| P-RF-16 | El administrador abre una conversación ajena directamente, sin motivo ni ventana de acceso; la apertura queda auditada sola (2026-07-17). | P0 |
 | P-RF-17 | Todo acceso administrativo a conversación queda auditado. | P0 |
 | P-RF-18 | El sistema registra un evento por cada request al modelo. | P0 |
 | P-RF-19 | El sistema permite listar documentos de conocimiento activos. | P0 |
@@ -457,8 +498,9 @@ type RespuestaAsistente = {
 };
 
 type CitaNormalizada = {
-  // Debe venir de retrievedContext.customMetadata.knowledge_document_id
-  // para documentos indexados por el script del piloto.
+  // Debe venir del par knowledge_document_id dentro del arreglo
+  // retrievedContext.customMetadata, para documentos indexados por el script
+  // del piloto.
   knowledgeDocumentId?: string;
   documentTitleSnapshot: string;
   documentVersionSnapshot?: string;
@@ -491,10 +533,11 @@ type MetadataServidor = {
 
 Las citas se obtienen del `groundingMetadata` devuelto por Gemini File Search. Para el piloto, el cruce exacto con la base de datos depende de la metadata propia adjuntada al indexar.
 
-Mapeo esperado por chunk:
+Mapeo esperado por chunk. `customMetadata` es un arreglo de pares
+`{ key, stringValue | numericValue }`, así que cada valor se busca por `key`:
 
-- `retrievedContext.customMetadata["knowledge_document_id"]` → `knowledgeDocumentId`
-- `retrievedContext.customMetadata["document_version"]` → fallback de `documentVersionSnapshot`
+- `customMetadata.find(m => m.key === "knowledge_document_id")?.stringValue` → `knowledgeDocumentId`
+- `customMetadata.find(m => m.key === "document_version")?.stringValue` → fallback de `documentVersionSnapshot`
 - `retrievedContext.title` → `documentTitleSnapshot`
 - `retrievedContext.pageNumber` → `pageNumber`
 - `retrievedContext.text` → `fragment`
@@ -803,11 +846,13 @@ rag_eval_cases (
 
 ### 9.1 Piloto
 
-El piloto usa un único contador de cuota:
+El piloto usa un único contador de cuota, `max_chat_turns_per_user_per_day`.
+Su valor NO vive en el código: está en `app_settings` y se cambia desde el panel
+admin sin desplegar (2026-08-19). La semilla es 30, provisional: se calibra con
+el uso real del piloto.
 
-```txt
-MAX_CHAT_TURNS_PER_USER_PER_DAY = 30
-```
+El tope complementario del turno público es `max_guest_turns_per_person_per_day`
+(semilla 1) más `max_guest_turns_per_network` (semilla 5), en la misma tabla.
 
 Un `chat_turn` es cada mensaje de usuario que inicia el flujo de respuesta del asistente. Esto incluye:
 
@@ -927,19 +972,27 @@ sequenceDiagram
     participant API as Admin API
     participant DB as Supabase
 
-    Admin->>UI: Selecciona conversacion de usuario
-    UI->>Admin: Solicita motivo obligatorio
-    Admin->>UI: Escribe motivo
-    UI->>API: GET conversacion + motivo
+    Admin->>UI: Abre conversacion de usuario
+    UI->>API: GET conversacion
     API->>DB: Verifica rol admin
     API->>DB: Guarda admin_audit_event
-    API->>DB: Lee conversacion y mensajes
-    API-->>UI: Conversacion
+    alt No se pudo registrar la auditoria
+        API-->>UI: Sin contenido (fail-closed)
+    else Auditoria confirmada
+        API->>DB: Lee conversacion y mensajes
+        API-->>UI: Conversacion
+    end
 ```
 
-Reglas:
+Reglas (2026-07-17):
 
-- Sin motivo, no hay acceso.
+- El admin abre a libre albedrío: **no** hay formulario de motivo ni ventana de
+  acceso. La fricción no protegía a nadie y sí empujaba a motivos inventados.
+- Cada apertura se registra automáticamente en `admin_audit_events` como log
+  silencioso (`view_user_conversation`).
+- **Fail-closed:** si el registro de auditoría falla, no se muestra el contenido.
+- El acceso a datos ajenos NO va por RLS, sino por páginas de servidor que
+  verifican rol admin. Nunca se le da al admin lectura amplia por RLS.
 - Todo acceso deja evento.
 - Los eventos de auditoría no deben ser editables desde la UI.
 - La auditoría debe poder revisarse posteriormente.
@@ -1083,7 +1136,7 @@ Antes de automatizar banderas o escalamiento se debe definir:
 - Un Scout no puede leer `admin_audit_events`.
 - Un Scout no puede modificar `knowledge_documents`.
 - Un usuario no puede cambiar su propio `role`.
-- Un admin puede leer conversaciones de otros usuarios solo a través de endpoint que exige motivo y registra auditoría.
+- Un admin puede leer conversaciones de otros usuarios solo a través de páginas de servidor que verifican su rol y registran la auditoría antes de mostrar contenido.
 - Las rutas admin verifican rol en servidor, no solo en frontend.
 
 ### 16.2 Service role
@@ -1102,7 +1155,11 @@ La service role de Supabase no se expone al cliente.
 - RLS inicial.
 - Script de indexación de documentos con `custom_metadata.knowledge_document_id`.
 - Prueba File Search + structured output + grounding metadata + recuperación de custom metadata.
-- Decisión final de modelo (`gemini-3.5-flash` salvo impedimento).
+- Decisión final de modelo: `gemini-3.7-flash` (2026-08-19). Es GA, admite
+  File Search, salida estructurada y niveles de razonamiento configurables;
+  Zulú arranca en `low`. El valor vive en `app_settings` y se cambia desde el
+  panel admin sin desplegar. Validación en `docs/notes/smoke-gemini-3.7-flash.md`;
+  la evidencia histórica del spike de `gemini-3.5-flash` no se reescribe.
 
 ### Semana 2: Chat usable
 
@@ -1120,8 +1177,8 @@ La service role de Supabase no se expone al cliente.
 - Límite simple diario.
 - Eventos por request.
 - Panel admin básico.
-- Motivo obligatorio para ver conversación ajena.
-- Auditoría admin.
+- Acceso directo a conversación ajena, sin motivo (2026-07-17).
+- Auditoría admin automática y fail-closed.
 - Consentimiento/política versionada con evento append-only.
 - Estados de cuenta.
 
@@ -1141,6 +1198,7 @@ La service role de Supabase no se expone al cliente.
 
 El piloto está listo cuando:
 
+- Un visitante puede aceptar la política, hacer su cuota de preguntas de prueba en la portada y conservar el borrador y la conversación al crear cuenta o iniciar sesión.
 - Un Scout puede registrarse, aceptar política y crear conversación.
 - Un Scout puede preguntar sobre manuales y recibir respuesta final estructurada.
 - Una respuesta fundamentada muestra citas reales cuando File Search las devuelve.
@@ -1151,9 +1209,8 @@ El piloto está listo cuando:
 - El bloqueo de seguridad del proveedor se convierte en respuesta segura, no en error genérico.
 - El JSON inválido tiene retry único y fallback amable.
 - El admin puede listar conversaciones.
-- El admin solo puede abrir conversación ajena registrando motivo.
-- Cada acceso admin queda auditado.
-- Los 8 documentos oficiales iniciales están indexados con `knowledge_document_id` en custom metadata.
+- El admin abre una conversación ajena sin motivo y cada apertura queda auditada sola; si la auditoría falla, no se muestra contenido.
+- Los 6 documentos oficiales del corpus confirmado están indexados con `knowledge_document_id` en custom metadata.
 - La normalización de citas recupera ese `knowledge_document_id` desde grounding.
 - Hay al menos 30 casos de evaluación.
 - No se guarda raw provider response por defecto.
@@ -1171,7 +1228,7 @@ El piloto está listo cuando:
 - [ ] RLS activada en tablas sensibles.
 - [ ] Usuario normal no puede leer conversaciones ajenas.
 - [ ] Usuario normal no puede cambiar rol.
-- [ ] Admin requiere motivo para conversación ajena.
+- [ ] Cada apertura de conversación ajena deja fila en `admin_audit_events` y sin esa fila no se muestra contenido.
 - [ ] Auditoría admin registra evento.
 - [ ] Script de indexación probado.
 - [ ] Documentos con versión definida.

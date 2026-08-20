@@ -4,11 +4,12 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import { Conversacion } from "@/components/chat/conversacion";
+import { LimpiezaBorradoresPendientes } from "@/components/chat/limpieza-borradores-pendientes";
 import { FondoMarca } from "@/components/marca/fondo-marca";
 import { ZuluMascota } from "@/components/marca/zulu-mascota";
 import { cargarTramo } from "@/lib/chat/transcripcion";
-import { esIdTraspasoBorradorValido } from "@/lib/invitados/borrador";
 import { crearClienteServidor } from "@/lib/supabase/server";
+import { esUuid } from "@/lib/uuid";
 
 export const metadata: Metadata = {
   title: "Conversación",
@@ -44,9 +45,7 @@ async function ContenidoConversacion({
   searchParams: Promise<{ borrador?: string }>;
 }) {
   const [{ id }, { borrador }] = await Promise.all([params, searchParams]);
-  const borradorTransferenciaId = esIdTraspasoBorradorValido(borrador)
-    ? borrador
-    : null;
+  const borradorTransferenciaId = esUuid(borrador) ? borrador : null;
   const supabase = await crearClienteServidor();
 
   const {
@@ -135,6 +134,7 @@ async function ContenidoConversacion({
             </span>
           )}
         </header>
+        <LimpiezaBorradoresPendientes />
         <div className="min-h-0 flex-1">
           <Conversacion
             archivada={conversacion.archived}

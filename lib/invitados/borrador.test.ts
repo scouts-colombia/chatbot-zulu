@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   claveBorradorInvitado,
-  esIdTraspasoBorradorValido,
   guardarBorradorInvitado,
   limpiarBorradoresPendientesExpirados,
   restaurarBorradorInvitado,
@@ -201,11 +200,5 @@ describe("borrador invitado", () => {
       }),
       "Pregunta vigente"
     );
-  });
-
-  it("valida identificadores opacos de traspaso", () => {
-    assert.equal(esIdTraspasoBorradorValido(TRASPASO), true);
-    assert.equal(esIdTraspasoBorradorValido("../../../otro"), false);
-    assert.equal(esIdTraspasoBorradorValido(null), false);
   });
 });
