@@ -18,7 +18,6 @@ import {
   ERROR_CONSENTIMIENTO_REQUERIDO,
   ERROR_CONVERSACION_NO_DISPONIBLE,
   ERROR_INVITADO_NO_DISPONIBLE,
-  ERROR_POLITICA_ACTUALIZADA,
 } from "@/lib/chat/respuestas-error";
 import {
   type BaseEventoModelo,
@@ -35,11 +34,7 @@ import {
   olvidarPreflightInvitado,
   prepararPreflightInvitado,
 } from "@/lib/invitados/preflight";
-import {
-  esVersionPoliticaVigente,
-  URL_POLITICA_PRIVACIDAD,
-  VERSION_POLITICA_PRIVACIDAD,
-} from "@/lib/privacidad";
+import { URL_POLITICA_PRIVACIDAD } from "@/lib/privacidad";
 import { crearClienteAdmin } from "@/lib/supabase/admin";
 import { crearClienteServidor } from "@/lib/supabase/server";
 
@@ -49,7 +44,6 @@ const CuerpoSchema = z.object({
   conversationId: z.string().uuid().optional(),
   mensaje: z.string().trim().min(1).max(2000),
   aceptaPolitica: z.boolean().optional(),
-  versionPoliticaAceptada: z.string().min(1).max(200).optional(),
 });
 
 const MENSAJE_BLOQUEADO =
@@ -259,7 +253,7 @@ export async function POST(request: Request) {
   // Estado de cuenta y consentimiento: lógica de API, no RLS (CLAUDE.md).
   const { data: perfil, error: errorPerfil } = await supabase
     .from("profiles")
-    .select("account_status, privacy_policy_version_accepted")
+    .select("account_status, privacy_policy_accepted_at")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -297,29 +291,9 @@ export async function POST(request: Request) {
     );
   }
 
-  // Gate de consentimiento (P-RF-04), activo: la política canónica es el
-  // Acuerdo CSN 369 y es el valor por defecto, así que una cuenta sin
-  // aceptación registrada no puede usar el chat. PRIVACY_POLICY_VERSION solo
-  // hace falta para apuntar a una revisión posterior.
-  const requiereConsentimiento =
-    perfil.privacy_policy_version_accepted !== VERSION_POLITICA_PRIVACIDAD;
-  const versionConsentidaValida = esVersionPoliticaVigente(
-    cuerpo.versionPoliticaAceptada
-  );
-  if (
-    requiereConsentimiento &&
-    esInvitado &&
-    cuerpo.aceptaPolitica &&
-    !versionConsentidaValida
-  ) {
-    return responderLiberandoPreflight(ERROR_POLITICA_ACTUALIZADA, {
-      status: 409,
-    });
-  }
-  if (
-    requiereConsentimiento &&
-    !(esInvitado && cuerpo.aceptaPolitica && versionConsentidaValida)
-  ) {
+  // Gate de consentimiento (P-RF-04): basta con haber aceptado una vez.
+  const requiereConsentimiento = perfil.privacy_policy_accepted_at == null;
+  if (requiereConsentimiento && !(esInvitado && cuerpo.aceptaPolitica)) {
     return responderLiberandoPreflight(ERROR_CONSENTIMIENTO_REQUERIDO, {
       status: 403,
     });
@@ -436,7 +410,6 @@ export async function POST(request: Request) {
       p_device_hash: identidadInvitada.deviceHash,
       p_environment_hash: identidadInvitada.environmentHash,
       p_network_hash: identidadInvitada.networkHash,
-      p_policy_version: VERSION_POLITICA_PRIVACIDAD,
       p_policy_url: URL_POLITICA_PRIVACIDAD,
       p_user_agent_hash: identidadInvitada.userAgentHash,
     });

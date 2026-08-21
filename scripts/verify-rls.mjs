@@ -227,7 +227,6 @@ try {
   const consentForged = await asA("POST", "consent_acceptance_events", {
     subject_user_id: idA,
     policy_type: "privacy_policy",
-    policy_version: "v99-falsa",
   });
   check(
     "A NO inserta consent_acceptance_events directo",

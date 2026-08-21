@@ -19,10 +19,7 @@ import {
 } from "@/components/navegacion/paginacion";
 import { Button } from "@/components/ui/button";
 import { esFalloDeVerificacionDeSesion } from "@/lib/auth/sesion";
-import {
-  URL_POLITICA_PRIVACIDAD,
-  VERSION_POLITICA_PRIVACIDAD,
-} from "@/lib/privacidad";
+import { URL_POLITICA_PRIVACIDAD } from "@/lib/privacidad";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { esUuid } from "@/lib/uuid";
 import { aceptarPoliticaPrivacidad, cerrarSesion } from "./(auth)/acciones";
@@ -100,9 +97,7 @@ async function ContenidoPrincipal({
 
   const { data: perfil } = await supabase
     .from("profiles")
-    .select(
-      "nombre, email, role, account_status, privacy_policy_version_accepted"
-    )
+    .select("nombre, email, role, account_status, privacy_policy_accepted_at")
     .eq("id", user.id)
     .single();
 
@@ -110,8 +105,7 @@ async function ContenidoPrincipal({
     ? MENSAJES_ESTADO[perfil.account_status]
     : "No pudimos cargar tu perfil. Cierra sesión e inténtalo de nuevo; si persiste, contacta a la organización.";
   const requiereConsentimiento =
-    !mensajeEstado &&
-    perfil?.privacy_policy_version_accepted !== VERSION_POLITICA_PRIVACIDAD;
+    !mensajeEstado && perfil?.privacy_policy_accepted_at == null;
 
   if (
     !mensajeEstado &&
@@ -232,19 +226,12 @@ async function ContenidoPrincipal({
                 Antes de continuar
               </h2>
               <p className="mt-2 text-foreground/70 text-sm">
-                Lee la política de privacidad vigente de Scouts Colombia. Tu
-                aceptación se conserva como un evento histórico y será necesaria
-                de nuevo si la versión cambia.
+                Lee la política de privacidad de Scouts Colombia. Tu aceptación
+                se registra una sola vez.
               </p>
-              <p className="mt-2 text-foreground/70 text-xs">
-                Versión que registrarás: {VERSION_POLITICA_PRIVACIDAD}
-              </p>
-              {(aviso === "consentimiento" ||
-                aviso === "politica_actualizada") && (
+              {aviso === "consentimiento" && (
                 <p className="mt-3 text-destructive text-sm" role="alert">
-                  {aviso === "politica_actualizada"
-                    ? "La política cambió desde que la viste. Revisa la versión vigente y vuelve a aceptarla."
-                    : "No pudimos registrar tu aceptación. Intenta de nuevo."}
+                  No pudimos registrar tu aceptación. Intenta de nuevo.
                 </p>
               )}
               <div className="mt-5 flex flex-col gap-3 sm:flex-row">
@@ -262,11 +249,6 @@ async function ContenidoPrincipal({
                   </a>
                 </Button>
                 <form action={aceptarPoliticaPrivacidad} className="flex-1">
-                  <input
-                    name="versionPoliticaAceptada"
-                    type="hidden"
-                    value={VERSION_POLITICA_PRIVACIDAD}
-                  />
                   {borradorTransferenciaId && (
                     <input
                       name="borrador"
