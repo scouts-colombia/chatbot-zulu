@@ -1,10 +1,11 @@
 import {
-  Archive,
-  LogOut,
-  MessageCircle,
-  Plus,
-  ShieldCheck,
-} from "lucide-react";
+  Archive01Icon,
+  CheckmarkBadge01Icon,
+  Logout01Icon,
+  Message01Icon,
+  PlusSignIcon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
@@ -196,7 +197,12 @@ async function ContenidoPrincipal({
                     servidor y no debe entrar a la caché de cliente del router
                     (invariante en app/admin/layout.tsx). */}
                 <a aria-label="Panel de administración" href="/admin">
-                  <ShieldCheck aria-hidden="true" className="size-4" />
+                  <HugeiconsIcon
+                    aria-hidden="true"
+                    className="size-4"
+                    icon={CheckmarkBadge01Icon}
+                    strokeWidth={1.8}
+                  />
                   <span className="hidden sm:inline">Panel admin</span>
                 </a>
               </Button>
@@ -208,7 +214,12 @@ async function ContenidoPrincipal({
                 type="submit"
                 variant="outline"
               >
-                <LogOut aria-hidden="true" className="size-4" />
+                <HugeiconsIcon
+                  aria-hidden="true"
+                  className="size-4"
+                  icon={Logout01Icon}
+                  strokeWidth={1.8}
+                />
                 <span className="hidden sm:inline">Cerrar sesión</span>
               </Button>
             </form>
@@ -297,7 +308,12 @@ async function ContenidoPrincipal({
                     className="btn-press min-h-12 w-full bg-scouts-yellow px-5 text-scouts-purple shadow-lg hover:bg-scouts-yellow/90 sm:w-auto"
                     type="submit"
                   >
-                    <Plus aria-hidden="true" className="size-5" />
+                    <HugeiconsIcon
+                      aria-hidden="true"
+                      className="size-5"
+                      icon={PlusSignIcon}
+                      strokeWidth={1.8}
+                    />
                     Nueva conversación
                   </Button>
                 </form>
@@ -321,9 +337,11 @@ async function ContenidoPrincipal({
                         : `${totalConversaciones} en tu historial activo`}
                     </p>
                   </div>
-                  <MessageCircle
+                  <HugeiconsIcon
                     aria-hidden="true"
                     className="size-5 text-scouts-orange"
+                    icon={Message01Icon}
+                    strokeWidth={1.8}
                   />
                 </div>
 
@@ -336,9 +354,11 @@ async function ContenidoPrincipal({
                           key={conversacion.id}
                         >
                           <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-scouts-purple/8 text-scouts-purple">
-                            <MessageCircle
+                            <HugeiconsIcon
                               aria-hidden="true"
                               className="size-4"
+                              icon={Message01Icon}
+                              strokeWidth={1.8}
                             />
                           </span>
                           <Link
@@ -368,7 +388,12 @@ async function ContenidoPrincipal({
                               type="submit"
                               variant="ghost"
                             >
-                              <Archive aria-hidden="true" className="size-4" />
+                              <HugeiconsIcon
+                                aria-hidden="true"
+                                className="size-4"
+                                icon={Archive01Icon}
+                                strokeWidth={1.8}
+                              />
                               <span className="hidden sm:inline">Archivar</span>
                             </Button>
                           </form>

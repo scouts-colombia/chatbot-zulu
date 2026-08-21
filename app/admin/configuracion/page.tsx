@@ -1,4 +1,5 @@
-import { Settings2 } from "lucide-react";
+import { Settings02Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { Suspense } from "react";
 import { requerirAdmin } from "@/lib/admin/guard";
 import { cargarConfiguracionChat } from "@/lib/configuracion/servidor";
@@ -46,9 +47,11 @@ async function ConfiguracionAdmin() {
             aplican a las solicitudes nuevas sin volver a desplegar.
           </p>
         </div>
-        <Settings2
+        <HugeiconsIcon
           aria-hidden="true"
           className="hidden size-7 shrink-0 text-scouts-orange sm:block"
+          icon={Settings02Icon}
+          strokeWidth={1.8}
         />
       </header>
 

@@ -1,6 +1,7 @@
 "use client";
 
-import { ArrowUp, Check } from "lucide-react";
+import { ArrowUp01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { cargarMensajesAnteriores } from "@/app/chat/acciones";
@@ -454,9 +455,10 @@ export function Conversacion({
               disabled={enviando || !borrador.trim()}
               type="submit"
             >
-              <ArrowUp
+              <HugeiconsIcon
                 aria-hidden="true"
                 className="size-5"
+                icon={ArrowUp01Icon}
                 strokeWidth={2.5}
               />
             </Button>
@@ -474,9 +476,10 @@ export function Conversacion({
                   type="checkbox"
                 />
                 <span className="size-5 rounded-md border border-scouts-purple/35 bg-white/55 shadow-inner transition peer-focus-visible:outline-2 peer-focus-visible:outline-scouts-purple peer-focus-visible:outline-offset-2 peer-checked:border-scouts-purple peer-checked:bg-scouts-yellow" />
-                <Check
+                <HugeiconsIcon
                   aria-hidden="true"
                   className="pointer-events-none absolute size-3.5 text-scouts-purple opacity-0 peer-checked:opacity-100"
+                  icon={Tick02Icon}
                   strokeWidth={3}
                 />
               </span>

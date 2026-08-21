@@ -1,4 +1,5 @@
-import { FileText } from "lucide-react";
+import { File01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { Suspense } from "react";
 import { requerirAdmin } from "@/lib/admin/guard";
 import { crearClienteAdmin } from "@/lib/supabase/admin";
@@ -61,9 +62,11 @@ async function ListaDocumentos() {
             Controla qué fuentes pueden fundamentar las respuestas.
           </p>
         </div>
-        <FileText
+        <HugeiconsIcon
           aria-hidden="true"
           className="hidden size-7 text-scouts-blue sm:block"
+          icon={File01Icon}
+          strokeWidth={1.8}
         />
       </header>
       <p className="rounded-2xl border border-scouts-blue/10 bg-scouts-blue/5 p-4 text-foreground/65 text-sm">

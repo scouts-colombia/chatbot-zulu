@@ -1,4 +1,5 @@
-import { Users } from "lucide-react";
+import { UserMultipleIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { Suspense } from "react";
 import {
   leerPagina,
@@ -74,9 +75,11 @@ async function ListaUsuarios({
             Gestiona el estado de las cuentas registradas.
           </p>
         </div>
-        <Users
+        <HugeiconsIcon
           aria-hidden="true"
           className="hidden size-7 text-scouts-red sm:block"
+          icon={UserMultipleIcon}
+          strokeWidth={1.8}
         />
       </header>
       <p className="rounded-2xl border border-scouts-orange/15 bg-scouts-orange/6 p-4 text-foreground/65 text-sm">

@@ -1,6 +1,11 @@
 "use client";
 
-import { Download, Share2, X } from "lucide-react";
+import {
+  Cancel01Icon,
+  Download01Icon,
+  Share01Icon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useState } from "react";
 import { ZuluMascota } from "@/components/marca/zulu-mascota";
 import { Button } from "@/components/ui/button";
@@ -104,13 +109,23 @@ export function InstalarPwa() {
               onClick={instalar}
               type="button"
             >
-              <Download aria-hidden="true" className="size-4" />
+              <HugeiconsIcon
+                aria-hidden="true"
+                className="size-4"
+                icon={Download01Icon}
+                strokeWidth={1.8}
+              />
               Instalar
             </Button>
           )}
           {mostrarAyudaIos && (
             <span className="flex min-h-11 items-center gap-2 text-scouts-purple text-sm">
-              <Share2 aria-hidden="true" className="size-4" />
+              <HugeiconsIcon
+                aria-hidden="true"
+                className="size-4"
+                icon={Share01Icon}
+                strokeWidth={1.8}
+              />
               Compartir
             </span>
           )}
@@ -124,7 +139,12 @@ export function InstalarPwa() {
         type="button"
         variant="ghost"
       >
-        <X aria-hidden="true" className="size-4" />
+        <HugeiconsIcon
+          aria-hidden="true"
+          className="size-4"
+          icon={Cancel01Icon}
+          strokeWidth={1.8}
+        />
       </Button>
     </aside>
   );
