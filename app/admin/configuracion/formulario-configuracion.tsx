@@ -70,6 +70,12 @@ export function FormularioConfiguracion({
           >
             <Select
               defaultValue={configuracion.nivelRazonamiento}
+              items={{
+                high: "Alto",
+                low: "Bajo",
+                medium: "Medio",
+                minimal: "Mínimo",
+              }}
               name="nivelRazonamiento"
             >
               <SelectTrigger

@@ -71,7 +71,11 @@ function DialogContent({
               />
             }
           >
-            <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} />
+            <HugeiconsIcon
+              aria-hidden="true"
+              icon={Cancel01Icon}
+              strokeWidth={2}
+            />
             <span className="sr-only">Cerrar</span>
           </DialogPrimitive.Close>
         ) : null}

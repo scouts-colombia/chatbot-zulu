@@ -54,6 +54,7 @@ function SelectTrigger({
       <SelectPrimitive.Icon
         render={
           <HugeiconsIcon
+            aria-hidden="true"
             className="pointer-events-none size-4 text-muted-foreground"
             icon={UnfoldMoreIcon}
             strokeWidth={2}
@@ -148,6 +149,7 @@ function SelectItem({
         }
       >
         <HugeiconsIcon
+          aria-hidden="true"
           className="pointer-events-none"
           icon={Tick02Icon}
           strokeWidth={2}
@@ -183,7 +185,7 @@ function SelectScrollUpButton({
       data-slot="select-scroll-up-button"
       {...props}
     >
-      <HugeiconsIcon icon={ArrowUp01Icon} strokeWidth={2} />
+      <HugeiconsIcon aria-hidden="true" icon={ArrowUp01Icon} strokeWidth={2} />
     </SelectPrimitive.ScrollUpArrow>
   );
 }
@@ -201,7 +203,11 @@ function SelectScrollDownButton({
       data-slot="select-scroll-down-button"
       {...props}
     >
-      <HugeiconsIcon icon={ArrowDown01Icon} strokeWidth={2} />
+      <HugeiconsIcon
+        aria-hidden="true"
+        icon={ArrowDown01Icon}
+        strokeWidth={2}
+      />
     </SelectPrimitive.ScrollDownArrow>
   );
 }
