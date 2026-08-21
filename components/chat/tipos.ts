@@ -1,3 +1,10 @@
+import type { EstadoConEtiqueta } from "@/lib/chat/contrato";
+
+export type ConversacionListado = {
+  id: string;
+  title: string;
+};
+
 export type CitaUI = {
   titulo: string;
   pagina?: number | null;
@@ -7,8 +14,6 @@ export type PreguntaGuiadaUI = {
   texto: string;
   opciones: string[];
 };
-
-import type { EstadoConEtiqueta } from "@/lib/chat/contrato";
 
 export type MensajeUI = {
   id: string;

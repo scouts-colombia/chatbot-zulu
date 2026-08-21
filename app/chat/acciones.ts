@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { rutaTrasArchivar } from "@/lib/chat/ruta-tras-archivar";
 import { cargarTramo } from "@/lib/chat/transcripcion";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { esUuid } from "@/lib/uuid";
@@ -47,12 +48,15 @@ export async function archivarConversacion(formData: FormData) {
     .select("id")
     .maybeSingle();
   revalidatePath("/");
+  revalidatePath(`/chat/${id}`);
   // Sin esto, un fallo devolvía al listado con la conversación aún ahí y sin
   // ningún aviso: la lectura natural es que el botón está roto.
-  if (error || !data) {
-    redirect("/?aviso=archivar");
-  }
-  redirect("/");
+  const destino = rutaTrasArchivar(
+    id,
+    formData.get("volver"),
+    Boolean(error || !data)
+  );
+  redirect(destino);
 }
 
 /**
