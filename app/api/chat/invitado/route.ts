@@ -7,7 +7,6 @@ import {
   ERROR_CONSENTIMIENTO_REQUERIDO,
   ERROR_CONVERSACION_NO_DISPONIBLE,
   ERROR_INVITADO_NO_DISPONIBLE,
-  ERROR_POLITICA_ACTUALIZADA,
   respuestaError,
 } from "@/lib/chat/respuestas-error";
 import type { IdentidadInvitada } from "@/lib/invitados/identidad";
@@ -20,7 +19,6 @@ import {
   obtenerOCrearConversacionInvitada,
   prepararPreflightInvitado,
 } from "@/lib/invitados/preflight";
-import { esVersionPoliticaVigente } from "@/lib/privacidad";
 import { crearClienteAdmin } from "@/lib/supabase/admin";
 import { crearClienteServidor } from "@/lib/supabase/server";
 
@@ -28,19 +26,13 @@ const LOG = "[chat/invitado]";
 
 const CuerpoSchema = z.object({
   aceptaPolitica: z.literal(true),
-  versionPoliticaAceptada: z.string().min(1).max(200),
 });
 
 export async function POST(request: Request) {
-  let cuerpo: z.infer<typeof CuerpoSchema>;
   try {
-    cuerpo = CuerpoSchema.parse(await request.json());
+    CuerpoSchema.parse(await request.json());
   } catch {
     return respuestaError(ERROR_CONSENTIMIENTO_REQUERIDO, 403);
-  }
-
-  if (!esVersionPoliticaVigente(cuerpo.versionPoliticaAceptada)) {
-    return respuestaError(ERROR_POLITICA_ACTUALIZADA, 409);
   }
 
   const supabase = await crearClienteServidor();

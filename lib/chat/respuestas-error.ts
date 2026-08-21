@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { VERSION_POLITICA_PRIVACIDAD } from "@/lib/privacidad";
 
 /**
  * Respuestas de error que comparten `/api/chat` y `/api/chat/invitado`. Estaban
@@ -28,15 +27,7 @@ export const ERROR_CONVERSACION_NO_DISPONIBLE = {
 
 export const ERROR_CONSENTIMIENTO_REQUERIDO = {
   codigo: "consentimiento_requerido",
-  mensaje:
-    "Debes aceptar la política de privacidad vigente antes de usar el chat.",
-} as const;
-
-export const ERROR_POLITICA_ACTUALIZADA = {
-  codigo: "politica_actualizada",
-  mensaje:
-    "La política de privacidad cambió. Revisa y acepta la versión vigente antes de enviar.",
-  versionPolitica: VERSION_POLITICA_PRIVACIDAD,
+  mensaje: "Debes aceptar la política de privacidad antes de usar el chat.",
 } as const;
 
 type CuerpoError = { codigo: string; mensaje?: string };

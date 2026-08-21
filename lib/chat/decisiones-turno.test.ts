@@ -54,19 +54,6 @@ describe("preparación de la sesión de prueba", () => {
     assert.equal(revertir, true);
   });
 
-  it("pide aceptar de nuevo cuando la política cambió", () => {
-    const { decision } = decidirPreparacionInvitada(false, {
-      codigo: "politica_actualizada",
-      mensaje: "Revisa la versión vigente.",
-      versionPolitica: "acuerdo-2027",
-    });
-    assert.deepEqual(decision, {
-      tipo: "politica_actualizada",
-      mensaje: "Revisa la versión vigente.",
-      versionPolitica: "acuerdo-2027",
-    });
-  });
-
   it("cae en un aviso genérico si el servidor no explica el fallo", () => {
     const { decision, revertir } = decidirPreparacionInvitada(false, null);
     assert.equal(decision.tipo, "aviso");

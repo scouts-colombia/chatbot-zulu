@@ -7,11 +7,7 @@ import { redirect } from "next/navigation";
 import { esFalloDeVerificacionDeSesion } from "@/lib/auth/sesion";
 import { construirHashesSolicitud } from "@/lib/invitados/identidad";
 import { limpiarIdentidadesInvitadasPendientes } from "@/lib/invitados/limpieza";
-import {
-  esVersionPoliticaVigente,
-  URL_POLITICA_PRIVACIDAD,
-  VERSION_POLITICA_PRIVACIDAD,
-} from "@/lib/privacidad";
+import { URL_POLITICA_PRIVACIDAD } from "@/lib/privacidad";
 import { crearClienteAdmin } from "@/lib/supabase/admin";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { esUuid } from "@/lib/uuid";
@@ -301,9 +297,6 @@ export async function registrarse(
 export async function aceptarPoliticaPrivacidad(formData: FormData) {
   const destino = destinoInicio(formData);
   const destinoError = destinoInicio(formData, "consentimiento");
-  if (!esVersionPoliticaVigente(formData.get("versionPoliticaAceptada"))) {
-    redirect(destinoInicio(formData, "politica_actualizada"));
-  }
 
   const supabase = await crearClienteServidor();
   const {
@@ -338,7 +331,6 @@ export async function aceptarPoliticaPrivacidad(formData: FormData) {
   const admin = crearClienteAdmin();
   const { error } = await admin.rpc("registrar_consentimiento_servidor", {
     p_user_id: user.id,
-    p_policy_version: VERSION_POLITICA_PRIVACIDAD,
     p_policy_url: URL_POLITICA_PRIVACIDAD,
     p_ip_hash: hashes.ipHash,
     p_user_agent_hash: hashes.userAgentHash,

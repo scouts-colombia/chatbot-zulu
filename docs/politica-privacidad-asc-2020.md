@@ -6,7 +6,6 @@
 > - **Fecha de consulta:** 2026-08-06
 > - **Aprobada por:** Acuerdo del Consejo Scout Nacional No. 369 del 27 de febrero de 2020, Resolución CSN No. 004-20
 > - **Vigencia declarada:** desde el 9 de marzo de 2020, "hasta el momento en que expresamente se revoque o modifique"
-> - **Identificador sugerido para `consent_acceptance_events.policy_version`:** `asc-2020-03-09`
 >
 > **Advertencia sobre la transcripción.** Se obtuvo automáticamente desde el HTML publicado. Conserva erratas que están en la fuente (`misas` por `mismas`, `scout,org.co` por `scout.org.co`, `carrera 47 No,` por `No.`) y puede haber introducido otras. Antes de usarla como prueba de consentimiento, cotéjala contra el documento oficial firmado.
 

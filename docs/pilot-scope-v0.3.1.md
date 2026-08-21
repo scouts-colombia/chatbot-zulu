@@ -267,10 +267,10 @@ Regla P0:
 
 - Cada aceptación de política/términos genera un registro nuevo.
 - No se sobrescriben aceptaciones anteriores.
-- Si cambia la versión de la política, el sistema exige una nueva aceptación y conserva la anterior.
+- Basta con una aceptación: el sistema no vuelve a pedirla si el texto de la política cambia.
 - La UI no ofrece edición ni eliminación de eventos de aceptación.
 
-Esto preserva prueba histórica de quién aceptó qué versión y cuándo.
+La caché en `profiles` es `privacy_policy_accepted_at`. No se guarda qué versión se aceptó: si el texto cambia, no queda forma de saber quién aceptó cuál versión (decisión 2026-08-20).
 
 ---
 
@@ -399,7 +399,7 @@ La identidad anónima de Supabase es un mecanismo interno, no una cuenta:
 | P-RF-01 | El usuario puede registrarse e iniciar sesión con correo. | P0 |
 | P-RF-02 | El sistema distingue rol `scout` y `admin`. | P0 |
 | P-RF-03 | El sistema conserva estado de cuenta: `activo`, `pendiente_autorizacion`, `bloqueado`. | P0 |
-| P-RF-04 | El usuario debe aceptar una versión de política/términos antes de usar el chat y la aceptación se registra como evento append-only. | P0 |
+| P-RF-04 | El usuario debe aceptar la política/términos antes de usar el chat y la aceptación se registra como evento append-only. | P0 |
 | P-RF-05 | El Scout puede crear, listar y abrir conversaciones propias. | P0 |
 | P-RF-06 | El Scout puede archivar conversaciones propias. | P0 |
 | P-RF-07 | El Scout puede enviar una pregunta a una conversación activa. | P0 |
@@ -441,7 +441,7 @@ La identidad anónima de Supabase es un mecanismo interno, no una cuenta:
 | P-RNF-11 | Los documentos indexados deben ser oficiales o aprobados manualmente. |
 | P-RNF-12 | El piloto no usa documentos subidos por usuarios finales. |
 | P-RNF-13 | El sistema registra eventos por request para evitar condiciones de carrera en contadores agregados. |
-| P-RNF-14 | Los consentimientos se conservan como eventos append-only; `profiles` solo cachea la última aceptación. |
+| P-RNF-14 | Los consentimientos se conservan como eventos append-only; `profiles` solo cachea la última aceptación, sin versión. |
 | P-RNF-15 | Las citas históricas se cruzan por ID propio de la aplicación, no por título visible. |
 | P-RNF-16 | El bloqueo de seguridad del proveedor se maneja como estado seguro de producto, no como excepción sin controlar. |
 | P-RNF-17 | La tabla `citations` es la fuente de verdad persistida de citas; `response_json` no duplica el arreglo de citas. |
@@ -582,7 +582,6 @@ profiles (
   nombre text,
   role text not null check (role in ('scout', 'admin')),
   account_status text not null check (account_status in ('activo', 'pendiente_autorizacion', 'bloqueado')),
-  privacy_policy_version_accepted text,
   privacy_policy_accepted_at timestamptz,
   guardian_authorization_status text check (guardian_authorization_status in ('no_aplica', 'pendiente', 'aprobada', 'rechazada')),
   created_at timestamptz not null default now(),
@@ -595,7 +594,7 @@ Notas:
 - El usuario no puede modificar `role`.
 - `guardian_authorization_status` puede empezar simple y refinarse luego.
 - La decisión legal/organizacional define cuándo usar `pendiente_autorizacion`.
-- `privacy_policy_version_accepted` y `privacy_policy_accepted_at` son caché de última aceptación, no fuente histórica de verdad.
+- `privacy_policy_accepted_at` es caché de última aceptación, no fuente histórica de verdad.
 
 ---
 
@@ -609,7 +608,6 @@ consent_acceptance_events (
   subject_user_id uuid not null references profiles(id),
   accepted_by_user_id uuid references profiles(id),
   policy_type text not null check (policy_type in ('privacy_policy', 'terms_of_use', 'guardian_authorization')),
-  policy_version text not null,
   policy_url text,
   accepted_at timestamptz not null default now(),
   ip_hash text,
@@ -1179,7 +1177,7 @@ La service role de Supabase no se expone al cliente.
 - Panel admin básico.
 - Acceso directo a conversación ajena, sin motivo (2026-07-17).
 - Auditoría admin automática y fail-closed.
-- Consentimiento/política versionada con evento append-only.
+- Consentimiento con evento append-only, sin versionar el texto aceptado.
 - Estados de cuenta.
 
 ### Semana 4: Calidad y endurecimiento
@@ -1243,7 +1241,7 @@ El piloto está listo cuando:
 - [ ] Set RAG de 30 casos ejecutado.
 - [ ] Preguntas fuera de alcance no inventan citas.
 - [ ] Prompt injection básico probado.
-- [ ] Política/consentimiento versionado visible.
+- [ ] Aceptación de política visible una sola vez.
 - [ ] Aceptación de política registrada en `consent_acceptance_events`.
 - [ ] Estado `pendiente_autorizacion` definido por organización.
 

@@ -66,7 +66,6 @@ export function Conversacion({
   requiereConsentimiento = false,
   sesionInvitadaEstablecida = false,
   borradorTransferenciaId = null,
-  versionPolitica,
 }: {
   conversationId?: string | null;
   mensajesIniciales: MensajeUI[];
@@ -77,7 +76,6 @@ export function Conversacion({
   requiereConsentimiento?: boolean;
   sesionInvitadaEstablecida?: boolean;
   borradorTransferenciaId?: string | null;
-  versionPolitica?: string;
 }) {
   const [conversationIdActual, setConversationIdActual] = useState(
     conversationId ?? null
@@ -100,8 +98,6 @@ export function Conversacion({
   const [conversationIdTransferencia, setConversationIdTransferencia] =
     useState<string | null>(conversationId ?? null);
   const [aceptaPolitica, setAceptaPolitica] = useState(false);
-  const [versionPoliticaActual, setVersionPoliticaActual] =
-    useState(versionPolitica);
   const reducirMovimiento = useMovimientoReducido();
 
   useEffect(() => {
@@ -240,13 +236,6 @@ export function Conversacion({
         setBorrador(limpio);
       }
       switch (decision.tipo) {
-        case "politica_actualizada":
-          if (decision.versionPolitica) {
-            setVersionPoliticaActual(decision.versionPolitica);
-          }
-          setAceptaPolitica(false);
-          setAviso(decision.mensaje);
-          break;
         case "registro":
           abrirRegistro(
             decision.mensaje,
@@ -281,7 +270,6 @@ export function Conversacion({
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               aceptaPolitica,
-              versionPoliticaAceptada: versionPoliticaActual,
             }),
           })
         );
@@ -304,10 +292,6 @@ export function Conversacion({
           mensaje: limpio,
           aceptaPolitica:
             esInvitado && requiereConsentimiento ? aceptaPolitica : undefined,
-          versionPoliticaAceptada:
-            esInvitado && requiereConsentimiento
-              ? versionPoliticaActual
-              : undefined,
         }),
       });
       // El cuerpo se parsea con tolerancia y DESPUÉS de mirar el status: un
@@ -481,7 +465,7 @@ export function Conversacion({
             <label className="mt-3 flex cursor-pointer items-start gap-2.5 text-pnpj-tinta/75 text-xs leading-5 [@media(max-height:30rem)]:mt-2 [@media(max-height:30rem)]:leading-[1.125rem]">
               <span className="relative mt-0.5 flex size-5 shrink-0 items-center justify-center">
                 <input
-                  aria-label={`Acepto la política de privacidad, versión ${versionPoliticaActual ?? "vigente"}`}
+                  aria-label="Acepto la política de privacidad"
                   checked={aceptaPolitica}
                   className="peer absolute inset-0 cursor-pointer opacity-0"
                   onChange={(evento) =>
@@ -506,9 +490,6 @@ export function Conversacion({
                 >
                   política de privacidad
                 </a>
-                {versionPoliticaActual
-                  ? ` (versión ${versionPoliticaActual})`
-                  : ""}
                 . Mis preguntas de prueba quedarán asociadas si creo una cuenta.
               </span>
             </label>

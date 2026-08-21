@@ -5,7 +5,6 @@ import {
   cargarConfiguracionChat,
   cargarConfiguracionChatPublica,
 } from "@/lib/configuracion/servidor";
-import { VERSION_POLITICA_PRIVACIDAD } from "@/lib/privacidad";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { Conversacion } from "./conversacion";
 import { NavegacionCuentaPublica } from "./navegacion-cuenta-publica";
@@ -29,7 +28,7 @@ export async function ChatPublico({ userId }: { userId: string | null }) {
     const [resultadoPerfil, resultadoConversacion] = await Promise.all([
       supabase
         .from("profiles")
-        .select("privacy_policy_version_accepted")
+        .select("privacy_policy_accepted_at")
         .eq("id", userId)
         .maybeSingle(),
       supabase
@@ -50,8 +49,7 @@ export async function ChatPublico({ userId }: { userId: string | null }) {
     }
 
     consentimientoAceptado =
-      resultadoPerfil.data?.privacy_policy_version_accepted ===
-      VERSION_POLITICA_PRIVACIDAD;
+      resultadoPerfil.data?.privacy_policy_accepted_at != null;
     conversationId = (resultadoConversacion.data?.id as string) ?? null;
 
     if (conversationId) {
@@ -77,7 +75,6 @@ export async function ChatPublico({ userId }: { userId: string | null }) {
         mensajesIniciales={mensajes}
         requiereConsentimiento={!consentimientoAceptado}
         sesionInvitadaEstablecida={Boolean(userId && conversationId)}
-        versionPolitica={VERSION_POLITICA_PRIVACIDAD}
       />
     </MarcoChatPublico>
   );

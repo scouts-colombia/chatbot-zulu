@@ -45,15 +45,12 @@ const AVISOS = {
     "No se pudo enviar el mensaje. Inténtalo de nuevo en un momento.",
   respuestaIlegible: "No se pudo leer la respuesta. Inténtalo de nuevo.",
   sinConexion: "No hay conexión con el servidor. Inténtalo de nuevo.",
-  politicaCambio:
-    "La política de privacidad cambió. Revísala y vuelve a aceptarla.",
 } as const;
 
 /** Cuerpo de respuesta del servidor tal como llega: sin garantías de forma. */
 export type CuerpoServidor = Record<string, unknown> | null;
 
 export type Decision =
-  | { tipo: "politica_actualizada"; mensaje: string; versionPolitica?: string }
   | { tipo: "registro"; mensaje?: string; conversationId?: string }
   | { tipo: "aviso"; mensaje: string }
   | { tipo: "reintentar_sesion_invitada"; mensaje: string }
@@ -66,27 +63,12 @@ function texto(valor: unknown) {
   return typeof valor === "string" && valor.length > 0 ? valor : undefined;
 }
 
-function politicaActualizada(cuerpo: CuerpoServidor): Decision | null {
-  if (cuerpo?.codigo !== "politica_actualizada") {
-    return null;
-  }
-  return {
-    tipo: "politica_actualizada",
-    mensaje: texto(cuerpo.mensaje) ?? AVISOS.politicaCambio,
-    versionPolitica: texto(cuerpo.versionPolitica),
-  };
-}
-
 /** Respuesta de `POST /api/chat/invitado`, que establece la sesión de prueba. */
 export function decidirPreparacionInvitada(
   ok: boolean,
   cuerpo: CuerpoServidor
 ): ResultadoDecision {
   if (!(ok && cuerpo)) {
-    const politica = politicaActualizada(cuerpo);
-    if (politica) {
-      return { decision: politica, revertir: true };
-    }
     if (cuerpo?.codigo === "registro_requerido") {
       return {
         decision: { tipo: "registro", mensaje: texto(cuerpo.mensaje) },
@@ -143,10 +125,6 @@ export function decidirTurno({
       };
     }
 
-    const politica = politicaActualizada(cuerpo);
-    if (politica) {
-      return { decision: politica, revertir: true };
-    }
     if (cuerpo?.codigo === "registro_requerido") {
       return {
         decision: {
