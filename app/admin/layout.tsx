@@ -1,10 +1,11 @@
 import {
-  FileText,
-  MessagesSquare,
-  Settings2,
-  ShieldCheck,
-  Users,
-} from "lucide-react";
+  CheckmarkBadge01Icon,
+  File01Icon,
+  Message01Icon,
+  Settings02Icon,
+  UserMultipleIcon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import type { Metadata } from "next";
 import { FondoMarca } from "@/components/marca/fondo-marca";
 import { ReauditarNavegacion } from "./reauditar-navegacion";
@@ -44,9 +45,11 @@ export default function LayoutAdmin({
             ← Chat
           </a>
           <h1 className="mr-auto flex items-center gap-2 font-semibold text-scouts-purple">
-            <ShieldCheck
+            <HugeiconsIcon
               aria-hidden="true"
               className="size-5 text-scouts-orange"
+              icon={CheckmarkBadge01Icon}
+              strokeWidth={1.8}
             />
             Panel admin
           </h1>
@@ -55,19 +58,39 @@ export default function LayoutAdmin({
             className="grid w-full grid-cols-2 gap-2 text-sm sm:flex sm:w-auto"
           >
             <a className="admin-nav-link" href="/admin/conversaciones">
-              <MessagesSquare aria-hidden="true" className="size-4" />
+              <HugeiconsIcon
+                aria-hidden="true"
+                className="size-4"
+                icon={Message01Icon}
+                strokeWidth={1.8}
+              />
               Conversaciones
             </a>
             <a className="admin-nav-link" href="/admin/documentos">
-              <FileText aria-hidden="true" className="size-4" />
+              <HugeiconsIcon
+                aria-hidden="true"
+                className="size-4"
+                icon={File01Icon}
+                strokeWidth={1.8}
+              />
               Documentos
             </a>
             <a className="admin-nav-link" href="/admin/usuarios">
-              <Users aria-hidden="true" className="size-4" />
+              <HugeiconsIcon
+                aria-hidden="true"
+                className="size-4"
+                icon={UserMultipleIcon}
+                strokeWidth={1.8}
+              />
               Usuarios
             </a>
             <a className="admin-nav-link" href="/admin/configuracion">
-              <Settings2 aria-hidden="true" className="size-4" />
+              <HugeiconsIcon
+                aria-hidden="true"
+                className="size-4"
+                icon={Settings02Icon}
+                strokeWidth={1.8}
+              />
               Configuración
             </a>
           </nav>

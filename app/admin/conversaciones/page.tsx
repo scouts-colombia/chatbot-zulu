@@ -1,4 +1,5 @@
-import { MessagesSquare } from "lucide-react";
+import { Message01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { Suspense } from "react";
 import {
   leerPagina,
@@ -107,9 +108,11 @@ async function ListaConversaciones({
             Revisa el historial visible para los Scouts.
           </p>
         </div>
-        <MessagesSquare
+        <HugeiconsIcon
           aria-hidden="true"
           className="hidden size-7 text-scouts-orange sm:block"
+          icon={Message01Icon}
+          strokeWidth={1.8}
         />
       </header>
       <ul className="space-y-2">

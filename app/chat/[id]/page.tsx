@@ -1,4 +1,5 @@
-import { Archive } from "lucide-react";
+import { Archive01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -126,7 +127,12 @@ async function ContenidoConversacion({
           </h1>
           {conversacion.archived && (
             <span className="flex items-center gap-1 rounded-full bg-scouts-yellow px-2 py-1 font-medium text-scouts-purple text-xs sm:px-2.5">
-              <Archive aria-hidden="true" className="size-3" />
+              <HugeiconsIcon
+                aria-hidden="true"
+                className="size-3"
+                icon={Archive01Icon}
+                strokeWidth={1.8}
+              />
               <span className="sr-only">Conversación archivada</span>
               <span aria-hidden="true" className="hidden sm:inline">
                 Archivada

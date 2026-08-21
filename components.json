@@ -1,6 +1,6 @@
 {
   "$schema": "https://ui.shadcn.com/schema.json",
-  "style": "radix-maia",
+  "style": "base-mira",
   "rsc": true,
   "tsx": true,
   "tailwind": {
@@ -10,6 +10,7 @@
     "cssVariables": true,
     "prefix": ""
   },
+  "iconLibrary": "hugeicons",
   "aliases": {
     "components": "@/components",
     "utils": "@/lib/utils",
