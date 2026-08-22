@@ -1,30 +1,26 @@
 import {
-  Archive01Icon,
   CheckmarkBadge01Icon,
   Logout01Icon,
-  Message01Icon,
   PlusSignIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { ChatPublico } from "@/components/chat/chat-publico";
 import { LimpiezaBorradoresPendientes } from "@/components/chat/limpieza-borradores-pendientes";
+import { MarcoChat } from "@/components/chat/marco-chat";
+import { MascotaBienvenidaChat } from "@/components/chat/personalidad-zulu";
 import { FondoMarca } from "@/components/marca/fondo-marca";
 import { ZuluMascota } from "@/components/marca/zulu-mascota";
-import {
-  leerPagina,
-  Paginacion,
-  rangoDePagina,
-} from "@/components/navegacion/paginacion";
+import { leerPagina } from "@/components/navegacion/paginacion";
 import { Button } from "@/components/ui/button";
 import { esFalloDeVerificacionDeSesion } from "@/lib/auth/sesion";
+import { listarConversacionesPropias } from "@/lib/chat/listado";
 import { URL_POLITICA_PRIVACIDAD } from "@/lib/privacidad";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { esUuid } from "@/lib/uuid";
 import { aceptarPoliticaPrivacidad, cerrarSesion } from "./(auth)/acciones";
-import { archivarConversacion, crearConversacion } from "./chat/acciones";
+import { crearConversacion } from "./chat/acciones";
 
 const MENSAJES_ESTADO: Record<string, string> = {
   pendiente_autorizacion:
@@ -150,287 +146,186 @@ async function ContenidoPrincipal({
   // navegación dejaría las conversaciones antiguas inalcanzables, que el Scout
   // leería como que se perdieron. Un fallo tampoco debe leerse como "aún no
   // tienes conversaciones", que llevaría a crear un hilo duplicado.
-  const [desde, hasta] = rangoDePagina(pagina);
-  const {
-    data: conversaciones,
-    count: totalConversaciones,
-    error: errorConversaciones,
-  } = mensajeEstado || requiereConsentimiento
-    ? { data: [], count: 0, error: null }
-    : await supabase
-        .from("conversations")
-        .select("id, title, updated_at", { count: "exact" })
-        .eq("archived", false)
-        .order("updated_at", { ascending: false })
-        .range(desde, hasta);
+  const listado =
+    mensajeEstado || requiereConsentimiento
+      ? { conversaciones: [], total: 0, error: false }
+      : await listarConversacionesPropias(pagina);
 
-  return (
-    <FondoMarca>
-      <div className="mx-auto flex min-h-dvh w-full max-w-6xl flex-col px-4 sm:px-6 lg:px-8">
-        <header className="app-shell-header mt-3 flex min-h-16 items-center justify-between gap-3 rounded-2xl px-4 py-2.5 sm:mt-5 sm:px-5">
-          <div className="flex min-w-0 items-center gap-2.5">
-            <ZuluMascota
-              className="size-12"
-              movimiento="quieto"
-              pose="marca"
-              priority
-              sizes="48px"
-            />
-            <div className="min-w-0">
-              <h1 className="font-semibold text-xl tracking-[-0.03em] text-scouts-purple">
-                Zulú
-              </h1>
-              <p className="truncate text-sm text-pnpj-tinta/60">
-                {perfil?.nombre ?? perfil?.email ?? user.email}
-                {perfil?.role === "admin" && " · admin"}
-              </p>
+  const nombreVisible = perfil?.nombre ?? perfil?.email ?? user.email ?? "";
+
+  if (mensajeEstado || requiereConsentimiento) {
+    return (
+      <FondoMarca>
+        <div className="mx-auto flex min-h-dvh w-full max-w-6xl flex-col px-4 sm:px-6 lg:px-8">
+          <header className="app-shell-header mt-3 flex min-h-16 items-center justify-between gap-3 rounded-2xl px-4 py-2.5 sm:mt-5 sm:px-5">
+            <div className="flex min-w-0 items-center gap-2.5">
+              <ZuluMascota
+                className="size-12"
+                movimiento="quieto"
+                pose="marca"
+                priority
+                sizes="48px"
+              />
+              <div className="min-w-0">
+                <h1 className="font-semibold text-xl tracking-[-0.03em] text-scouts-purple">
+                  Zulú
+                </h1>
+                <p className="truncate text-sm text-pnpj-tinta/60">
+                  {nombreVisible}
+                  {perfil?.role === "admin" && " · admin"}
+                </p>
+              </div>
             </div>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            {perfil?.role === "admin" && (
-              <Button
-                asChild
-                className="btn-press min-h-11 border-scouts-purple/20 bg-white/40 px-3 text-scouts-purple hover:bg-white/70"
-                variant="outline"
-              >
-                {/* <a>, no <Link>: el panel admin audita al renderizar en
+            <div className="flex shrink-0 items-center gap-2">
+              {perfil?.role === "admin" && (
+                <Button
+                  asChild
+                  className="btn-press min-h-11 border-scouts-purple/20 bg-white/40 px-3 text-scouts-purple hover:bg-white/70"
+                  variant="outline"
+                >
+                  {/* <a>, no <Link>: el panel admin audita al renderizar en
                     servidor y no debe entrar a la caché de cliente del router
                     (invariante en app/admin/layout.tsx). */}
-                <a aria-label="Panel de administración" href="/admin">
+                  <a aria-label="Panel de administración" href="/admin">
+                    <HugeiconsIcon
+                      aria-hidden="true"
+                      className="size-4"
+                      icon={CheckmarkBadge01Icon}
+                      strokeWidth={1.8}
+                    />
+                    <span className="hidden sm:inline">Panel admin</span>
+                  </a>
+                </Button>
+              )}
+              <form action={cerrarSesion}>
+                <Button
+                  aria-label="Cerrar sesión"
+                  className="btn-press min-h-11 border-scouts-purple/20 bg-white/40 px-3 text-scouts-purple hover:bg-white/70"
+                  type="submit"
+                  variant="outline"
+                >
                   <HugeiconsIcon
                     aria-hidden="true"
                     className="size-4"
-                    icon={CheckmarkBadge01Icon}
+                    icon={Logout01Icon}
                     strokeWidth={1.8}
                   />
-                  <span className="hidden sm:inline">Panel admin</span>
-                </a>
-              </Button>
-            )}
-            <form action={cerrarSesion}>
-              <Button
-                aria-label="Cerrar sesión"
-                className="btn-press min-h-11 border-scouts-purple/20 bg-white/40 px-3 text-scouts-purple hover:bg-white/70"
-                type="submit"
-                variant="outline"
-              >
-                <HugeiconsIcon
-                  aria-hidden="true"
-                  className="size-4"
-                  icon={Logout01Icon}
-                  strokeWidth={1.8}
-                />
-                <span className="hidden sm:inline">Cerrar sesión</span>
-              </Button>
-            </form>
-          </div>
-        </header>
-
-        <main className="flex flex-1 items-start justify-center py-8 sm:py-12">
-          {mensajeEstado ? (
-            <p className="auth-card-surface w-full max-w-xl rounded-3xl p-8 text-center text-foreground/70">
-              {mensajeEstado}
-            </p>
-          ) : requiereConsentimiento ? (
-            <section className="auth-card-surface w-full max-w-xl rounded-3xl p-6 sm:p-8">
-              <h2 className="font-semibold text-2xl text-scouts-purple">
-                Antes de continuar
-              </h2>
-              <p className="mt-2 text-foreground/70 text-sm">
-                Lee la política de privacidad de Scouts Colombia. Tu aceptación
-                se registra una sola vez.
-              </p>
-              {aviso === "consentimiento" && (
-                <p className="mt-3 text-destructive text-sm" role="alert">
-                  No pudimos registrar tu aceptación. Intenta de nuevo.
-                </p>
-              )}
-              <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-                <Button
-                  asChild
-                  className="min-h-11 border-scouts-purple/25 text-scouts-purple"
-                  variant="outline"
-                >
-                  <a
-                    href={URL_POLITICA_PRIVACIDAD}
-                    rel="noreferrer"
-                    target="_blank"
-                  >
-                    Leer política
-                  </a>
+                  <span className="hidden sm:inline">Cerrar sesión</span>
                 </Button>
-                <form action={aceptarPoliticaPrivacidad} className="flex-1">
-                  {borradorTransferenciaId && (
-                    <input
-                      name="borrador"
-                      type="hidden"
-                      value={borradorTransferenciaId}
-                    />
-                  )}
-                  {conversationIdTransferencia && (
-                    <input
-                      name="conversacion"
-                      type="hidden"
-                      value={conversationIdTransferencia}
-                    />
-                  )}
-                  <Button
-                    className="btn-press min-h-11 w-full bg-scouts-purple text-white hover:bg-scouts-purple/90"
-                    type="submit"
-                  >
-                    Acepto y quiero continuar
-                  </Button>
-                </form>
-              </div>
-            </section>
-          ) : (
-            <div className="w-full max-w-4xl space-y-6">
-              <section className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
-                <div>
-                  <span className="brand-kicker">Tu espacio Scout</span>
-                  <h2 className="mt-3 text-balance font-semibold text-3xl tracking-[-0.04em] text-pnpj-morado sm:text-4xl">
-                    ¿Qué quieres descubrir hoy?
-                  </h2>
-                  <p className="mt-2 max-w-xl text-pretty text-sm text-pnpj-tinta/68 sm:text-base">
-                    Continúa una conversación o inicia una nueva consulta sobre
-                    los manuales oficiales.
-                  </p>
-                </div>
-                <form action={crearConversacion} className="w-full sm:w-auto">
-                  {borradorTransferenciaId && (
-                    <input
-                      name="borrador"
-                      type="hidden"
-                      value={borradorTransferenciaId}
-                    />
-                  )}
-                  <Button
-                    className="btn-press min-h-12 w-full bg-scouts-yellow px-5 text-scouts-purple shadow-lg hover:bg-scouts-yellow/90 sm:w-auto"
-                    type="submit"
-                  >
-                    <HugeiconsIcon
-                      aria-hidden="true"
-                      className="size-5"
-                      icon={PlusSignIcon}
-                      strokeWidth={1.8}
-                    />
-                    Nueva conversación
-                  </Button>
-                </form>
-              </section>
+              </form>
+            </div>
+          </header>
 
-              {aviso === "archivar" && (
-                <p className="brand-alert" role="alert">
-                  No se pudo archivar la conversación. Intenta de nuevo.
+          <main className="flex flex-1 items-start justify-center py-8 sm:py-12">
+            {mensajeEstado ? (
+              <p className="auth-card-surface w-full max-w-xl rounded-3xl p-8 text-center text-foreground/70">
+                {mensajeEstado}
+              </p>
+            ) : (
+              <section className="auth-card-surface w-full max-w-xl rounded-3xl p-6 sm:p-8">
+                <h2 className="font-semibold text-2xl text-scouts-purple">
+                  Antes de continuar
+                </h2>
+                <p className="mt-2 text-foreground/70 text-sm">
+                  Lee la política de privacidad de Scouts Colombia. Tu
+                  aceptación se registra una sola vez.
                 </p>
-              )}
-
-              <section className="auth-card-surface rounded-3xl p-3 sm:p-5">
-                <div className="flex items-center justify-between gap-3 px-2 pb-3 sm:px-1">
-                  <div>
-                    <h2 className="font-semibold text-lg text-scouts-purple">
-                      Tus conversaciones
-                    </h2>
-                    <p className="text-foreground/70 text-xs">
-                      {totalConversaciones == null
-                        ? "Historial reciente"
-                        : `${totalConversaciones} en tu historial activo`}
-                    </p>
-                  </div>
-                  <HugeiconsIcon
-                    aria-hidden="true"
-                    className="size-5 text-scouts-orange"
-                    icon={Message01Icon}
-                    strokeWidth={1.8}
-                  />
-                </div>
-
-                {conversaciones && conversaciones.length > 0 ? (
-                  <>
-                    <ul className="space-y-2">
-                      {conversaciones.map((conversacion) => (
-                        <li
-                          className="brand-list-item flex items-center gap-3 rounded-2xl px-3 py-3 sm:px-4"
-                          key={conversacion.id}
-                        >
-                          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-scouts-purple/8 text-scouts-purple">
-                            <HugeiconsIcon
-                              aria-hidden="true"
-                              className="size-4"
-                              icon={Message01Icon}
-                              strokeWidth={1.8}
-                            />
-                          </span>
-                          <Link
-                            className="focus-ring-card min-w-0 flex-1 rounded-md"
-                            href={`/chat/${conversacion.id}`}
-                          >
-                            <span className="block truncate font-medium text-foreground text-sm">
-                              {conversacion.title}
-                            </span>
-                            <time className="text-foreground/70 text-xs">
-                              Actualizada{" "}
-                              {new Date(
-                                conversacion.updated_at as string
-                              ).toLocaleDateString("es-CO")}
-                            </time>
-                          </Link>
-                          <form action={archivarConversacion}>
-                            <input
-                              name="id"
-                              type="hidden"
-                              value={conversacion.id}
-                            />
-                            <Button
-                              aria-label="Archivar conversación"
-                              className="min-h-11 min-w-11"
-                              size="sm"
-                              type="submit"
-                              variant="ghost"
-                            >
-                              <HugeiconsIcon
-                                aria-hidden="true"
-                                className="size-4"
-                                icon={Archive01Icon}
-                                strokeWidth={1.8}
-                              />
-                              <span className="hidden sm:inline">Archivar</span>
-                            </Button>
-                          </form>
-                        </li>
-                      ))}
-                    </ul>
-                    <Paginacion
-                      cantidadEnPagina={conversaciones.length}
-                      className="px-2 pt-4"
-                      etiquetas={{
-                        anterior: "← Anteriores",
-                        siguiente: "Más antiguas →",
-                      }}
-                      href={(destino) => `/?pagina=${destino}`}
-                      pagina={pagina}
-                      total={totalConversaciones}
-                    />
-                  </>
-                ) : (
-                  <p
-                    className={
-                      errorConversaciones
-                        ? "rounded-2xl bg-scouts-red/8 px-5 py-8 text-center text-scouts-red text-sm"
-                        : "rounded-2xl bg-scouts-purple/5 px-5 py-10 text-center text-foreground/70 text-sm"
-                    }
-                    role={errorConversaciones ? "alert" : undefined}
-                  >
-                    {errorConversaciones
-                      ? "No pudimos cargar tus conversaciones. Recarga la página; si el problema sigue, vuelve en un momento."
-                      : "Aún no tienes conversaciones. Crea una y pregunta sobre los manuales oficiales."}
+                {aviso === "consentimiento" && (
+                  <p className="mt-3 text-destructive text-sm" role="alert">
+                    No pudimos registrar tu aceptación. Intenta de nuevo.
                   </p>
                 )}
+                <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+                  <Button
+                    asChild
+                    className="min-h-11 border-scouts-purple/25 text-scouts-purple"
+                    variant="outline"
+                  >
+                    <a
+                      href={URL_POLITICA_PRIVACIDAD}
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      Leer política
+                    </a>
+                  </Button>
+                  <form action={aceptarPoliticaPrivacidad} className="flex-1">
+                    {borradorTransferenciaId && (
+                      <input
+                        name="borrador"
+                        type="hidden"
+                        value={borradorTransferenciaId}
+                      />
+                    )}
+                    {conversationIdTransferencia && (
+                      <input
+                        name="conversacion"
+                        type="hidden"
+                        value={conversationIdTransferencia}
+                      />
+                    )}
+                    <Button
+                      className="btn-press min-h-11 w-full bg-scouts-purple text-white hover:bg-scouts-purple/90"
+                      type="submit"
+                    >
+                      Acepto y quiero continuar
+                    </Button>
+                  </form>
+                </div>
               </section>
-            </div>
-          )}
-        </main>
-      </div>
+            )}
+          </main>
+        </div>
+      </FondoMarca>
+    );
+  }
+
+  return (
+    <FondoMarca className="h-dvh overflow-hidden">
+      <MarcoChat
+        avisoArchivar={aviso === "archivar"}
+        borradorTransferenciaId={borradorTransferenciaId}
+        conversaciones={listado.conversaciones}
+        correo={perfil?.email ?? user.email ?? ""}
+        errorConversaciones={listado.error}
+        esAdmin={perfil?.role === "admin"}
+        nombre={nombreVisible}
+        pagina={pagina}
+        titulo="Zulú"
+        totalConversaciones={listado.total}
+      >
+        <div className="flex h-full flex-1 flex-col items-center justify-center px-4 text-center">
+          <MascotaBienvenidaChat />
+          <h2 className="text-balance font-semibold text-2xl tracking-[-0.03em] text-pnpj-morado sm:text-3xl">
+            ¿Qué quieres descubrir hoy?
+          </h2>
+          <p className="mt-3 max-w-md text-pretty text-sm text-pnpj-tinta/68 sm:text-base">
+            Pregunta sobre los manuales oficiales de Scouts Colombia. Zulú te
+            responderá con las fuentes que respaldan la respuesta.
+          </p>
+          <form action={crearConversacion} className="mt-6">
+            {borradorTransferenciaId && (
+              <input
+                name="borrador"
+                type="hidden"
+                value={borradorTransferenciaId}
+              />
+            )}
+            <Button
+              className="btn-press min-h-12 bg-scouts-yellow px-5 text-scouts-purple shadow-lg hover:bg-scouts-yellow/90"
+              type="submit"
+            >
+              <HugeiconsIcon
+                aria-hidden="true"
+                className="size-5"
+                icon={PlusSignIcon}
+                strokeWidth={1.8}
+              />
+              Nueva conversación
+            </Button>
+          </form>
+        </div>
+      </MarcoChat>
     </FondoMarca>
   );
 }

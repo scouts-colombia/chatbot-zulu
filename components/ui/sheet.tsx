@@ -21,7 +21,6 @@ function SheetTrigger({
       <SheetPrimitive.Trigger
         data-slot="sheet-trigger"
         {...props}
-        nativeButton={false}
         render={children}
       />
     );

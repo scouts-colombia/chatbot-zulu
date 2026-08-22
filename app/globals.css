@@ -4,7 +4,7 @@
 @plugin "@tailwindcss/typography";
 
 @theme inline {
-  --font-sans: var(--font-futura);
+  --font-sans: var(--font-albert), Arial, sans-serif;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -35,6 +35,7 @@
   --color-pnpj-crema: var(--pnpj-crema);
   --color-pnpj-tinta: var(--pnpj-tinta);
   --color-pnpj-morado: var(--pnpj-morado);
+  --color-zulu-cafe: var(--zulu-cafe);
 }
 
 :root {
@@ -75,6 +76,7 @@
   --pnpj-morado: #4d006e;
   --pnpj-wash-amarillo: #fdcf21;
   --pnpj-wash-durazno: #ffc8c8;
+  --zulu-cafe: #613322;
 }
 
 @layer base {
@@ -87,6 +89,10 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+  }
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
   }
 }
 
@@ -257,7 +263,7 @@ textarea:focus-visible {
 
 @layer base {
   html {
-    font-family: var(--font-sans), Arial, sans-serif;
+    font-family: var(--font-albert), Arial, sans-serif;
     font-synthesis: none;
     text-rendering: optimizeLegibility;
   }

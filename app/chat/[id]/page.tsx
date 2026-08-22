@@ -1,13 +1,14 @@
-import { Archive01Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import { Conversacion } from "@/components/chat/conversacion";
 import { LimpiezaBorradoresPendientes } from "@/components/chat/limpieza-borradores-pendientes";
+import { MarcoChat } from "@/components/chat/marco-chat";
 import { FondoMarca } from "@/components/marca/fondo-marca";
 import { ZuluMascota } from "@/components/marca/zulu-mascota";
+import { leerPagina } from "@/components/navegacion/paginacion";
+import { listarConversacionesPropias } from "@/lib/chat/listado";
 import { cargarTramo } from "@/lib/chat/transcripcion";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { esUuid } from "@/lib/uuid";
@@ -23,7 +24,11 @@ export default function PaginaConversacion({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ borrador?: string }>;
+  searchParams: Promise<{
+    borrador?: string;
+    aviso?: string;
+    pagina?: string;
+  }>;
 }) {
   return (
     <Suspense
@@ -43,10 +48,18 @@ async function ContenidoConversacion({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ borrador?: string }>;
+  searchParams: Promise<{
+    borrador?: string;
+    aviso?: string;
+    pagina?: string;
+  }>;
 }) {
-  const [{ id }, { borrador }] = await Promise.all([params, searchParams]);
+  const [{ id }, { borrador, aviso, pagina: paginaParam }] = await Promise.all([
+    params,
+    searchParams,
+  ]);
   const borradorTransferenciaId = esUuid(borrador) ? borrador : null;
+  const pagina = leerPagina(paginaParam);
   const supabase = await crearClienteServidor();
 
   const {
@@ -61,7 +74,7 @@ async function ContenidoConversacion({
   // y falso, sobre todo con usuarios de 15 años.
   const { data: perfil, error: errorPerfil } = await supabase
     .from("profiles")
-    .select("account_status")
+    .select("nombre, email, role, account_status")
     .eq("id", user.id)
     .maybeSingle();
   if (errorPerfil) {
@@ -93,7 +106,10 @@ async function ContenidoConversacion({
     notFound();
   }
 
-  const tramo = await cargarTramo(id);
+  const [tramo, listado] = await Promise.all([
+    cargarTramo(id),
+    listarConversacionesPropias(pagina),
+  ]);
   if (tramo.error) {
     return (
       <AvisoPantalla>
@@ -104,42 +120,20 @@ async function ContenidoConversacion({
 
   return (
     <FondoMarca className="h-dvh overflow-hidden">
-      <div className="mx-auto flex h-dvh w-full max-w-4xl flex-col px-3 sm:px-6">
-        <header className="app-shell-header mt-3 flex min-h-16 items-center gap-3 rounded-2xl px-4 py-2.5 sm:mt-5">
-          <Link
-            aria-label="Zulú, volver a conversaciones"
-            className="focus-ring flex shrink-0 items-center gap-1.5 rounded-lg py-1 pr-1.5 text-scouts-purple"
-            href="/"
-          >
-            <ZuluMascota
-              className="size-10"
-              movimiento="quieto"
-              pose="marca"
-              priority
-              sizes="40px"
-            />
-            <span className="font-semibold text-sm tracking-[-0.02em]">
-              Zulú
-            </span>
-          </Link>
-          <h1 className="min-w-0 flex-1 truncate font-medium text-sm text-pnpj-morado">
-            {conversacion.title}
-          </h1>
-          {conversacion.archived && (
-            <span className="flex items-center gap-1 rounded-full bg-scouts-yellow px-2 py-1 font-medium text-scouts-purple text-xs sm:px-2.5">
-              <HugeiconsIcon
-                aria-hidden="true"
-                className="size-3"
-                icon={Archive01Icon}
-                strokeWidth={1.8}
-              />
-              <span className="sr-only">Conversación archivada</span>
-              <span aria-hidden="true" className="hidden sm:inline">
-                Archivada
-              </span>
-            </span>
-          )}
-        </header>
+      <MarcoChat
+        archivada={conversacion.archived}
+        avisoArchivar={aviso === "archivar"}
+        borradorTransferenciaId={borradorTransferenciaId}
+        conversacionActivaId={conversacion.id}
+        conversaciones={listado.conversaciones}
+        correo={perfil?.email ?? user.email ?? ""}
+        errorConversaciones={listado.error}
+        esAdmin={perfil?.role === "admin"}
+        nombre={perfil?.nombre ?? perfil?.email ?? user.email ?? ""}
+        pagina={pagina}
+        titulo={conversacion.title}
+        totalConversaciones={listado.total}
+      >
         <LimpiezaBorradoresPendientes />
         <div className="min-h-0 flex-1">
           <Conversacion
@@ -151,7 +145,7 @@ async function ContenidoConversacion({
             mensajesIniciales={tramo.mensajes}
           />
         </div>
-      </div>
+      </MarcoChat>
     </FondoMarca>
   );
 }
