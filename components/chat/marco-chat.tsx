@@ -99,8 +99,14 @@ export function MarcoChat({
     });
   };
 
+  // En `/chat/:id` Conversacion ya consumió el token; reenviarlo a "Nuevo
+  // chat" deja el compositor vacío y el texto varado en el hilo anterior.
+  const borradorParaNuevoChat = conversacionActivaId
+    ? null
+    : borradorTransferenciaId;
+
   const propsBarra = {
-    borradorTransferenciaId,
+    borradorTransferenciaId: borradorParaNuevoChat,
     conversacionActivaId: conversacionActivaId ?? null,
     conversaciones,
     errorConversaciones,
@@ -203,11 +209,11 @@ export function MarcoChat({
             </span>
           ) : null}
           <form action={crearConversacion} className="sm:hidden">
-            {borradorTransferenciaId ? (
+            {borradorParaNuevoChat ? (
               <input
                 name="borrador"
                 type="hidden"
-                value={borradorTransferenciaId}
+                value={borradorParaNuevoChat}
               />
             ) : null}
             <Button
