@@ -23,12 +23,10 @@ export async function listarConversacionesPropias(pagina: number) {
     return { conversaciones: [], total: null, error: true };
   }
 
-  const conversaciones: ConversacionListado[] = [];
-  for (const fila of data ?? []) {
-    if (typeof fila.id === "string" && typeof fila.title === "string") {
-      conversaciones.push({ id: fila.id, title: fila.title });
-    }
-  }
+  const conversaciones: ConversacionListado[] = (data ?? []).map((fila) => ({
+    id: fila.id,
+    title: fila.title,
+  }));
 
   return { conversaciones, total: count, error: false };
 }

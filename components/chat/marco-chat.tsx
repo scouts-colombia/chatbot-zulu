@@ -35,7 +35,6 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { glassCard } from "@/lib/glass";
 import { cn } from "@/lib/utils";
 import type { ConversacionListado } from "./tipos";
 
@@ -43,6 +42,12 @@ const FUNCIONES_PROXIMAS = [
   { icono: Search01Icon, etiqueta: "Buscar" },
   { icono: BookOpen01Icon, etiqueta: "Biblioteca" },
   { icono: Folder02Icon, etiqueta: "Proyectos" },
+] as const;
+
+const ACCIONES_PROXIMAS = [
+  { icono: PencilEdit01Icon, etiqueta: "Cambiar nombre" },
+  { icono: PinIcon, etiqueta: "Fijar" },
+  { icono: Share01Icon, etiqueta: "Compartir" },
 ] as const;
 
 const claseAccionBarra =
@@ -272,12 +277,7 @@ function ContenidoBarra({
   );
 
   return (
-    <div
-      className={cn(
-        glassCard,
-        "flex h-full min-h-0 flex-col overflow-hidden rounded-2xl p-3"
-      )}
-    >
+    <div className="auth-card-surface flex h-full min-h-0 flex-col overflow-hidden rounded-2xl p-3">
       <div
         className={cn("mb-3 flex min-h-10 items-center", !colapsada && "gap-1")}
       >
@@ -580,7 +580,7 @@ function ListadoConversaciones({
             <Link
               aria-current={activa ? "page" : undefined}
               className={cn(
-                "focus-ring flex h-9 items-center overflow-hidden rounded-lg pr-2 pl-2 text-sm font-medium transition-[padding,color,background-color] duration-200",
+                "focus-ring flex h-9 items-center overflow-hidden rounded-lg px-2 text-sm font-medium transition-[padding,color,background-color] duration-200",
                 "group-hover/chat:pr-9 group-focus-within/chat:pr-9 group-has-[[data-popup-open]]/chat:pr-9 max-sm:pr-9",
                 activa
                   ? "bg-scouts-purple text-white shadow-sm"
@@ -646,42 +646,20 @@ function MenuConversacion({
         />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="min-w-48" side="right">
-        <DropdownMenuItem className="min-h-9" disabled>
-          <HugeiconsIcon
-            aria-hidden="true"
-            className="size-[18px]"
-            icon={PencilEdit01Icon}
-            strokeWidth={1.8}
-          />
-          <span className="flex-1">Cambiar nombre</span>
-          <span className="text-[0.65rem] text-muted-foreground">
-            Próximamente
-          </span>
-        </DropdownMenuItem>
-        <DropdownMenuItem className="min-h-9" disabled>
-          <HugeiconsIcon
-            aria-hidden="true"
-            className="size-[18px]"
-            icon={PinIcon}
-            strokeWidth={1.8}
-          />
-          <span className="flex-1">Fijar</span>
-          <span className="text-[0.65rem] text-muted-foreground">
-            Próximamente
-          </span>
-        </DropdownMenuItem>
-        <DropdownMenuItem className="min-h-9" disabled>
-          <HugeiconsIcon
-            aria-hidden="true"
-            className="size-[18px]"
-            icon={Share01Icon}
-            strokeWidth={1.8}
-          />
-          <span className="flex-1">Compartir</span>
-          <span className="text-[0.65rem] text-muted-foreground">
-            Próximamente
-          </span>
-        </DropdownMenuItem>
+        {ACCIONES_PROXIMAS.map((accion) => (
+          <DropdownMenuItem className="min-h-9" disabled key={accion.etiqueta}>
+            <HugeiconsIcon
+              aria-hidden="true"
+              className="size-[18px]"
+              icon={accion.icono}
+              strokeWidth={1.8}
+            />
+            <span className="flex-1">{accion.etiqueta}</span>
+            <span className="text-[0.65rem] text-muted-foreground">
+              Próximamente
+            </span>
+          </DropdownMenuItem>
+        ))}
         <DropdownMenuSeparator />
         <form action={archivarConversacion} className="w-full">
           <input name="id" type="hidden" value={id} />
