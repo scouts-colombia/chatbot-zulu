@@ -126,6 +126,7 @@ async function ContenidoConversacion({
         borradorTransferenciaId={borradorTransferenciaId}
         conversacionActivaId={conversacion.id}
         conversaciones={listado.conversaciones}
+        correo={perfil?.email ?? user.email ?? ""}
         errorConversaciones={listado.error}
         esAdmin={perfil?.role === "admin"}
         nombre={perfil?.nombre ?? perfil?.email ?? user.email ?? ""}

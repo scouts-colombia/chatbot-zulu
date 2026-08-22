@@ -8,7 +8,7 @@ import {
   URL_ORGANIZACION,
   URL_SITIO,
 } from "@/lib/seo";
-import { futuraStd } from "./futura";
+import { albertSans } from "./fuentes";
 
 import "./globals.css";
 
@@ -98,7 +98,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html className={futuraStd.variable} lang="es-CO">
+    <html
+      className={`${albertSans.variable} ${albertSans.className}`}
+      lang="es-CO"
+    >
       <body className="antialiased">
         {children}
         <InstalarPwa />

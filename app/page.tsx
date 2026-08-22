@@ -286,6 +286,7 @@ async function ContenidoPrincipal({
         avisoArchivar={aviso === "archivar"}
         borradorTransferenciaId={borradorTransferenciaId}
         conversaciones={listado.conversaciones}
+        correo={perfil?.email ?? user.email ?? ""}
         errorConversaciones={listado.error}
         esAdmin={perfil?.role === "admin"}
         nombre={nombreVisible}
